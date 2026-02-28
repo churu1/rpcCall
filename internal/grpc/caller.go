@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
@@ -17,6 +19,19 @@ import (
 
 	"rpccall/internal/models"
 )
+
+var jsonMarshaler = &jsonpb.Marshaler{
+	EmitDefaults: true,
+	Indent:       "  ",
+}
+
+func marshalDynamicMessage(msg *dynamic.Message) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := jsonMarshaler.Marshal(&buf, msg); err != nil {
+		return msg.MarshalJSONIndent()
+	}
+	return buf.Bytes(), nil
+}
 
 type Caller struct {
 	parser     *ProtoParser
@@ -168,7 +183,7 @@ func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, erro
 		}, nil
 	}
 
-	respJSON, marshalErr := resp.(*dynamic.Message).MarshalJSONIndent()
+	respJSON, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
 	if marshalErr != nil {
 		return nil, fmt.Errorf("failed to marshal response: %w", marshalErr)
 	}
@@ -246,7 +261,7 @@ func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(strin
 				})
 				return
 			}
-			jsonBytes, marshalErr := resp.(*dynamic.Message).MarshalJSONIndent()
+			jsonBytes, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
 			if marshalErr != nil {
 				onMessage(fmt.Sprintf(`{"error":"marshal failed: %s"}`, marshalErr.Error()))
 				continue
@@ -332,7 +347,7 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 		}, nil
 	}
 
-	respJSON, marshalErr := resp.(*dynamic.Message).MarshalJSONIndent()
+	respJSON, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
 	if marshalErr != nil {
 		return nil, fmt.Errorf("failed to marshal response: %w", marshalErr)
 	}
@@ -420,7 +435,7 @@ func (c *Caller) InvokeBidiStream(req models.GrpcRequest, onMessage func(string)
 				})
 				return
 			}
-			jsonBytes, marshalErr := resp.(*dynamic.Message).MarshalJSONIndent()
+			jsonBytes, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
 			if marshalErr != nil {
 				onMessage(fmt.Sprintf(`{"error":"marshal failed: %s"}`, marshalErr.Error()))
 				continue
