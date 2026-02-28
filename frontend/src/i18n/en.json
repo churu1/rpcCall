@@ -27,7 +27,8 @@
     "clientStream": "CLIENT STREAM",
     "bidiStream": "BIDI STREAM",
     "placeholder": "localhost:50051",
-    "clickToSave": ", click to save current address"
+    "clickToSave": ", click to save current address",
+    "timeout": "Request timeout (seconds)"
   },
   "panels": {
     "requestBody": "Request Body",
@@ -89,7 +90,12 @@
   "history": {
     "title": "HISTORY",
     "clear": "Clear History",
-    "noHistory": "No history records"
+    "noHistory": "No history records",
+    "compare": "Compare",
+    "selectToCompare": "⌘+Click one more to compare",
+    "diff": "Request Diff",
+    "request": "Request Body",
+    "response": "Response Body"
   },
   "command": {
     "placeholder": "Type a command or search methods...",
@@ -203,6 +209,8 @@
     "delay": "Delay",
     "ms": "ms",
     "addRule": "Add Rule",
+    "responseBody": "Response Body",
+    "responseBodyPlaceholder": "{\"message\": \"mock response\"}",
     "stopServer": "Stop Server",
     "startServer": "Start Server"
   },
@@ -241,6 +249,10 @@
     "running": "Running...",
     "runChain": "Run Chain",
     "results": "Results",
-    "empty": "(empty)"
+    "empty": "(empty)",
+    "selectService": "-- Select Service --",
+    "selectMethod": "-- Select Method --",
+    "manualInput": "Manual",
+    "selectMode": "Select"
   }
 }

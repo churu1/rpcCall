@@ -45,6 +45,7 @@ export interface Tab {
   certPath: string;
   keyPath: string;
   caPath: string;
+  timeoutSec: number;
   timing: TimingDetail | null;
 }
 
@@ -89,6 +90,7 @@ function createTab(method?: ServiceMethod): Tab {
     certPath: "",
     keyPath: "",
     caPath: "",
+    timeoutSec: 30,
     timing: null,
   };
 }

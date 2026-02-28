@@ -292,6 +292,31 @@ export function AddressBar() {
         )}
       </div>
 
+      <div
+        className="flex items-center shrink-0 rounded-md focus-within:ring-1 focus-within:ring-[var(--color-ring)]"
+        title={t("addressBar.timeout")}
+      >
+        <input
+          type="text"
+          inputMode="numeric"
+          value={tab.timeoutSec}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^0-9]/g, "");
+            updateTab(tab.id, { timeoutSec: raw === "" ? (0 as any) : Number(raw) });
+          }}
+          onBlur={() => {
+            const v = Number(tab.timeoutSec);
+            if (!v || v < 1 || v > 3600) {
+              updateTab(tab.id, { timeoutSec: !v || v < 1 ? 30 : 3600 });
+            }
+          }}
+          className="w-10 bg-[var(--color-secondary)] text-xs text-center px-1 py-1.5 rounded-l-md border border-r-0 border-[var(--color-input)] focus:outline-none text-[var(--color-foreground)]"
+        />
+        <span className="text-xs text-[var(--color-muted-foreground)] bg-[var(--color-secondary)] border border-l-0 border-[var(--color-input)] px-1.5 py-[6px] rounded-r-md select-none">
+          s
+        </span>
+      </div>
+
       <button
         className={cn(
           "flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0",

@@ -13,11 +13,20 @@ import (
 )
 
 type MockRule struct {
-	ServiceName string `json:"serviceName"`
-	MethodName  string `json:"methodName"`
-	StatusCode  string `json:"statusCode"`
-	DelayMs     int    `json:"delayMs"`
+	ServiceName  string `json:"serviceName"`
+	MethodName   string `json:"methodName"`
+	StatusCode   string `json:"statusCode"`
+	DelayMs      int    `json:"delayMs"`
+	ResponseBody string `json:"responseBody"`
 }
+
+type rawBytes []byte
+
+func (r rawBytes) Marshal() ([]byte, error)   { return r, nil }
+func (r rawBytes) Unmarshal(b []byte) error    { return nil }
+func (r rawBytes) ProtoMessage()               {}
+func (r rawBytes) Reset()                      {}
+func (r rawBytes) String() string              { return string(r) }
 
 type MockServer struct {
 	mu       sync.Mutex
@@ -162,6 +171,12 @@ func (m *MockServer) unknownHandler(srv interface{}, stream grpc.ServerStream) e
 
 	if rule.StatusCode != "" && rule.StatusCode != "OK" {
 		return status.Errorf(parseGrpcCode(rule.StatusCode), "mock error for %s", fullMethod)
+	}
+
+	if rule.ResponseBody != "" {
+		if err := stream.SendMsg(rawBytes(rule.ResponseBody)); err != nil {
+			return status.Errorf(codes.Internal, "failed to send mock response: %v", err)
+		}
 	}
 
 	return nil

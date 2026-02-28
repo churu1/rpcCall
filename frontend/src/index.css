@@ -129,3 +129,11 @@ body {
 .json-editor-pre {
   min-height: 100%;
 }
+
+input[type="text"]::-webkit-contacts-auto-fill-button,
+input[type="text"]::-webkit-credentials-auto-fill-button,
+input:not([type="number"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])::-webkit-textfield-decoration-container {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

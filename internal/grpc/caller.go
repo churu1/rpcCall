@@ -81,6 +81,13 @@ func dialWithConfig(address string, req models.GrpcRequest) (*grpc.ClientConn, e
 	return conn, nil
 }
 
+func getTimeout(req models.GrpcRequest) time.Duration {
+	if req.TimeoutSec > 0 {
+		return time.Duration(req.TimeoutSec) * time.Second
+	}
+	return 30 * time.Second
+}
+
 func buildOutgoingMetadata(entries []models.MetadataEntry) metadata.MD {
 	md := metadata.MD{}
 	for _, e := range entries {
@@ -126,7 +133,7 @@ func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, erro
 	if len(req.Metadata) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, buildOutgoingMetadata(req.Metadata))
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, getTimeout(req))
 	defer cancel()
 
 	stub := grpcdynamic.NewStub(conn)
@@ -196,6 +203,11 @@ func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(strin
 	ctx := context.Background()
 	if len(req.Metadata) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, buildOutgoingMetadata(req.Metadata))
+	}
+	if req.TimeoutSec > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, getTimeout(req))
+		_ = cancel
 	}
 
 	stub := grpcdynamic.NewStub(conn)
@@ -273,7 +285,7 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 	if len(req.Metadata) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, buildOutgoingMetadata(req.Metadata))
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, getTimeout(req))
 	defer cancel()
 
 	stub := grpcdynamic.NewStub(conn)
@@ -349,6 +361,11 @@ func (c *Caller) InvokeBidiStream(req models.GrpcRequest, onMessage func(string)
 	ctx := context.Background()
 	if len(req.Metadata) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, buildOutgoingMetadata(req.Metadata))
+	}
+	if req.TimeoutSec > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, getTimeout(req))
+		_ = cancel
 	}
 
 	stub := grpcdynamic.NewStub(conn)

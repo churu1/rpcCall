@@ -37,6 +37,7 @@ export function useGrpc() {
       certPath: tab.certPath,
       keyPath: tab.keyPath,
       caPath: tab.caPath,
+      timeoutSec: tab.timeoutSec,
     };
 
     try {

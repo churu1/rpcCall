@@ -7,14 +7,16 @@ export function TabBar() {
   const { tabs, activeTabId, setActiveTab, removeTab, addTab, reorderTabs } = useAppStore();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
   const dragCounterRef = useRef(0);
 
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     setDragIndex(index);
+    setJustDroppedId(null);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(index));
     const el = e.currentTarget as HTMLElement;
-    el.style.opacity = "0.5";
+    el.style.opacity = "0.4";
   }, []);
 
   const handleDragEnd = useCallback((e: React.DragEvent) => {
@@ -47,13 +49,18 @@ export function TabBar() {
       e.preventDefault();
       const fromIndex = Number(e.dataTransfer.getData("text/plain"));
       if (!isNaN(fromIndex) && fromIndex !== toIndex) {
+        const movedTab = tabs[fromIndex];
         reorderTabs(fromIndex, toIndex);
+        if (movedTab) {
+          setJustDroppedId(movedTab.id);
+          setTimeout(() => setJustDroppedId(null), 500);
+        }
       }
       setDragIndex(null);
       setDragOverIndex(null);
       dragCounterRef.current = 0;
     },
-    [reorderTabs]
+    [reorderTabs, tabs]
   );
 
   return (
@@ -70,15 +77,20 @@ export function TabBar() {
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
             className={cn(
-              "flex items-center gap-1.5 px-3 h-9 border-r cursor-pointer text-xs shrink-0 max-w-[200px] group transition-all",
+              "flex items-center gap-1.5 px-3 h-9 border-r cursor-pointer text-xs shrink-0 max-w-[200px] group transition-all duration-200 relative",
               tab.id === activeTabId
                 ? "bg-[var(--color-background)] text-[var(--color-foreground)]"
                 : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-secondary)]",
-              dragOverIndex === index && dragIndex !== index && "border-l-2 border-l-[var(--color-primary)]"
+              dragIndex !== null && dragIndex !== index && "transition-transform",
+              dragOverIndex === index && dragIndex !== index && "bg-[var(--color-primary)]/5",
+              justDroppedId === tab.id && "bg-[var(--color-primary)]/10"
             )}
             onClick={() => setActiveTab(tab.id)}
             title={tab.method ? `${tab.method.serviceName}/${tab.method.methodName}` : tab.title}
           >
+            {dragOverIndex === index && dragIndex !== null && dragIndex !== index && (
+              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-[var(--color-primary)] rounded-full" />
+            )}
             <span className="truncate">{tab.title}</span>
             <button
               className="opacity-0 group-hover:opacity-100 hover:bg-[var(--color-muted)] rounded p-0.5 transition-opacity"

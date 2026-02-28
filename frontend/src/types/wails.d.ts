@@ -14,6 +14,7 @@ declare interface GrpcRequest {
   certPath: string;
   keyPath: string;
   caPath: string;
+  timeoutSec: number;
 }
 
 declare interface TimingDetail {
@@ -124,6 +125,7 @@ declare interface MockRule {
   methodName: string;
   statusCode: string;
   delayMs: number;
+  responseBody: string;
 }
 
 declare interface Environment {

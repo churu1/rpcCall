@@ -27,7 +27,8 @@
     "clientStream": "客户端流",
     "bidiStream": "双向流",
     "placeholder": "localhost:50051",
-    "clickToSave": "，点击保存当前地址"
+    "clickToSave": "，点击保存当前地址",
+    "timeout": "请求超时（秒）"
   },
   "panels": {
     "requestBody": "请求体",
@@ -89,7 +90,12 @@
   "history": {
     "title": "历史记录",
     "clear": "清空历史",
-    "noHistory": "暂无历史记录"
+    "noHistory": "暂无历史记录",
+    "compare": "对比",
+    "selectToCompare": "⌘+点击再选一条进行对比",
+    "diff": "请求对比",
+    "request": "请求体",
+    "response": "响应体"
   },
   "command": {
     "placeholder": "输入命令或搜索方法...",
@@ -203,6 +209,8 @@
     "delay": "延迟",
     "ms": "ms",
     "addRule": "添加规则",
+    "responseBody": "响应体",
+    "responseBodyPlaceholder": "{\"message\": \"mock response\"}",
     "stopServer": "停止服务",
     "startServer": "启动服务"
   },
@@ -241,6 +249,10 @@
     "running": "执行中...",
     "runChain": "执行链式调用",
     "results": "结果",
-    "empty": "（空）"
+    "empty": "（空）",
+    "selectService": "-- 选择服务 --",
+    "selectMethod": "-- 选择方法 --",
+    "manualInput": "手动输入",
+    "selectMode": "下拉选择"
   }
 }

@@ -5,7 +5,7 @@ import { Plus, Trash2, Play, Square } from "lucide-react";
 export function MockPanel() {
   const { t } = useTranslation();
   const [port, setPort] = useState(50051);
-  const [rules, setRules] = useState<MockRule[]>([{ serviceName: "", methodName: "", statusCode: "OK", delayMs: 0 }]);
+  const [rules, setRules] = useState<MockRule[]>([{ serviceName: "", methodName: "", statusCode: "OK", delayMs: 0, responseBody: "" }]);
   const [running, setRunning] = useState(false);
   const [serverPort, setServerPort] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export function MockPanel() {
 
   useEffect(() => { checkStatus(); }, [checkStatus]);
 
-  const addRule = () => setRules([...rules, { serviceName: "", methodName: "", statusCode: "OK", delayMs: 0 }]);
+  const addRule = () => setRules([...rules, { serviceName: "", methodName: "", statusCode: "OK", delayMs: 0, responseBody: "" }]);
   const removeRule = (i: number) => setRules(rules.filter((_, idx) => idx !== i));
   const updateRule = (i: number, updates: Partial<MockRule>) => setRules(rules.map((r, idx) => (idx === i ? { ...r, ...updates } : r)));
 
@@ -127,6 +127,13 @@ export function MockPanel() {
                   <span className="text-[10px] text-[var(--color-muted-foreground)]">ms</span>
                 </div>
               </div>
+              <textarea
+                value={rule.responseBody}
+                onChange={(e) => updateRule(i, { responseBody: e.target.value })}
+                placeholder={t("mock.responseBodyPlaceholder")}
+                className="w-full bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px] font-mono resize-none h-14"
+                spellCheck={false}
+              />
             </div>
           ))}
 

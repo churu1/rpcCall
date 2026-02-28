@@ -44,6 +44,7 @@ type GrpcRequest struct {
 	CertPath    string          `json:"certPath"`
 	KeyPath     string          `json:"keyPath"`
 	CaPath      string          `json:"caPath"`
+	TimeoutSec  int             `json:"timeoutSec"`
 }
 
 type TimingDetail struct {
