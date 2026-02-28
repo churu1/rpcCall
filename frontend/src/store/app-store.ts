@@ -2,6 +2,11 @@ import { create } from "zustand";
 
 export type MethodType = "unary" | "server_streaming" | "client_streaming" | "bidi_streaming";
 
+export type TabType = "grpc" | "http";
+
+export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
+export type HttpMethod = (typeof HTTP_METHODS)[number];
+
 export interface ServiceMethod {
   serviceName: string;
   methodName: string;
@@ -31,6 +36,7 @@ export interface MetadataEntry {
 export interface Tab {
   id: string;
   title: string;
+  tabType: TabType;
   address: string;
   method: ServiceMethod | null;
   requestBody: string;
@@ -47,6 +53,10 @@ export interface Tab {
   caPath: string;
   timeoutSec: number;
   timing: TimingDetail | null;
+  // HTTP tab only
+  httpMethod: HttpMethod;
+  httpUrl: string;
+  httpHeaders: MetadataEntry[];
 }
 
 interface AppState {
@@ -59,7 +69,7 @@ interface AppState {
   removeProtoFile: (path: string) => void;
   clearProtoFiles: () => void;
 
-  addTab: (method?: ServiceMethod) => string;
+  addTab: (method?: ServiceMethod, tabType?: TabType) => string;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
@@ -71,11 +81,13 @@ interface AppState {
 
 let tabCounter = 0;
 
-function createTab(method?: ServiceMethod): Tab {
+function createTab(method?: ServiceMethod, tabType: TabType = "grpc"): Tab {
   tabCounter++;
+  const isHttp = tabType === "http";
   return {
     id: `tab-${tabCounter}`,
-    title: method ? `${method.serviceName}/${method.methodName}` : "New Request",
+    title: isHttp ? "HTTP Request" : method ? `${method.serviceName}/${method.methodName}` : "New Request",
+    tabType,
     address: "localhost:50051",
     method: method ?? null,
     requestBody: "{\n  \n}",
@@ -92,6 +104,9 @@ function createTab(method?: ServiceMethod): Tab {
     caPath: "",
     timeoutSec: 30,
     timing: null,
+    httpMethod: "GET",
+    httpUrl: "https://api.example.com",
+    httpHeaders: [],
   };
 }
 
@@ -119,8 +134,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearProtoFiles: () => set({ protoFiles: [] }),
 
-  addTab: (method) => {
-    const tab = createTab(method);
+  addTab: (method, tabType = "grpc") => {
+    const tab = createTab(method, tabType);
     set((state) => ({
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,
@@ -132,7 +147,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const newTabs = state.tabs.filter((t) => t.id !== id);
       if (newTabs.length === 0) {
-        const tab = createTab();
+        const tab = createTab(undefined, "grpc");
         return { tabs: [tab], activeTabId: tab.id };
       }
       const newActiveId =

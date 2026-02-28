@@ -9,6 +9,11 @@
   "tabs": {
     "newRequest": "新建请求"
   },
+  "http": {
+    "urlPlaceholder": "https://api.example.com",
+    "newRequest": "新建 HTTP 请求",
+    "addHeader": "添加请求头"
+  },
   "addressBar": {
     "send": "发送",
     "sending": "发送中...",
@@ -100,6 +105,7 @@
   "command": {
     "placeholder": "输入命令或搜索方法...",
     "newTab": "新建 gRPC 标签页",
+    "newHttpTab": "新建 HTTP 请求",
     "invoke": "调用",
     "importFile": "导入 Proto 文件",
     "importDir": "导入 Proto 目录",

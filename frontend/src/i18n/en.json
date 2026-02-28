@@ -9,6 +9,11 @@
   "tabs": {
     "newRequest": "New Request"
   },
+  "http": {
+    "urlPlaceholder": "https://api.example.com",
+    "newRequest": "New HTTP Request",
+    "addHeader": "Add header"
+  },
   "addressBar": {
     "send": "Send",
     "sending": "Sending...",
@@ -100,6 +105,7 @@
   "command": {
     "placeholder": "Type a command or search methods...",
     "newTab": "New gRPC Tab",
+    "newHttpTab": "New HTTP Request",
     "invoke": "Invoke",
     "importFile": "Import Proto Files",
     "importDir": "Import Proto Directory",

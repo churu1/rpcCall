@@ -41,6 +41,23 @@ declare interface GrpcResponse {
   timing?: TimingDetail;
 }
 
+declare interface HttpRequest {
+  method: string;
+  url: string;
+  headers: { key: string; value: string }[];
+  body: string;
+  timeoutSec: number;
+}
+
+declare interface HttpResponse {
+  statusCode: number;
+  status: string;
+  headers: { key: string; value: string }[];
+  body: string;
+  elapsedMs: number;
+  error?: string;
+}
+
 declare interface BenchmarkVariable {
   name: string;
   type: 'sequence' | 'random_int' | 'random_string' | 'list';
@@ -171,6 +188,7 @@ interface Window {
         InvokeClientStream: (req: GrpcRequest) => Promise<GrpcResponse>;
         InvokeServerStream: (req: GrpcRequest) => Promise<void>;
         InvokeBidiStream: (req: GrpcRequest) => Promise<void>;
+        InvokeHttp: (req: HttpRequest) => Promise<HttpResponse>;
         SelectCertFile: () => Promise<string>;
         GetHistory: (limit: number) => Promise<any[]>;
         GetHistoryDetail: (id: number) => Promise<any>;

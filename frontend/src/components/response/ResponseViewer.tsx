@@ -127,8 +127,13 @@ export function ResponseViewer() {
 
   if (!tab) return null;
 
+  const isHttp = tab.tabType === "http";
+  const responsePanels: readonly ("body" | "headers" | "trailers")[] = isHttp
+    ? ["body", "headers"]
+    : ["body", "headers", "trailers"];
+
   const statusColor = tab.statusCode
-    ? tab.statusCode === "OK"
+    ? tab.statusCode === "OK" || (isHttp && String(tab.statusCode).startsWith("2"))
       ? "text-[var(--color-method-unary)]"
       : "text-[var(--color-destructive)]"
     : "";
@@ -137,7 +142,7 @@ export function ResponseViewer() {
     <div className="flex flex-col h-full" ref={containerRef} tabIndex={-1}>
       <div className="flex items-center justify-between border-b">
         <div className="flex items-center">
-          {(["body", "headers", "trailers"] as const).map((panel) => (
+          {responsePanels.map((panel) => (
             <button
               key={panel}
               className={cn(
@@ -157,7 +162,7 @@ export function ResponseViewer() {
           ))}
         </div>
         <div className="flex items-center gap-2 px-3 text-xs">
-          {tab.statusCode && tab.statusCode !== "OK" && tab.method && (
+          {tab.statusCode && tab.statusCode !== "OK" && !isHttp && tab.method && (
             <button
               onClick={handleAIDiagnose}
               disabled={aiLoading}

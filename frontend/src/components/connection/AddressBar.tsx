@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useAppStore, type MethodType } from "@/store/app-store";
+import { useAppStore, type MethodType, HTTP_METHODS } from "@/store/app-store";
 import { useGrpc } from "@/hooks/useGrpc";
+import { useHttp } from "@/hooks/useHttp";
 import { cn } from "@/lib/utils";
 import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save } from "lucide-react";
 
@@ -29,8 +30,11 @@ const methodTypeI18nKeys: Record<MethodType, string> = {
 export function AddressBar() {
   const { t } = useTranslation();
   const { activeTabId, tabs, updateTab } = useAppStore();
-  const { send } = useGrpc();
+  const { send: sendGrpc } = useGrpc();
+  const { send: sendHttp } = useHttp();
   const tab = tabs.find((tabItem) => tabItem.id === activeTabId);
+  const isHttp = tab?.tabType === "http";
+  const send = isHttp ? sendHttp : sendGrpc;
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
@@ -56,7 +60,10 @@ export function AddressBar() {
 
   useEffect(() => {
     const onInvoke = () => {
-      if (tab?.method && !tab.isLoading) send();
+      if (!tab?.isLoading) {
+        if (isHttp && tab.httpUrl?.trim()) send();
+        else if (!isHttp && tab?.method) send();
+      }
     };
     document.addEventListener("rpccall:invoke", onInvoke);
     return () => document.removeEventListener("rpccall:invoke", onInvoke);
@@ -84,11 +91,14 @@ export function AddressBar() {
   const methodColor = methodType ? methodTypeColors[methodType] : null;
   const methodLabel = methodType ? t(methodTypeI18nKeys[methodType]) : null;
 
+  const canSend = isHttp ? tab.httpUrl?.trim() : tab.method;
+
   const handleSaveAddress = async () => {
-    if (!tab.address.trim()) return;
-    const name = saveName.trim() || tab.address;
+    const addr = isHttp ? tab.httpUrl : tab.address;
+    if (!addr?.trim()) return;
+    const name = saveName.trim() || addr;
     try {
-      await window.go.main.App.SaveAddress(name, tab.address);
+      await window.go.main.App.SaveAddress(name, addr);
       await loadAddresses();
       setShowSaveInput(false);
       setSaveName("");
@@ -96,7 +106,11 @@ export function AddressBar() {
   };
 
   const handleSelectAddress = (addr: SavedAddress) => {
-    updateTab(tab.id, { address: addr.address });
+    if (isHttp) {
+      updateTab(tab.id, { httpUrl: addr.address });
+    } else {
+      updateTab(tab.id, { address: addr.address });
+    }
     setShowDropdown(false);
   };
 
@@ -132,7 +146,17 @@ export function AddressBar() {
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b">
-      {methodLabel && (
+      {isHttp ? (
+        <select
+          value={tab.httpMethod}
+          onChange={(e) => updateTab(tab.id, { httpMethod: e.target.value as typeof tab.httpMethod })}
+          className="bg-[var(--color-secondary)] text-sm font-mono font-medium px-2 py-1.5 rounded-l-md border border-r-0 border-[var(--color-input)] focus:outline-none text-[var(--color-foreground)] shrink-0"
+        >
+          {HTTP_METHODS.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      ) : methodLabel ? (
         <span
           className={cn(
             "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--color-secondary)] shrink-0",
@@ -141,30 +165,35 @@ export function AddressBar() {
         >
           {methodLabel}
         </span>
-      )}
+      ) : null}
 
       <div className="relative flex-1" ref={dropdownRef}>
         <div className="flex items-center rounded-md focus-within:ring-1 focus-within:ring-[var(--color-ring)]">
           <input
             type="text"
-            value={tab.address}
-            onChange={(e) => updateTab(tab.id, { address: e.target.value })}
-            placeholder={t("addressBar.placeholder")}
-            className="flex-1 bg-[var(--color-secondary)] text-sm px-3 py-1.5 rounded-l-md border border-r-0 border-[var(--color-input)] focus:outline-none text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]"
+            value={isHttp ? tab.httpUrl : tab.address}
+            onChange={(e) => updateTab(tab.id, isHttp ? { httpUrl: e.target.value } : { address: e.target.value })}
+            placeholder={isHttp ? t("http.urlPlaceholder") : t("addressBar.placeholder")}
+            className={cn(
+              "flex-1 bg-[var(--color-secondary)] text-sm px-3 py-1.5 border border-[var(--color-input)] focus:outline-none text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]",
+              isHttp ? "rounded-md" : "rounded-l-md border-r-0"
+            )}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && tab.method && !tab.isLoading) send();
+              if (e.key === "Enter" && canSend && !tab.isLoading) send();
             }}
           />
-          <button
-            onClick={() => {
-              if (!showDropdown) loadAddresses();
-              setShowDropdown(!showDropdown);
-            }}
-            className="px-1.5 py-1.5 border border-l-0 border-[var(--color-input)] bg-[var(--color-secondary)] rounded-r-md hover:bg-[var(--color-accent)] transition-colors h-[34px] flex items-center"
-            title={t("addressBar.selectAddress")}
-          >
-            <ChevronDown size={14} className={cn("text-[var(--color-muted-foreground)] transition-transform", showDropdown && "rotate-180")} />
-          </button>
+          {!isHttp && (
+            <button
+              onClick={() => {
+                if (!showDropdown) loadAddresses();
+                setShowDropdown(!showDropdown);
+              }}
+              className="px-1.5 py-1.5 border border-l-0 border-[var(--color-input)] bg-[var(--color-secondary)] rounded-r-md hover:bg-[var(--color-accent)] transition-colors h-[34px] flex items-center"
+              title={t("addressBar.selectAddress")}
+            >
+              <ChevronDown size={14} className={cn("text-[var(--color-muted-foreground)] transition-transform", showDropdown && "rotate-180")} />
+            </button>
+          )}
           <button
             onClick={() => document.dispatchEvent(new CustomEvent("rpccall:save-request"))}
             className="ml-1 p-1.5 rounded-md hover:bg-[var(--color-accent)] transition-colors text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
@@ -175,7 +204,8 @@ export function AddressBar() {
           <div className="relative" ref={saveInputRef}>
             <button
               onClick={() => {
-                if (!tab.address.trim()) return;
+                const addr = isHttp ? tab.httpUrl : tab.address;
+                if (!addr?.trim()) return;
                 setSaveName("");
                 setShowSaveInput(!showSaveInput);
               }}
@@ -187,7 +217,7 @@ export function AddressBar() {
             {showSaveInput && (
               <div className="absolute top-full right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg z-50 p-2 w-[260px]">
                 <div className="text-xs text-[var(--color-muted-foreground)] mb-1.5">{t("addressBar.setAlias")}</div>
-                <div className="text-[10px] font-mono text-[var(--color-muted-foreground)] mb-2 truncate">{tab.address}</div>
+                <div className="text-[10px] font-mono text-[var(--color-muted-foreground)] mb-2 truncate">{isHttp ? tab.httpUrl : tab.address}</div>
                 <input
                   autoFocus
                   value={saveName}
@@ -230,7 +260,7 @@ export function AddressBar() {
                   key={addr.id}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--color-accent)] transition-colors group",
-                    addr.address === tab.address && "bg-[var(--color-accent)]/50"
+                    (isHttp ? addr.address === tab.httpUrl : addr.address === tab.address) && "bg-[var(--color-accent)]/50"
                   )}
                   onClick={() => handleSelectAddress(addr)}
                 >
@@ -323,9 +353,9 @@ export function AddressBar() {
           tab.isLoading
             ? "bg-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/80 text-white"
             : "bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/80 text-white",
-          !tab.method && "opacity-50 cursor-not-allowed"
+          !canSend && "opacity-50 cursor-not-allowed"
         )}
-        disabled={!tab.method || tab.isLoading}
+        disabled={!canSend || tab.isLoading}
         onClick={send}
       >
         {tab.isLoading ? (

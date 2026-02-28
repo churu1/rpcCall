@@ -36,11 +36,14 @@ function entriesToJson(entries: MetadataEntry[]): string {
 function MetadataTable({
   entries,
   onChange,
+  addEntryLabel,
 }: {
   entries: MetadataEntry[];
   onChange: (entries: MetadataEntry[]) => void;
+  addEntryLabel?: string;
 }) {
   const { t } = useTranslation();
+  const label = addEntryLabel ?? t("metadata.addMetadata");
   const [jsonMode, setJsonMode] = useState(false);
   const [jsonText, setJsonText] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -204,7 +207,7 @@ function MetadataTable({
         onClick={addEntry}
         className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] py-1"
       >
-        <Plus size={12} /> {t("metadata.addMetadata")}
+        <Plus size={12} /> {label}
       </button>
     </div>
   );
@@ -302,14 +305,20 @@ export function RequestEditor() {
 
   if (!tab) return null;
 
-  const panels = [
-    { key: "body" as const, label: t("panels.requestBody") },
-    { key: "metadata" as const, label: `${t("panels.metadata")} (${tab.metadata.length})` },
-    { key: "tls" as const, label: tab.useTls ? t("panels.tls") + " ●" : t("panels.tls") },
-    { key: "benchmark" as const, label: t("panels.benchmark") },
-    { key: "chain" as const, label: t("panels.chain") },
-    { key: "mock" as const, label: t("panels.mock") },
-  ];
+  const isHttp = tab.tabType === "http";
+  const panels = isHttp
+    ? [
+        { key: "body" as const, label: t("panels.requestBody") },
+        { key: "metadata" as const, label: `${t("panels.headers")} (${tab.httpHeaders.length})` },
+      ]
+    : [
+        { key: "body" as const, label: t("panels.requestBody") },
+        { key: "metadata" as const, label: `${t("panels.metadata")} (${tab.metadata.length})` },
+        { key: "tls" as const, label: tab.useTls ? t("panels.tls") + " ●" : t("panels.tls") },
+        { key: "benchmark" as const, label: t("panels.benchmark") },
+        { key: "chain" as const, label: t("panels.chain") },
+        { key: "mock" as const, label: t("panels.mock") },
+      ];
 
   const handleFormat = () => {
     try {
@@ -384,7 +393,7 @@ export function RequestEditor() {
         </div>
         {(activePanel === "body" || activePanel === "metadata") && (
           <div className="flex items-center gap-0.5 pr-2 shrink-0 border-l pl-2">
-            {activePanel === "body" && tab.method && (
+            {activePanel === "body" && tab.method && !isHttp && (
               <button
                 onClick={handleAIGenerate}
                 disabled={aiLoading}
@@ -434,10 +443,18 @@ export function RequestEditor() {
             placeholder='{\n  "field": "value"\n}'
           />
         ) : activePanel === "metadata" ? (
-          <MetadataTable
-            entries={tab.metadata}
-            onChange={(metadata) => updateTab(tab.id, { metadata })}
-          />
+          isHttp ? (
+            <MetadataTable
+              entries={tab.httpHeaders}
+              onChange={(httpHeaders) => updateTab(tab.id, { httpHeaders })}
+              addEntryLabel={t("http.addHeader")}
+            />
+          ) : (
+            <MetadataTable
+              entries={tab.metadata}
+              onChange={(metadata) => updateTab(tab.id, { metadata })}
+            />
+          )
         ) : activePanel === "tls" ? (
           <TlsConfig />
         ) : activePanel === "chain" ? (

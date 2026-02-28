@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Globe } from "lucide-react";
 
 export function TabBar() {
+  const { t } = useTranslation();
   const { tabs, activeTabId, setActiveTab, removeTab, addTab, reorderTabs } = useAppStore();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -86,7 +88,7 @@ export function TabBar() {
               justDroppedId === tab.id && "bg-[var(--color-primary)]/10"
             )}
             onClick={() => setActiveTab(tab.id)}
-            title={tab.method ? `${tab.method.serviceName}/${tab.method.methodName}` : tab.title}
+            title={tab.tabType === "http" ? tab.httpUrl || tab.title : tab.method ? `${tab.method.serviceName}/${tab.method.methodName}` : tab.title}
           >
             {dragOverIndex === index && dragIndex !== null && dragIndex !== index && (
               <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-[var(--color-primary)] rounded-full" />
@@ -106,9 +108,17 @@ export function TabBar() {
       </div>
       <button
         className="flex items-center justify-center w-9 h-9 hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-        onClick={() => addTab()}
+        onClick={() => addTab(undefined, "grpc")}
+        title={t("tabs.newRequest")}
       >
         <Plus size={14} />
+      </button>
+      <button
+        className="flex items-center justify-center w-9 h-9 hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] border-l"
+        onClick={() => addTab(undefined, "http")}
+        title={t("http.newRequest")}
+      >
+        <Globe size={14} />
       </button>
     </div>
   );

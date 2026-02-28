@@ -94,7 +94,14 @@ export function CommandPalette() {
         category: "GRPC",
         icon: <Plus size={14} />,
         shortcut: "⌘ T",
-        action: () => { addTab(); close(); },
+        action: () => { addTab(undefined, "grpc"); close(); },
+      },
+      {
+        id: "new-http-tab",
+        label: t("command.newHttpTab"),
+        category: "HTTP",
+        icon: <Globe size={14} />,
+        action: () => { addTab(undefined, "http"); close(); },
       },
       {
         id: "invoke",

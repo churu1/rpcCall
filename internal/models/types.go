@@ -152,3 +152,24 @@ type ChainStepResult struct {
 	ElapsedMs  int64  `json:"elapsedMs"`
 	Error      string `json:"error,omitempty"`
 }
+
+// --- HTTP (Postman-like) ---
+
+// HttpRequest is the request payload for HTTP calls.
+type HttpRequest struct {
+	Method    string          `json:"method"`    // GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
+	URL       string          `json:"url"`       // full URL including scheme
+	Headers   []MetadataEntry `json:"headers"`
+	Body      string          `json:"body"`
+	TimeoutSec int            `json:"timeoutSec"`
+}
+
+// HttpResponse is the response from an HTTP call.
+type HttpResponse struct {
+	StatusCode int             `json:"statusCode"` // e.g. 200, 404
+	Status     string          `json:"status"`     // e.g. "200 OK"
+	Headers    []MetadataEntry `json:"headers"`
+	Body       string          `json:"body"`
+	ElapsedMs  int64           `json:"elapsedMs"`
+	Error      string          `json:"error,omitempty"`
+}

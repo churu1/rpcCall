@@ -16,6 +16,7 @@ import (
 	"rpccall/internal/ai"
 	grpclib "rpccall/internal/grpc"
 	"rpccall/internal/history"
+	"rpccall/internal/httpclient"
 	"rpccall/internal/logger"
 	"rpccall/internal/models"
 	"rpccall/internal/report"
@@ -277,6 +278,31 @@ func (a *App) InvokeBidiStream(req models.GrpcRequest) error {
 			runtime.EventsEmit(a.ctx, "stream:done", resp)
 		},
 	)
+}
+
+func (a *App) resolveEnvVariablesForHttp(req *models.HttpRequest) {
+	if a.history == nil {
+		return
+	}
+	env, _ := a.history.GetActiveEnvironment()
+	if env == nil || len(env.Variables) == 0 {
+		return
+	}
+	for k, v := range env.Variables {
+		placeholder := "{{" + k + "}}"
+		req.URL = strings.ReplaceAll(req.URL, placeholder, v)
+		req.Body = strings.ReplaceAll(req.Body, placeholder, v)
+		for i := range req.Headers {
+			req.Headers[i].Value = strings.ReplaceAll(req.Headers[i].Value, placeholder, v)
+		}
+	}
+}
+
+// InvokeHttp sends an HTTP request (GET, POST, etc.) and returns the response.
+func (a *App) InvokeHttp(req models.HttpRequest) (*models.HttpResponse, error) {
+	a.resolveEnvVariablesForHttp(&req)
+	logger.Info("InvokeHttp: %s %s", req.Method, req.URL)
+	return httpclient.Do(req)
 }
 
 func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error) {
