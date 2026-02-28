@@ -50,10 +50,11 @@ declare interface BenchmarkVariable {
 }
 
 declare interface BenchmarkConfig {
-  mode: 'count' | 'duration';
+  mode: 'count' | 'duration' | 'qps';
   concurrency: number;
   totalRequests: number;
   durationSec: number;
+  targetQps: number;
   rampUpEnabled: boolean;
   rampUpStepSec: number;
   rampUpStepAdd: number;

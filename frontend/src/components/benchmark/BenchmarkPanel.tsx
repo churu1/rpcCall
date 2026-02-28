@@ -14,6 +14,7 @@ function defaultConfig(): BenchmarkConfig {
     concurrency: 10,
     totalRequests: 1000,
     durationSec: 30,
+    targetQps: 100,
     rampUpEnabled: false,
     rampUpStepSec: 5,
     rampUpStepAdd: 2,
@@ -167,7 +168,7 @@ export function BenchmarkPanel() {
         <div className="flex items-center gap-3">
           <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.mode")}</label>
           <div className="flex gap-2">
-            {(["count", "duration"] as const).map((m) => (
+            {(["count", "duration", "qps"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setConfig((c) => ({ ...c, mode: m }))}
@@ -177,31 +178,31 @@ export function BenchmarkPanel() {
                     : "border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:border-[var(--color-muted-foreground)]"
                 }`}
               >
-                {m === "count" ? t("benchmark.byCount") : t("benchmark.byDuration")}
+                {m === "count" ? t("benchmark.byCount") : m === "duration" ? t("benchmark.byDuration") : t("benchmark.byQps")}
               </button>
             ))}
           </div>
         </div>
 
         {/* Concurrency */}
-        <div className="flex items-center gap-3">
-          <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.concurrency")}</label>
-          <input
-            type="number"
-            min={1}
-            max={10000}
-            value={config.concurrency}
-            onChange={(e) => setConfig((c) => ({ ...c, concurrency: Math.max(1, Number(e.target.value)) }))}
-            className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
-          />
-        </div>
+        {config.mode !== "qps" && (
+          <div className="flex items-center gap-3">
+            <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.concurrency")}</label>
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              value={config.concurrency}
+              onChange={(e) => setConfig((c) => ({ ...c, concurrency: Math.max(1, Number(e.target.value)) }))}
+              className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+            />
+          </div>
+        )}
 
-        {/* Count / Duration */}
-        <div className="flex items-center gap-3">
-          <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">
-            {config.mode === "count" ? t("benchmark.totalRequests") : t("benchmark.duration")}
-          </label>
-          {config.mode === "count" ? (
+        {/* Count / Duration / QPS */}
+        {config.mode === "count" && (
+          <div className="flex items-center gap-3">
+            <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.totalRequests")}</label>
             <input
               type="number"
               min={1}
@@ -209,7 +210,11 @@ export function BenchmarkPanel() {
               onChange={(e) => setConfig((c) => ({ ...c, totalRequests: Math.max(1, Number(e.target.value)) }))}
               className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
             />
-          ) : (
+          </div>
+        )}
+        {config.mode === "duration" && (
+          <div className="flex items-center gap-3">
+            <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.duration")}</label>
             <div className="flex items-center gap-1">
               <input
                 type="number"
@@ -220,8 +225,38 @@ export function BenchmarkPanel() {
               />
               <span className="text-[var(--color-muted-foreground)]">{t("benchmark.seconds")}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+        {config.mode === "qps" && (
+          <>
+            <div className="flex items-center gap-3">
+              <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.targetQps")}</label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  value={config.targetQps}
+                  onChange={(e) => setConfig((c) => ({ ...c, targetQps: Math.max(1, Number(e.target.value)) }))}
+                  className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                />
+                <span className="text-[var(--color-muted-foreground)]">req/s</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.duration")}</label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  value={config.durationSec}
+                  onChange={(e) => setConfig((c) => ({ ...c, durationSec: Math.max(1, Number(e.target.value)) }))}
+                  className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                />
+                <span className="text-[var(--color-muted-foreground)]">{t("benchmark.seconds")}</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Ramp-up */}
         <div className="flex flex-col gap-2 p-2 rounded border border-[var(--color-border)]">

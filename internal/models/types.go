@@ -82,10 +82,11 @@ type HistoryRecord struct {
 // --- Benchmark ---
 
 type BenchmarkConfig struct {
-	Mode          string              `json:"mode"`          // "count" or "duration"
+	Mode          string              `json:"mode"`          // "count", "duration", or "qps"
 	Concurrency   int                 `json:"concurrency"`
 	TotalRequests int                 `json:"totalRequests"` // mode=count
-	DurationSec   int                 `json:"durationSec"`   // mode=duration
+	DurationSec   int                 `json:"durationSec"`   // mode=duration or qps
+	TargetQPS     int                 `json:"targetQps"`     // mode=qps
 	RampUpEnabled bool                `json:"rampUpEnabled"`
 	RampUpStepSec int                 `json:"rampUpStepSec"`
 	RampUpStepAdd int                 `json:"rampUpStepAdd"`

@@ -38,7 +38,21 @@ func (c *Caller) RunBenchmark(
 		cfg.Concurrency = 1
 	}
 
-	conns, err := createConnPool(req, cfg.Concurrency)
+	if cfg.Mode == "qps" && cfg.TargetQPS > 0 {
+		minWorkers := cfg.TargetQPS
+		if minWorkers > 2000 {
+			minWorkers = 2000
+		}
+		if cfg.Concurrency < minWorkers {
+			cfg.Concurrency = minWorkers
+		}
+	}
+
+	connPoolSize := cfg.Concurrency
+	if connPoolSize > 50 {
+		connPoolSize = 50
+	}
+	conns, err := createConnPool(req, connPoolSize)
 	if err != nil {
 		return err
 	}
@@ -136,13 +150,75 @@ func (c *Caller) RunBenchmark(
 
 	var limiter func() bool
 
-	if cfg.Mode == "count" {
+	switch cfg.Mode {
+	case "count":
 		var dispatched atomic.Int64
 		total := int64(cfg.TotalRequests)
 		limiter = func() bool {
 			return dispatched.Add(1) <= total && ctx.Err() == nil
 		}
-	} else {
+	case "qps":
+		dur := time.Duration(cfg.DurationSec) * time.Second
+		if cfg.DurationSec <= 0 {
+			dur = 30 * time.Second
+		}
+		deadline := time.After(dur)
+		expired := make(chan struct{})
+		go func() {
+			select {
+			case <-deadline:
+				close(expired)
+			case <-ctx.Done():
+			}
+		}()
+
+		targetQPS := cfg.TargetQPS
+		if targetQPS <= 0 {
+			targetQPS = 100
+		}
+
+		// Batch token injection: inject tokens every 10ms window
+		batchInterval := 10 * time.Millisecond
+		tokensPerBatch := float64(targetQPS) * batchInterval.Seconds()
+		if tokensPerBatch < 1 {
+			tokensPerBatch = 1
+			batchInterval = time.Second / time.Duration(targetQPS)
+		}
+		tokens := make(chan struct{}, targetQPS*3)
+		go func() {
+			ticker := time.NewTicker(batchInterval)
+			defer ticker.Stop()
+			var carry float64
+			for {
+				select {
+				case <-ticker.C:
+					carry += tokensPerBatch
+					n := int(carry)
+					carry -= float64(n)
+					for i := 0; i < n; i++ {
+						select {
+						case tokens <- struct{}{}:
+						default:
+						}
+					}
+				case <-expired:
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+		limiter = func() bool {
+			select {
+			case <-expired:
+				return false
+			case <-ctx.Done():
+				return false
+			case <-tokens:
+				return true
+			}
+		}
+	default:
 		deadline := time.After(time.Duration(cfg.DurationSec) * time.Second)
 		expired := make(chan struct{})
 		go func() {
