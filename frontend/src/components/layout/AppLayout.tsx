@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { useAppStore } from "@/store/app-store";
 import { useThemeStore } from "@/store/theme-store";
 import { useTranslation } from "react-i18next";
-import { Sun, Moon, Keyboard, Languages, Sparkles } from "lucide-react";
+import { Sun, Moon, Keyboard, Languages, Sparkles, HelpCircle } from "lucide-react";
 import { TabBar } from "./TabBar";
 import { ServiceTree } from "@/components/service-tree/ServiceTree";
 import { AddressBar } from "@/components/connection/AddressBar";
@@ -16,6 +16,7 @@ import { CollectionPanel } from "@/components/collection/CollectionPanel";
 import { SaveRequestDialog } from "@/components/collection/SaveRequestDialog";
 import { ShortcutsPanel } from "@/components/shortcuts/ShortcutsPanel";
 import { AISettingsPanel } from "@/components/ai/AISettingsPanel";
+import { HelpPanel } from "@/components/help/HelpPanel";
 
 export function AppLayout() {
   const { sidebarWidth, setSidebarWidth } = useAppStore();
@@ -47,6 +48,7 @@ export function AppLayout() {
   const [showSaveRequest, setShowSaveRequest] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const toggleLang = useCallback(() => {
     const next = i18n.language === "zh" ? "en" : "zh";
@@ -78,6 +80,7 @@ export function AppLayout() {
       {showSaveRequest && <SaveRequestDialog onClose={() => setShowSaveRequest(false)} />}
       {showShortcuts && <ShortcutsPanel onClose={() => setShowShortcuts(false)} />}
       {showAISettings && <AISettingsPanel onClose={() => setShowAISettings(false)} />}
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
       {/* Drag region for macOS title bar */}
       <div
         className="h-8 bg-[var(--color-card)] flex items-center justify-center text-xs text-[var(--color-muted-foreground)] select-none relative"
@@ -95,6 +98,13 @@ export function AppLayout() {
             title={t("ai.settingsTitle")}
           >
             <Sparkles size={14} />
+          </button>
+          <button
+            className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            onClick={() => setShowHelp(true)}
+            title={t("help.title")}
+          >
+            <HelpCircle size={14} />
           </button>
           <button
             className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
