@@ -36,6 +36,7 @@ export function HistoryPanel() {
   const { addTab, updateTab } = useAppStore();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [collapsed, setCollapsed] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -53,6 +54,7 @@ export function HistoryPanel() {
   }, [loadHistory]);
 
   const handleReplay = async (entry: HistoryEntry) => {
+    setSelectedId(entry.id);
     try {
       const detail: HistoryDetail = await window.go.main.App.GetHistoryDetail(entry.id);
       if (!detail) return;
@@ -70,6 +72,11 @@ export function HistoryPanel() {
         address: detail.address,
         requestBody: detail.requestBody,
         metadata: detail.requestMetadata?.map((m) => ({ ...m, enabled: true })) ?? [],
+        responseBody: detail.responseBody ?? "",
+        responseMetadata: detail.responseHeaders?.map((m) => ({ ...m, enabled: true })) ?? [],
+        responseTrailers: detail.responseTrailers?.map((m) => ({ ...m, enabled: true })) ?? [],
+        statusCode: detail.statusCode || null,
+        elapsedMs: detail.elapsedMs || null,
       });
     } catch {
       // ignore
@@ -133,7 +140,12 @@ export function HistoryPanel() {
             entries.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--color-secondary)] cursor-pointer text-xs border-b border-[var(--color-border)]/50 group"
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs border-b border-[var(--color-border)]/50 group transition-colors duration-150",
+                  selectedId === entry.id
+                    ? "bg-[var(--color-primary)]/10 border-l-2 border-l-[var(--color-primary)] pl-2.5"
+                    : "hover:bg-[var(--color-secondary)]"
+                )}
                 onClick={() => handleReplay(entry)}
               >
                 {entry.statusCode === "OK" ? (

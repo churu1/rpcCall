@@ -63,7 +63,7 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const keyboardNavRef = useRef(false);
-  const { protoFiles, addTab } = useAppStore();
+  const { protoFiles, addTab, removeTab, activeTabId } = useAppStore();
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useTranslation();
 
@@ -346,6 +346,12 @@ export function CommandPalette() {
         return;
       }
 
+      if ((e.metaKey || e.ctrlKey) && e.key === "w") {
+        e.preventDefault();
+        if (activeTabId) removeTab(activeTabId);
+        return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
         document.dispatchEvent(new CustomEvent("rpccall:invoke"));
@@ -367,7 +373,7 @@ export function CommandPalette() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addTab]);
+  }, [addTab, removeTab, activeTabId]);
 
   useEffect(() => {
     if (open) {
