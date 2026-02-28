@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0f1117;
+  --color-foreground: #e4e4e7;
+  --color-card: #18181b;
+  --color-card-foreground: #e4e4e7;
+  --color-popover: #18181b;
+  --color-popover-foreground: #e4e4e7;
+  --color-primary: #6d28d9;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #e4e4e7;
+  --color-muted: #27272a;
+  --color-muted-foreground: #a1a1aa;
+  --color-accent: #27272a;
+  --color-accent-foreground: #e4e4e7;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #3f3f46;
+  --color-input: #3f3f46;
+  --color-ring: #6d28d9;
+  --color-sidebar: #18181b;
+  --color-sidebar-foreground: #a1a1aa;
+  --color-sidebar-active: #6d28d9;
+
+  --color-method-unary: #22c55e;
+  --color-method-server-stream: #3b82f6;
+  --color-method-client-stream: #f59e0b;
+  --color-method-bidi-stream: #ef4444;
+
+  --color-syntax-property: #93c5fd;
+  --color-syntax-string: #86efac;
+  --color-syntax-number: #fde68a;
+  --color-syntax-boolean: #c4b5fd;
+  --color-syntax-null: #fca5a5;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+
+  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+/* Disable text selection globally, re-enable only in content areas */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.selectable pre,
+.selectable code,
+.selectable td,
+.selectable span,
+textarea,
+input,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-muted-foreground);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-foreground);
+}
+
+/* Hide scrollbar for tab containers */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Prism JSON syntax highlighting */
+.token.property { color: var(--color-syntax-property); }
+.token.string { color: var(--color-syntax-string); }
+.token.number { color: var(--color-syntax-number); }
+.token.boolean { color: var(--color-syntax-boolean); }
+.token.null { color: var(--color-syntax-null); }
+.token.operator,
+.token.punctuation { color: var(--color-muted-foreground); }
+
+/* JSON Editor styles */
+.json-editor {
+  caret-color: var(--color-foreground);
+}
+.json-editor-textarea {
+  outline: none !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.json-editor-textarea::placeholder {
+  color: var(--color-muted-foreground) !important;
+  -webkit-text-fill-color: var(--color-muted-foreground) !important;
+}
+.json-editor-pre {
+  min-height: 100%;
+}

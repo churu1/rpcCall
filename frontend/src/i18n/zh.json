@@ -1,0 +1,246 @@
+{
+  "app": {
+    "title": "RpcCall"
+  },
+  "titlebar": {
+    "lightMode": "切换到浅色模式",
+    "darkMode": "切换到深色模式"
+  },
+  "tabs": {
+    "newRequest": "新建请求"
+  },
+  "addressBar": {
+    "send": "发送",
+    "sending": "发送中...",
+    "saveAddress": "保存当前地址",
+    "selectAddress": "选择已保存的地址",
+    "aliasPlaceholder": "例如：内网测试、线上环境",
+    "setAlias": "为地址设置别名",
+    "save": "保存",
+    "cancel": "取消",
+    "noAddresses": "暂无保存的地址",
+    "saveToCollection": "保存请求到集合",
+    "rename": "重命名",
+    "delete": "删除",
+    "unary": "一元调用",
+    "serverStream": "服务端流",
+    "clientStream": "客户端流",
+    "bidiStream": "双向流",
+    "placeholder": "localhost:50051",
+    "clickToSave": "，点击保存当前地址"
+  },
+  "panels": {
+    "requestBody": "请求体",
+    "metadata": "元数据",
+    "tls": "TLS",
+    "benchmark": "压测",
+    "chain": "链式调用",
+    "mock": "Mock",
+    "response": "响应",
+    "headers": "响应头",
+    "trailers": "尾部元数据"
+  },
+  "editor": {
+    "format": "格式化",
+    "minify": "压缩",
+    "placeholder": "{\n  \"field\": \"value\"\n}"
+  },
+  "response": {
+    "noResponse": "暂无响应，发送请求后在此查看结果。",
+    "tree": "树形",
+    "raw": "原始",
+    "noEntries": "暂无条目"
+  },
+  "metadata": {
+    "jsonFormat": "JSON 格式",
+    "invalidJson": "无效的 JSON 格式，需要 {\"key\": \"value\"} 格式",
+    "apply": "应用",
+    "addMetadata": "添加元数据"
+  },
+  "services": {
+    "title": "服务",
+    "importFile": "导入 Proto 文件",
+    "importDir": "导入 Proto 目录",
+    "reflection": "服务端反射",
+    "reload": "重新加载",
+    "clearAll": "清除全部",
+    "loading": "加载中...",
+    "noServices": "导入 .proto 文件或使用服务端反射开始"
+  },
+  "collections": {
+    "title": "收藏集合",
+    "newCollection": "新建集合",
+    "noCollections": "暂无集合",
+    "noRequests": "暂无保存的请求",
+    "loading": "加载中...",
+    "collectionName": "集合名称："
+  },
+  "environment": {
+    "noEnv": "无环境",
+    "manage": "管理环境",
+    "manageTitle": "管理环境",
+    "newEnv": "新建环境",
+    "name": "名称",
+    "variables": "变量",
+    "addVariable": "添加变量",
+    "selectOrCreate": "选择一个环境或创建新环境",
+    "vars": "个变量"
+  },
+  "history": {
+    "title": "历史记录",
+    "clear": "清空历史",
+    "noHistory": "暂无历史记录"
+  },
+  "command": {
+    "placeholder": "输入命令或搜索方法...",
+    "newTab": "新建 gRPC 标签页",
+    "invoke": "调用",
+    "importFile": "导入 Proto 文件",
+    "importDir": "导入 Proto 目录",
+    "reflection": "服务端反射",
+    "toggleTheme": "切换主题",
+    "reloadProtos": "重新加载所有 Proto",
+    "clearProtos": "清除所有 Proto",
+    "startBenchmark": "开始压测",
+    "stopBenchmark": "停止压测",
+    "selectEnv": "选择环境",
+    "manageEnvs": "管理环境",
+    "saveRequest": "保存请求到集合",
+    "showShortcuts": "显示快捷键",
+    "exportWorkspace": "导出工作台",
+    "importWorkspace": "导入工作台",
+    "noResults": "未找到匹配的命令或方法",
+    "navigate": "导航",
+    "select": "选择",
+    "close": "关闭"
+  },
+  "shortcuts": {
+    "title": "快捷键参考",
+    "general": "通用",
+    "commandPalette": "打开命令面板",
+    "newTab": "新建标签页",
+    "closeTab": "关闭当前标签页",
+    "sendRequest": "发送请求",
+    "proto": "Proto",
+    "reloadProtos": "重新加载所有 Proto",
+    "editing": "编辑",
+    "search": "搜索文本",
+    "indent": "插入缩进（两空格）",
+    "closeSearch": "关闭搜索 / 弹窗",
+    "navigation": "导航",
+    "navigateList": "上下浏览列表",
+    "selectItem": "选择当前项"
+  },
+  "benchmark": {
+    "selectMethod": "请先选择一个 gRPC 方法",
+    "mode": "模式",
+    "byCount": "按请求数",
+    "byDuration": "按持续时间",
+    "concurrency": "并发数",
+    "totalRequests": "总请求数",
+    "duration": "持续时间（秒）",
+    "rampUp": "阶梯加压",
+    "stepSec": "每阶梯秒数",
+    "stepAdd": "每阶梯增加并发",
+    "variables": "请求变量",
+    "start": "开始压测",
+    "stop": "停止压测",
+    "running": "运行中",
+    "summary": "汇总",
+    "latencyDist": "延迟分布",
+    "qpsTrend": "QPS / 延迟趋势",
+    "errorCodes": "错误码分布",
+    "exportJson": "导出 JSON",
+    "exportCsv": "导出 CSV",
+    "exportHtml": "导出 HTML",
+    "reset": "重新配置",
+    "history": "历史记录",
+    "seconds": "秒",
+    "every": "每",
+    "secIncrease": "秒增加",
+    "concurrencyUnit": "并发",
+    "min": "Min",
+    "p50": "P50",
+    "p90": "P90",
+    "p99": "P99",
+    "max": "Max"
+  },
+  "saveRequest": {
+    "title": "保存请求",
+    "requestName": "请求名称",
+    "collection": "集合",
+    "noCollections": "暂无集合",
+    "orCreateNew": "或创建新集合",
+    "newCollectionPlaceholder": "新集合名称",
+    "saving": "保存中...",
+    "save": "保存",
+    "placeholder": "我的请求"
+  },
+  "tls": {
+    "enableTls": "启用 TLS",
+    "certFile": "客户端证书",
+    "keyFile": "客户端密钥",
+    "caFile": "CA 证书",
+    "selectFile": "选择文件"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "close": "关闭"
+  },
+  "lang": {
+    "switch": "EN"
+  },
+  "mock": {
+    "title": "Mock gRPC 服务器",
+    "runningOn": "运行中，端口：",
+    "port": "端口",
+    "rules": "规则",
+    "ruleN": "规则 {{n}}",
+    "servicePlaceholder": "package.ServiceName",
+    "methodPlaceholder": "MethodName",
+    "delay": "延迟",
+    "ms": "ms",
+    "addRule": "添加规则",
+    "stopServer": "停止服务",
+    "startServer": "启动服务"
+  },
+  "timing": {
+    "connect": "建立连接",
+    "serialize": "序列化",
+    "rpc": "RPC 调用",
+    "total": "总计"
+  },
+  "ai": {
+    "settingsTitle": "AI 设置",
+    "endpoint": "API 地址",
+    "endpointHint": "兼容 OpenAI 接口格式，如 https://api.openai.com",
+    "apiKey": "API Key",
+    "model": "模型",
+    "modelHint": "留空则使用 gpt-3.5-turbo",
+    "generate": "AI 生成",
+    "saved": "保存成功",
+    "analyze": "AI 分析",
+    "diagnose": "AI 诊断",
+    "analyzing": "分析中...",
+    "diagnosing": "诊断中...",
+    "analysisTitle": "AI 响应分析",
+    "diagnosisTitle": "AI 错误诊断",
+    "close": "收起",
+    "notConfigured": "请先在设置中配置 AI"
+  },
+  "chain": {
+    "title": "链式调用",
+    "description": "链式调用 - 按顺序执行多个请求，支持 {{prev.field}} 变量引用上一步结果",
+    "stepN": "步骤 {{n}}",
+    "addressPlaceholder": "localhost:50051",
+    "servicePlaceholder": "ServiceName",
+    "methodPlaceholder": "MethodName",
+    "addStep": "添加步骤",
+    "running": "执行中...",
+    "runChain": "执行链式调用",
+    "results": "结果",
+    "empty": "（空）"
+  }
+}

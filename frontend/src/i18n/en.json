@@ -1,0 +1,246 @@
+{
+  "app": {
+    "title": "RpcCall"
+  },
+  "titlebar": {
+    "lightMode": "Switch to light mode",
+    "darkMode": "Switch to dark mode"
+  },
+  "tabs": {
+    "newRequest": "New Request"
+  },
+  "addressBar": {
+    "send": "Send",
+    "sending": "Sending...",
+    "saveAddress": "Save current address",
+    "selectAddress": "Select saved address",
+    "aliasPlaceholder": "e.g. internal test, production",
+    "setAlias": "Set alias for address",
+    "save": "Save",
+    "cancel": "Cancel",
+    "noAddresses": "No saved addresses",
+    "saveToCollection": "Save request to collection",
+    "rename": "Rename",
+    "delete": "Delete",
+    "unary": "UNARY",
+    "serverStream": "SERVER STREAM",
+    "clientStream": "CLIENT STREAM",
+    "bidiStream": "BIDI STREAM",
+    "placeholder": "localhost:50051",
+    "clickToSave": ", click to save current address"
+  },
+  "panels": {
+    "requestBody": "Request Body",
+    "metadata": "Metadata",
+    "tls": "TLS",
+    "benchmark": "Benchmark",
+    "chain": "Chain",
+    "mock": "Mock",
+    "response": "Response",
+    "headers": "Headers",
+    "trailers": "Trailers"
+  },
+  "editor": {
+    "format": "Format",
+    "minify": "Minify",
+    "placeholder": "{\n  \"field\": \"value\"\n}"
+  },
+  "response": {
+    "noResponse": "No response yet. Send a request to see the result.",
+    "tree": "Tree",
+    "raw": "Raw",
+    "noEntries": "No entries"
+  },
+  "metadata": {
+    "jsonFormat": "JSON format",
+    "invalidJson": "Invalid JSON, expected {\"key\": \"value\"} format",
+    "apply": "Apply",
+    "addMetadata": "Add metadata"
+  },
+  "services": {
+    "title": "SERVICES",
+    "importFile": "Import Proto File",
+    "importDir": "Import Proto Directory",
+    "reflection": "Server Reflection",
+    "reload": "Reload",
+    "clearAll": "Clear All",
+    "loading": "Loading...",
+    "noServices": "Import .proto files or use Server Reflection to start"
+  },
+  "collections": {
+    "title": "Collections",
+    "newCollection": "New Collection",
+    "noCollections": "No collections yet",
+    "noRequests": "No saved requests",
+    "loading": "Loading...",
+    "collectionName": "Collection name:"
+  },
+  "environment": {
+    "noEnv": "No Environment",
+    "manage": "Manage Environments",
+    "manageTitle": "Manage Environments",
+    "newEnv": "New Environment",
+    "name": "Name",
+    "variables": "Variables",
+    "addVariable": "Add Variable",
+    "selectOrCreate": "Select an environment or create a new one",
+    "vars": "vars"
+  },
+  "history": {
+    "title": "HISTORY",
+    "clear": "Clear History",
+    "noHistory": "No history records"
+  },
+  "command": {
+    "placeholder": "Type a command or search methods...",
+    "newTab": "New gRPC Tab",
+    "invoke": "Invoke",
+    "importFile": "Import Proto Files",
+    "importDir": "Import Proto Directory",
+    "reflection": "Server Reflection",
+    "toggleTheme": "Toggle Theme",
+    "reloadProtos": "Reload All Protos",
+    "clearProtos": "Clear All Protos",
+    "startBenchmark": "Start Benchmark",
+    "stopBenchmark": "Stop Benchmark",
+    "selectEnv": "Select Environment",
+    "manageEnvs": "Manage Environments",
+    "saveRequest": "Save Request to Collection",
+    "showShortcuts": "Show Keyboard Shortcuts",
+    "exportWorkspace": "Export Workspace",
+    "importWorkspace": "Import Workspace",
+    "noResults": "No matching commands or methods",
+    "navigate": "navigate",
+    "select": "select",
+    "close": "close"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "general": "General",
+    "commandPalette": "Open Command Palette",
+    "newTab": "New Tab",
+    "closeTab": "Close Current Tab",
+    "sendRequest": "Send Request",
+    "proto": "Proto",
+    "reloadProtos": "Reload All Protos",
+    "editing": "Editing",
+    "search": "Find Text",
+    "indent": "Insert Indent (2 spaces)",
+    "closeSearch": "Close Search / Dialog",
+    "navigation": "Navigation",
+    "navigateList": "Navigate List Up/Down",
+    "selectItem": "Select Current Item"
+  },
+  "benchmark": {
+    "selectMethod": "Please select a gRPC method first",
+    "mode": "Mode",
+    "byCount": "By Count",
+    "byDuration": "By Duration",
+    "concurrency": "Concurrency",
+    "totalRequests": "Total Requests",
+    "duration": "Duration (sec)",
+    "rampUp": "Ramp Up",
+    "stepSec": "Step Seconds",
+    "stepAdd": "Step Add",
+    "variables": "Request Variables",
+    "start": "Start Benchmark",
+    "stop": "Stop Benchmark",
+    "running": "Running",
+    "summary": "Summary",
+    "latencyDist": "Latency Distribution",
+    "qpsTrend": "QPS / Latency Trend",
+    "errorCodes": "Error Code Distribution",
+    "exportJson": "Export JSON",
+    "exportCsv": "Export CSV",
+    "exportHtml": "Export HTML",
+    "reset": "Reconfigure",
+    "history": "History",
+    "seconds": "sec",
+    "every": "Every",
+    "secIncrease": "sec add",
+    "concurrencyUnit": "concurrency",
+    "min": "Min",
+    "p50": "P50",
+    "p90": "P90",
+    "p99": "P99",
+    "max": "Max"
+  },
+  "saveRequest": {
+    "title": "Save Request",
+    "requestName": "Request Name",
+    "collection": "Collection",
+    "noCollections": "No collections yet",
+    "orCreateNew": "Or create new collection",
+    "newCollectionPlaceholder": "New collection name",
+    "saving": "Saving...",
+    "save": "Save",
+    "placeholder": "My Request"
+  },
+  "tls": {
+    "enableTls": "Enable TLS",
+    "certFile": "Client Certificate",
+    "keyFile": "Client Key",
+    "caFile": "CA Certificate",
+    "selectFile": "Select file"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close"
+  },
+  "lang": {
+    "switch": "中文"
+  },
+  "mock": {
+    "title": "Mock gRPC Server",
+    "runningOn": "Running on port:",
+    "port": "Port",
+    "rules": "Rules",
+    "ruleN": "Rule {{n}}",
+    "servicePlaceholder": "package.ServiceName",
+    "methodPlaceholder": "MethodName",
+    "delay": "Delay",
+    "ms": "ms",
+    "addRule": "Add Rule",
+    "stopServer": "Stop Server",
+    "startServer": "Start Server"
+  },
+  "timing": {
+    "connect": "Connect",
+    "serialize": "Serialize",
+    "rpc": "RPC Call",
+    "total": "Total"
+  },
+  "ai": {
+    "settingsTitle": "AI Settings",
+    "endpoint": "API Endpoint",
+    "endpointHint": "OpenAI-compatible endpoint, e.g. https://api.openai.com",
+    "apiKey": "API Key",
+    "model": "Model",
+    "modelHint": "Leave empty to use gpt-3.5-turbo",
+    "generate": "AI Generate",
+    "saved": "Saved successfully",
+    "analyze": "AI Analyze",
+    "diagnose": "AI Diagnose",
+    "analyzing": "Analyzing...",
+    "diagnosing": "Diagnosing...",
+    "analysisTitle": "AI Response Analysis",
+    "diagnosisTitle": "AI Error Diagnosis",
+    "close": "Collapse",
+    "notConfigured": "Please configure AI in settings first"
+  },
+  "chain": {
+    "title": "Chain Request",
+    "description": "Chain Request - sequential calls with {{prev.field}} variables",
+    "stepN": "Step {{n}}",
+    "addressPlaceholder": "localhost:50051",
+    "servicePlaceholder": "ServiceName",
+    "methodPlaceholder": "MethodName",
+    "addStep": "Add Step",
+    "running": "Running...",
+    "runChain": "Run Chain",
+    "results": "Results",
+    "empty": "(empty)"
+  }
+}

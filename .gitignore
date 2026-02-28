@@ -1,0 +1,32 @@
+# Build output
+build/bin/
+dist/
+*.app
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+
+# Logs
+logs/
+
+# Runtime data
+*.db
+*.csv
+rpccall_workspace.json
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
