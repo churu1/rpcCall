@@ -39,11 +39,10 @@ export function AISettingsPanel({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={onClose} />
       <div
         className="relative w-[440px] bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
           <span className="text-sm font-medium">{t("ai.settingsTitle")}</span>
