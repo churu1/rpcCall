@@ -146,6 +146,18 @@ func createTables(db *sql.DB) error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS chain_templates (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			steps_json TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
 	return err
 }
 
@@ -679,5 +691,53 @@ func (s *Store) DeleteBenchmarkHistory(id int64) error {
 
 func (s *Store) ClearBenchmarkHistory() error {
 	_, err := s.db.Exec("DELETE FROM benchmark_history")
+	return err
+}
+
+// --- Chain Templates ---
+
+type ChainTemplate struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	StepsJSON string `json:"stepsJson"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func (s *Store) SaveChainTemplate(name string, stepsJSON string) (*ChainTemplate, error) {
+	result, err := s.db.Exec(
+		"INSERT INTO chain_templates (name, steps_json) VALUES (?, ?)",
+		name, stepsJSON,
+	)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := result.LastInsertId()
+	return &ChainTemplate{ID: id, Name: name, StepsJSON: stepsJSON}, nil
+}
+
+func (s *Store) ListChainTemplates() ([]ChainTemplate, error) {
+	rows, err := s.db.Query("SELECT id, name, steps_json, created_at FROM chain_templates ORDER BY created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var templates []ChainTemplate
+	for rows.Next() {
+		var t ChainTemplate
+		if err := rows.Scan(&t.ID, &t.Name, &t.StepsJSON, &t.CreatedAt); err != nil {
+			continue
+		}
+		templates = append(templates, t)
+	}
+	return templates, nil
+}
+
+func (s *Store) UpdateChainTemplate(id int64, name string, stepsJSON string) error {
+	_, err := s.db.Exec("UPDATE chain_templates SET name = ?, steps_json = ? WHERE id = ?", name, stepsJSON, id)
+	return err
+}
+
+func (s *Store) DeleteChainTemplate(id int64) error {
+	_, err := s.db.Exec("DELETE FROM chain_templates WHERE id = ?", id)
 	return err
 }

@@ -728,6 +728,36 @@ func (a *App) ClearBenchmarkHistory() error {
 	return a.history.ClearBenchmarkHistory()
 }
 
+// --- Chain Templates ---
+
+func (a *App) SaveChainTemplate(name string, stepsJSON string) (*history.ChainTemplate, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.SaveChainTemplate(name, stepsJSON)
+}
+
+func (a *App) ListChainTemplates() ([]history.ChainTemplate, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.ListChainTemplates()
+}
+
+func (a *App) UpdateChainTemplate(id int64, name string, stepsJSON string) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.UpdateChainTemplate(id, name, stepsJSON)
+}
+
+func (a *App) DeleteChainTemplate(id int64) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.DeleteChainTemplate(id)
+}
+
 func (a *App) ExportBenchmarkHTML(result models.BenchmarkResult) (string, error) {
 	html, err := report.GenerateHTMLReport(result)
 	if err != nil {

@@ -291,6 +291,15 @@
     "selectService": "-- 选择服务 --",
     "selectMethod": "-- 选择方法 --",
     "manualInput": "手动输入",
-    "selectMode": "下拉选择"
+    "selectMode": "下拉选择",
+    "saveTemplate": "保存模板",
+    "loadTemplate": "加载模板",
+    "templateName": "模板名称",
+    "templateNamePlaceholder": "例如：用户注册流程",
+    "noTemplates": "暂无保存的模板",
+    "templateSaved": "模板已保存",
+    "deleteTemplate": "删除模板",
+    "updateTemplate": "更新模板",
+    "savedTemplates": "已保存的链式调用模板"
   }
 }

@@ -291,6 +291,15 @@
     "selectService": "-- Select Service --",
     "selectMethod": "-- Select Method --",
     "manualInput": "Manual",
-    "selectMode": "Select"
+    "selectMode": "Select",
+    "saveTemplate": "Save Template",
+    "loadTemplate": "Load Template",
+    "templateName": "Template Name",
+    "templateNamePlaceholder": "e.g. User Registration Flow",
+    "noTemplates": "No saved templates",
+    "templateSaved": "Template saved",
+    "deleteTemplate": "Delete Template",
+    "updateTemplate": "Update Template",
+    "savedTemplates": "Saved Chain Templates"
   }
 }

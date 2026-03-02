@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
 import { cn } from "@/lib/utils";
-import { Clock, AlertCircle, CheckCircle2, Sparkles, Loader2, ChevronDown, Stethoscope, X } from "lucide-react";
+import { Clock, AlertCircle, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronRight, Stethoscope, X } from "lucide-react";
 import { SearchBar, HighlightedText, type SearchMatch } from "@/components/search/SearchBar";
 import { TimingBar } from "./TimingBar";
 import { highlightJsonHtml } from "@/components/editor/JsonEditor";
@@ -30,7 +30,7 @@ export function ResponseViewer() {
   const { t } = useTranslation();
   const { activeTabId, tabs } = useAppStore();
   const tab = tabs.find((t) => t.id === activeTabId);
-  const [activePanel, setActivePanel] = useState<"body" | "headers" | "trailers">("body");
+  const [activePanel, setActivePanel] = useState<"body" | "headers" | "trailers" | "chain">("body");
   const [viewMode, setViewMode] = useState<"raw" | "tree">("raw");
   const [showSearch, setShowSearch] = useState(false);
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
@@ -125,6 +125,19 @@ export function ResponseViewer() {
     return () => el.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const handler = () => setActivePanel("chain");
+    document.addEventListener("rpccall:show-chain-results", handler);
+    return () => document.removeEventListener("rpccall:show-chain-results", handler);
+  }, []);
+
+  const chainResults = tab?.chainResults;
+  useEffect(() => {
+    if (activePanel === "chain" && (!chainResults || chainResults.length === 0)) {
+      setActivePanel("body");
+    }
+  }, [activePanel, chainResults]);
+
   if (!tab) return null;
 
   const statusColor = tab.statusCode
@@ -155,6 +168,19 @@ export function ResponseViewer() {
                   : `${t("panels.trailers")} (${tab.responseTrailers.length})`}
             </button>
           ))}
+          {tab.chainResults && tab.chainResults.length > 0 && (
+            <button
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium transition-colors border-b-2",
+                activePanel === "chain"
+                  ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
+                  : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              )}
+              onClick={() => setActivePanel("chain")}
+            >
+              {t("chain.results")} ({tab.chainResults.length})
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2 px-3 text-xs">
           {tab.statusCode && tab.statusCode !== "OK" && tab.method && (
@@ -246,7 +272,9 @@ export function ResponseViewer() {
         </div>
       )}
       <div className="flex-1 overflow-auto selectable">
-        {activePanel === "body" ? (
+        {activePanel === "chain" && tab.chainResults ? (
+          <ChainResultsView results={tab.chainResults} />
+        ) : activePanel === "body" ? (
           tab.responseBody ? (
             viewMode === "tree" ? (
               <JsonTreeViewer json={tab.responseBody} />
@@ -270,10 +298,67 @@ export function ResponseViewer() {
           )
         ) : activePanel === "headers" ? (
           <ReadonlyMetadataTable entries={tab.responseMetadata} emptyText={t("response.noEntries")} />
-        ) : (
+        ) : activePanel === "trailers" ? (
           <ReadonlyMetadataTable entries={tab.responseTrailers} emptyText={t("response.noEntries")} />
-        )}
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function ChainResultsView({ results }: { results: ChainStepResult[] }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set(results.map((_, i) => i)));
+
+  useEffect(() => {
+    setExpanded(new Set(results.map((_, i) => i)));
+  }, [results]);
+
+  const toggle = (i: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-1 p-2">
+      {results.map((r) => (
+        <div key={r.index} className="border border-[var(--color-border)] rounded overflow-hidden">
+          <div
+            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--color-secondary)] transition-colors"
+            onClick={() => toggle(r.index)}
+          >
+            {expanded.has(r.index) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <span className="text-xs font-medium">{t("chain.stepN", { n: r.index + 1 })}</span>
+            <span className={cn(
+              "text-[10px] font-mono px-1.5 py-0.5 rounded",
+              r.statusCode === "OK"
+                ? "text-green-500 bg-green-500/10"
+                : "text-[var(--color-destructive)] bg-[var(--color-destructive)]/10"
+            )}>
+              {r.statusCode}
+            </span>
+            <span className="text-[10px] text-[var(--color-muted-foreground)] ml-auto flex items-center gap-1">
+              <Clock size={10} />
+              {r.elapsedMs}ms
+            </span>
+          </div>
+          {expanded.has(r.index) && (
+            <pre className="px-3 py-2 text-xs font-[var(--font-mono)] bg-[var(--color-secondary)] border-t border-[var(--color-border)] whitespace-pre-wrap overflow-auto max-h-[300px] leading-relaxed">
+              {r.error ? (
+                <span className="text-[var(--color-destructive)]">{r.error}</span>
+              ) : r.body ? (
+                <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(r.body) }} />
+              ) : (
+                <span className="text-[var(--color-muted-foreground)]">{t("chain.empty")}</span>
+              )}
+            </pre>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

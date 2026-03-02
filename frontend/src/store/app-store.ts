@@ -28,6 +28,14 @@ export interface MetadataEntry {
   enabled: boolean;
 }
 
+export interface ChainStepConfig {
+  address: string;
+  serviceName: string;
+  methodName: string;
+  body: string;
+  manualInput?: boolean;
+}
+
 export interface Tab {
   id: string;
   title: string;
@@ -47,6 +55,8 @@ export interface Tab {
   caPath: string;
   timeoutSec: number;
   timing: TimingDetail | null;
+  chainSteps?: ChainStepConfig[];
+  chainResults?: ChainStepResult[];
 }
 
 interface AppState {
@@ -75,7 +85,7 @@ function createTab(method?: ServiceMethod): Tab {
   tabCounter++;
   return {
     id: `tab-${tabCounter}`,
-    title: method ? `${method.serviceName}/${method.methodName}` : "New Request",
+    title: method?.serviceName && method?.methodName ? `${method.serviceName}/${method.methodName}` : "New Request",
     address: "localhost:50051",
     method: method ?? null,
     requestBody: "{\n  \n}",

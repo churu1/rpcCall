@@ -121,6 +121,13 @@ declare interface ChainResult {
   steps: ChainStepResult[];
 }
 
+declare interface ChainTemplate {
+  id: number;
+  name: string;
+  stepsJson: string;
+  createdAt: string;
+}
+
 declare interface MockRule {
   serviceName: string;
   methodName: string;
@@ -210,6 +217,10 @@ interface Window {
         ExportWorkspace: () => Promise<string>;
         ImportWorkspace: () => Promise<void>;
         InvokeChain: (steps: ChainStep[]) => Promise<ChainResult>;
+        SaveChainTemplate: (name: string, stepsJson: string) => Promise<ChainTemplate | null>;
+        ListChainTemplates: () => Promise<ChainTemplate[] | null>;
+        UpdateChainTemplate: (id: number, name: string, stepsJson: string) => Promise<void>;
+        DeleteChainTemplate: (id: number) => Promise<void>;
         StartMockServer: (port: number, rules: MockRule[]) => Promise<void>;
         StopMockServer: () => Promise<void>;
         IsMockServerRunning: () => Promise<boolean>;
