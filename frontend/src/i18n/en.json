@@ -186,10 +186,13 @@
   },
   "tls": {
     "enableTls": "Enable TLS",
-    "certFile": "Client Certificate",
+    "tlsEnabled": "TLS Enabled",
+    "tlsDisabled": "TLS Disabled",
+    "certFile": "Client Cert",
     "keyFile": "Client Key",
-    "caFile": "CA Certificate",
-    "selectFile": "Select file"
+    "caFile": "CA Cert",
+    "selectFile": "Select file",
+    "notSelected": "Not selected"
   },
   "common": {
     "save": "Save",
@@ -264,7 +267,7 @@
     "mock": "Mock Server",
     "mockDesc": "Configure rules and start a local gRPC Mock server in the Mock tab. Set status codes, delays, and custom response bodies for frontend development.",
     "tls": "TLS Config",
-    "tlsDesc": "Enable TLS connections in the TLS tab. Supports client certificate, key, and CA certificate file configuration.",
+    "tlsDesc": "Click the lock icon next to the address bar to enable TLS. Supports client certificate, key, and CA certificate file configuration. The icon turns green when enabled.",
     "ai": "AI Assistant",
     "aiDesc": "After configuring an OpenAI-compatible API, use AI Generate in the request editor, AI Analyze to interpret responses, or AI Diagnose to troubleshoot errors.",
     "timeout": "Request Timeout",

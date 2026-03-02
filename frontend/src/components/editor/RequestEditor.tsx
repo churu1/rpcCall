@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2, Braces, List, WrapText, Minimize2, Sparkles, Loader2 } from "lucide-react";
-import { TlsConfig } from "@/components/connection/TlsConfig";
 import { SearchBar, type SearchMatch } from "@/components/search/SearchBar";
 import { BenchmarkPanel } from "@/components/benchmark/BenchmarkPanel";
 import { ChainEditor } from "@/components/chain/ChainEditor";
@@ -214,7 +213,7 @@ export function RequestEditor() {
   const { t } = useTranslation();
   const { activeTabId, tabs, updateTab } = useAppStore();
   const tab = tabs.find((t) => t.id === activeTabId);
-  const [activePanel, setActivePanel] = useState<"body" | "metadata" | "tls" | "benchmark" | "chain" | "mock">("body");
+  const [activePanel, setActivePanel] = useState<"body" | "metadata" | "benchmark" | "chain" | "mock">("body");
   const [showSearch, setShowSearch] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -305,7 +304,6 @@ export function RequestEditor() {
   const panels = [
     { key: "body" as const, label: t("panels.requestBody") },
     { key: "metadata" as const, label: `${t("panels.metadata")} (${tab.metadata.length})` },
-    { key: "tls" as const, label: tab.useTls ? t("panels.tls") + " ●" : t("panels.tls") },
     { key: "benchmark" as const, label: t("panels.benchmark") },
     { key: "chain" as const, label: t("panels.chain") },
     { key: "mock" as const, label: t("panels.mock") },
@@ -438,8 +436,6 @@ export function RequestEditor() {
             entries={tab.metadata}
             onChange={(metadata) => updateTab(tab.id, { metadata })}
           />
-        ) : activePanel === "tls" ? (
-          <TlsConfig />
         ) : activePanel === "chain" ? (
           <ChainEditor />
         ) : activePanel === "mock" ? (

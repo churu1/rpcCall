@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore, type MethodType } from "@/store/app-store";
 import { useGrpc } from "@/hooks/useGrpc";
 import { cn } from "@/lib/utils";
-import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save } from "lucide-react";
+import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save, Shield, ShieldOff, FileKey, FolderOpen } from "lucide-react";
 
 interface SavedAddress {
   id: number;
@@ -38,8 +38,10 @@ export function AddressBar() {
   const [editName, setEditName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [saveName, setSaveName] = useState("");
+  const [showTls, setShowTls] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const saveInputRef = useRef<HTMLDivElement>(null);
+  const tlsRef = useRef<HTMLDivElement>(null);
 
   const loadAddresses = async () => {
     try {
@@ -71,12 +73,15 @@ export function AddressBar() {
       if (saveInputRef.current && !saveInputRef.current.contains(e.target as Node)) {
         setShowSaveInput(false);
       }
+      if (tlsRef.current && !tlsRef.current.contains(e.target as Node)) {
+        setShowTls(false);
+      }
     };
-    if (showDropdown || showSaveInput) {
+    if (showDropdown || showSaveInput || showTls) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showDropdown, showSaveInput]);
+  }, [showDropdown, showSaveInput, showTls]);
 
   if (!tab) return null;
 
@@ -317,6 +322,52 @@ export function AddressBar() {
         </span>
       </div>
 
+      <div className="relative" ref={tlsRef}>
+        <button
+          onClick={() => setShowTls(!showTls)}
+          className={cn(
+            "p-1.5 rounded-md transition-colors shrink-0",
+            tab.useTls
+              ? "text-[var(--color-method-unary)] bg-[var(--color-method-unary)]/10 hover:bg-[var(--color-method-unary)]/20"
+              : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-foreground)]"
+          )}
+          title={tab.useTls ? t("tls.tlsEnabled") : t("tls.tlsDisabled")}
+        >
+          {tab.useTls ? <Shield size={14} /> : <ShieldOff size={14} />}
+        </button>
+        {showTls && (
+          <div className="absolute top-full right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg z-50 p-3 w-[280px]">
+            <label className="flex items-center gap-2 text-xs cursor-pointer mb-2">
+              <input
+                type="checkbox"
+                checked={tab.useTls ?? false}
+                onChange={(e) => updateTab(tab.id, { useTls: e.target.checked })}
+                className="rounded"
+              />
+              {tab.useTls ? (
+                <Shield size={13} className="text-[var(--color-method-unary)]" />
+              ) : (
+                <ShieldOff size={13} className="text-[var(--color-muted-foreground)]" />
+              )}
+              <span className="font-medium">{t("tls.enableTls")}</span>
+            </label>
+            {tab.useTls && (
+              <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--color-border)]">
+                <CertFileRow label={t("tls.caFile")} value={tab.caPath} notSelected={t("tls.notSelected")} onSelect={async () => {
+                  try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { caPath: p }); } catch {}
+                }} />
+                <CertFileRow label={t("tls.certFile")} value={tab.certPath} notSelected={t("tls.notSelected")} onSelect={async () => {
+                  try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { certPath: p }); } catch {}
+                }} />
+                <CertFileRow label={t("tls.keyFile")} value={tab.keyPath} notSelected={t("tls.notSelected")} onSelect={async () => {
+                  try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { keyPath: p }); } catch {}
+                }} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <button
         className={cn(
           "flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0",
@@ -339,6 +390,26 @@ export function AddressBar() {
             {t("addressBar.send")}
           </>
         )}
+      </button>
+    </div>
+  );
+}
+
+function CertFileRow({ label, value, notSelected, onSelect }: { label: string; value: string; notSelected: string; onSelect: () => void }) {
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <span className="text-[10px] text-[var(--color-muted-foreground)] w-[70px] shrink-0">{label}</span>
+      <div className="flex-1 flex items-center gap-1 bg-[var(--color-secondary)] rounded border border-[var(--color-input)] px-2 py-0.5 text-[10px] min-w-0">
+        <FileKey size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
+        <span className="truncate text-[var(--color-muted-foreground)]">
+          {value ? value.split("/").pop() : notSelected}
+        </span>
+      </div>
+      <button
+        onClick={onSelect}
+        className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+      >
+        <FolderOpen size={12} />
       </button>
     </div>
   );

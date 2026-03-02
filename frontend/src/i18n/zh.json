@@ -186,10 +186,13 @@
   },
   "tls": {
     "enableTls": "启用 TLS",
+    "tlsEnabled": "TLS 已启用",
+    "tlsDisabled": "TLS 未启用",
     "certFile": "客户端证书",
     "keyFile": "客户端密钥",
     "caFile": "CA 证书",
-    "selectFile": "选择文件"
+    "selectFile": "选择文件",
+    "notSelected": "未选择"
   },
   "common": {
     "save": "保存",
@@ -264,7 +267,7 @@
     "mock": "Mock 服务器",
     "mockDesc": "在「Mock」标签页配置规则并启动本地 gRPC Mock 服务器。可设置状态码、延迟和自定义响应体，方便前端联调。",
     "tls": "TLS 配置",
-    "tlsDesc": "在「TLS」标签页启用 TLS 连接，支持配置客户端证书、密钥和 CA 证书文件。",
+    "tlsDesc": "点击地址栏旁的锁图标启用 TLS 连接，支持配置客户端证书、密钥和 CA 证书文件。启用后图标变为绿色。",
     "ai": "AI 辅助",
     "aiDesc": "配置 OpenAI 兼容的 API 后，可在请求编辑器中使用「AI 生成」自动填充请求体，在响应面板使用「AI 分析」解读响应或「AI 诊断」排查错误。",
     "timeout": "请求超时",
