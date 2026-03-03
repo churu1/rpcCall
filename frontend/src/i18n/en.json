@@ -60,7 +60,7 @@
     "addMetadata": "Add metadata"
   },
   "services": {
-    "title": "SERVICES",
+    "title": "PROJECTS",
     "importFile": "Import Proto File",
     "importDir": "Import Proto Directory",
     "reflection": "Server Reflection",
@@ -119,6 +119,9 @@
     "exportWorkspace": "Export Workspace",
     "importWorkspace": "Import Workspace",
     "noResults": "No matching commands or methods",
+    "searchAllProjects": "All projects",
+    "scopeCurrentProject": "Current project: {{project}}",
+    "scopeNoProject": "Current tab is not bound to a project",
     "navigate": "navigate",
     "select": "select",
     "close": "close"
@@ -218,7 +221,11 @@
     "failed": "failed",
     "okUpper": "OK",
     "failUpper": "FAIL",
-    "error": "error"
+    "rawTags": "Raw Tags",
+    "error": "error",
+    "selectProjectFirst": "Please select a Proto project",
+    "newProject": "New Project",
+    "newProjectName": "Enter project name"
   },
   "saveRequest": {
     "title": "Save Request",

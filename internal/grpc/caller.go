@@ -53,8 +53,11 @@ func (c *Caller) SetReflection(r *ReflectionClient) {
 	c.reflection = r
 }
 
-func (c *Caller) findMethodDescriptor(serviceName, methodName string) (*desc.MethodDescriptor, error) {
-	for _, fd := range c.parser.GetAllFileDescriptors() {
+func (c *Caller) findMethodDescriptor(projectID, serviceName, methodName string) (*desc.MethodDescriptor, error) {
+	if strings.TrimSpace(projectID) == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
+	for _, fd := range c.parser.GetAllFileDescriptorsByProject(projectID) {
 		for _, svc := range fd.GetServices() {
 			if svc.GetFullyQualifiedName() == serviceName || svc.GetName() == serviceName {
 				for _, md := range svc.GetMethods() {
@@ -66,16 +69,27 @@ func (c *Caller) findMethodDescriptor(serviceName, methodName string) (*desc.Met
 		}
 	}
 
-	svcDesc := c.reflection.GetServiceDescriptor(serviceName)
-	if svcDesc != nil {
-		for _, md := range svcDesc.GetMethods() {
-			if md.GetName() == methodName {
-				return md, nil
+	if c.reflection != nil {
+		if svcDesc := c.reflection.GetServiceDescriptor(serviceName); svcDesc != nil {
+			for _, md := range svcDesc.GetMethods() {
+				if md.GetName() == methodName {
+					return md, nil
+				}
+			}
+		}
+		for _, svcDesc := range c.reflection.GetAllServiceDescriptors() {
+			if svcDesc.GetName() != serviceName && svcDesc.GetFullyQualifiedName() != serviceName {
+				continue
+			}
+			for _, md := range svcDesc.GetMethods() {
+				if md.GetName() == methodName {
+					return md, nil
+				}
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("method %s/%s not found", serviceName, methodName)
+	return nil, fmt.Errorf("method %s/%s not found in project %s", serviceName, methodName, projectID)
 }
 
 func dialWithConfig(address string, req models.GrpcRequest) (*grpc.ClientConn, error) {
@@ -124,7 +138,7 @@ func mdToEntries(md metadata.MD) []models.MetadataEntry {
 }
 
 func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, error) {
-	methodDesc, err := c.findMethodDescriptor(req.ServiceName, req.MethodName)
+	methodDesc, err := c.findMethodDescriptor(req.ProjectID, req.ServiceName, req.MethodName)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +213,7 @@ func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, erro
 }
 
 func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(string), onDone func(models.GrpcResponse)) error {
-	methodDesc, err := c.findMethodDescriptor(req.ServiceName, req.MethodName)
+	methodDesc, err := c.findMethodDescriptor(req.ProjectID, req.ServiceName, req.MethodName)
 	if err != nil {
 		return err
 	}
@@ -285,7 +299,7 @@ func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(strin
 }
 
 func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcResponse, error) {
-	methodDesc, err := c.findMethodDescriptor(req.ServiceName, req.MethodName)
+	methodDesc, err := c.findMethodDescriptor(req.ProjectID, req.ServiceName, req.MethodName)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +377,7 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 }
 
 func (c *Caller) InvokeBidiStream(req models.GrpcRequest, onMessage func(string), onDone func(models.GrpcResponse)) error {
-	methodDesc, err := c.findMethodDescriptor(req.ServiceName, req.MethodName)
+	methodDesc, err := c.findMethodDescriptor(req.ProjectID, req.ServiceName, req.MethodName)
 	if err != nil {
 		return err
 	}

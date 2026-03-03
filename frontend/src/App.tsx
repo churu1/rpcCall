@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 
 class ErrorBoundary extends Component<
@@ -33,6 +33,32 @@ class ErrorBoundary extends Component<
 }
 
 function App() {
+  useEffect(() => {
+    const applyNoSuggestAttrs = (el: HTMLInputElement | HTMLTextAreaElement) => {
+      el.setAttribute("autocomplete", "off");
+      el.setAttribute("autocorrect", "off");
+      el.setAttribute("autocapitalize", "off");
+      el.setAttribute("spellcheck", "false");
+      el.setAttribute("data-form-type", "other");
+      el.setAttribute("data-lpignore", "true");
+    };
+
+    // One-time pass for current DOM.
+    document
+      .querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")
+      .forEach(applyNoSuggestAttrs);
+
+    // Lightweight lazy patch for dynamically created inputs.
+    const onFocusIn = (ev: FocusEvent) => {
+      const target = ev.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        applyNoSuggestAttrs(target);
+      }
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
+
   return (
     <ErrorBoundary>
       <AppLayout />

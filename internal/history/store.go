@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -35,8 +35,23 @@ func NewStore() (*Store, error) {
 	}
 
 	if err := createTables(db); err != nil {
-		db.Close()
-		return nil, err
+		// User chose data reset over compatibility migration. If schema is broken
+		// (e.g. missing project_id columns in old DB), drop the DB and recreate.
+		if strings.Contains(strings.ToLower(err.Error()), "no such column: project_id") {
+			_ = db.Close()
+			_ = os.Remove(dbPath)
+			db, err = sql.Open("sqlite", dbPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to reopen database after reset: %w", err)
+			}
+			if err := createTables(db); err != nil {
+				_ = db.Close()
+				return nil, err
+			}
+		} else {
+			db.Close()
+			return nil, err
+		}
 	}
 
 	return &Store{db: db}, nil
@@ -77,12 +92,25 @@ func createTables(db *sql.DB) error {
 	}
 
 	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS proto_projects (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			created_at TEXT NOT NULL
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS saved_proto_sources (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id TEXT NOT NULL DEFAULT '',
 			source_type TEXT NOT NULL,
 			path TEXT NOT NULL UNIQUE,
 			import_paths TEXT NOT NULL DEFAULT '[]',
-			created_at TEXT NOT NULL
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES proto_projects(id) ON DELETE CASCADE
 		)
 	`)
 	if err != nil {
@@ -167,6 +195,8 @@ func createTables(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS decode_history (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			project_id TEXT NOT NULL DEFAULT '',
+			project_name TEXT NOT NULL DEFAULT '',
 			service_name TEXT NOT NULL DEFAULT '',
 			method_name TEXT NOT NULL DEFAULT '',
 			target TEXT NOT NULL DEFAULT 'input',
@@ -194,6 +224,89 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_service_method ON decode_history(service_name, method_name)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_project_id ON decode_history(project_id)`)
+	if err != nil {
+		return err
+	}
+	if err := migrateProtoProjectScope(db); err != nil {
+		return err
+	}
+	return migrateDecodeHistoryProjectScope(db)
+}
+
+func migrateProtoProjectScope(db *sql.DB) error {
+	if _, err := db.Exec(`ALTER TABLE saved_proto_sources ADD COLUMN project_id TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+			return err
+		}
+	}
+
+	var needsLegacy int
+	if err := db.QueryRow(`SELECT COUNT(1) FROM saved_proto_sources WHERE project_id = '' OR project_id IS NULL`).Scan(&needsLegacy); err != nil {
+		return err
+	}
+	if needsLegacy > 0 {
+		legacyID := "legacy"
+		if _, err := db.Exec(`
+			INSERT INTO proto_projects (id, name, created_at)
+			VALUES (?, ?, ?)
+			ON CONFLICT(id) DO NOTHING
+		`, legacyID, legacyID, time.Now().Format(time.RFC3339)); err != nil {
+			return err
+		}
+		if _, err := db.Exec(`UPDATE saved_proto_sources SET project_id = ? WHERE project_id = '' OR project_id IS NULL`, legacyID); err != nil {
+			return err
+		}
+	}
+
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS saved_proto_sources_new (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id TEXT NOT NULL,
+			source_type TEXT NOT NULL,
+			path TEXT NOT NULL,
+			import_paths TEXT NOT NULL DEFAULT '[]',
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES proto_projects(id) ON DELETE CASCADE,
+			UNIQUE(project_id, path)
+		)
+	`); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO saved_proto_sources_new (id, project_id, source_type, path, import_paths, created_at)
+		SELECT id, project_id, source_type, path, import_paths, created_at FROM saved_proto_sources
+	`); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec(`DROP TABLE saved_proto_sources`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE saved_proto_sources_new RENAME TO saved_proto_sources`); err != nil {
+		return err
+	}
+
+	_, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_proto_sources_project_id ON saved_proto_sources(project_id)`)
+	return err
+}
+
+func migrateDecodeHistoryProjectScope(db *sql.DB) error {
+	if _, err := db.Exec(`ALTER TABLE decode_history ADD COLUMN project_id TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+			return err
+		}
+	}
+	if _, err := db.Exec(`ALTER TABLE decode_history ADD COLUMN project_name TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+			return err
+		}
+	}
+	_, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_project_id ON decode_history(project_id)`)
 	return err
 }
 
@@ -390,39 +503,181 @@ func (s *Store) DeleteAddress(id int64) error {
 
 type SavedProtoSource struct {
 	ID          int64    `json:"id"`
+	ProjectID   string   `json:"projectId"`
 	SourceType  string   `json:"sourceType"`
 	Path        string   `json:"path"`
 	ImportPaths []string `json:"importPaths"`
 	CreatedAt   string   `json:"createdAt"`
 }
 
-func (s *Store) SaveProtoSource(sourceType, path string, importPaths []string) (*SavedProtoSource, error) {
+type ProtoProject struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func normalizeProjectID(name string) string {
+	name = strings.TrimSpace(strings.ToLower(name))
+	if name == "" {
+		name = "project"
+	}
+	name = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '-'
+	}, name)
+	return strings.Trim(name, "-")
+}
+
+func (s *Store) ListProtoProjects() ([]ProtoProject, error) {
+	rows, err := s.db.Query(`
+		SELECT id, name, created_at
+		FROM proto_projects
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []ProtoProject
+	for rows.Next() {
+		var p ProtoProject
+		if err := rows.Scan(&p.ID, &p.Name, &p.CreatedAt); err != nil {
+			continue
+		}
+		projects = append(projects, p)
+	}
+	return projects, nil
+}
+
+func (s *Store) CreateProtoProject(name string) (*ProtoProject, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("project name cannot be empty")
+	}
+	baseID := normalizeProjectID(name)
+	if baseID == "" {
+		baseID = "project"
+	}
+	id := baseID
+	now := time.Now().Format(time.RFC3339)
+	for i := 0; i < 100; i++ {
+		if i > 0 {
+			id = fmt.Sprintf("%s-%d", baseID, i+1)
+		}
+		_, err := s.db.Exec(`
+			INSERT INTO proto_projects (id, name, created_at)
+			VALUES (?, ?, ?)
+		`, id, name, now)
+		if err == nil {
+			return &ProtoProject{ID: id, Name: name, CreatedAt: now}, nil
+		}
+		if !strings.Contains(strings.ToLower(err.Error()), "constraint") {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("failed to allocate project id for %s", name)
+}
+
+func (s *Store) UpsertProtoProject(id, name string) (*ProtoProject, error) {
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if id == "" && name == "" {
+		return nil, fmt.Errorf("project id/name cannot both be empty")
+	}
+	if id == "" {
+		return s.CreateProtoProject(name)
+	}
+	if name == "" {
+		name = id
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	_, err := s.db.Exec(`
+		INSERT INTO proto_projects (id, name, created_at)
+		VALUES (?, ?, ?)
+	`, id, name, now)
+	if err == nil {
+		return &ProtoProject{ID: id, Name: name, CreatedAt: now}, nil
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "constraint") {
+		return nil, err
+	}
+
+	var existing ProtoProject
+	if rowErr := s.db.QueryRow(`
+		SELECT id, name, created_at
+		FROM proto_projects
+		WHERE id = ?
+	`, id).Scan(&existing.ID, &existing.Name, &existing.CreatedAt); rowErr == nil {
+		return &existing, nil
+	}
+	if rowErr := s.db.QueryRow(`
+		SELECT id, name, created_at
+		FROM proto_projects
+		WHERE name = ?
+	`, name).Scan(&existing.ID, &existing.Name, &existing.CreatedAt); rowErr == nil {
+		return &existing, nil
+	}
+	return nil, err
+}
+
+func (s *Store) DeleteProtoProject(projectID string) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return fmt.Errorf("project id cannot be empty")
+	}
+	_, err := s.db.Exec("DELETE FROM proto_projects WHERE id = ?", projectID)
+	return err
+}
+
+func (s *Store) SaveProtoSource(projectID, sourceType, path string, importPaths []string) (*SavedProtoSource, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("project id cannot be empty")
+	}
 	if path == "" {
 		return nil, fmt.Errorf("path cannot be empty")
 	}
 	ipJSON, _ := json.Marshal(importPaths)
 	now := time.Now().Format(time.RFC3339)
 	result, err := s.db.Exec(`
-		INSERT INTO saved_proto_sources (source_type, path, import_paths, created_at)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(path) DO UPDATE SET source_type = excluded.source_type, import_paths = excluded.import_paths
-	`, sourceType, path, string(ipJSON), now)
+		INSERT INTO saved_proto_sources (project_id, source_type, path, import_paths, created_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, path) DO UPDATE
+		SET project_id = excluded.project_id, source_type = excluded.source_type, import_paths = excluded.import_paths
+	`, projectID, sourceType, path, string(ipJSON), now)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := result.LastInsertId()
 	if id == 0 {
-		row := s.db.QueryRow("SELECT id FROM saved_proto_sources WHERE path = ?", path)
+		row := s.db.QueryRow("SELECT id FROM saved_proto_sources WHERE path = ? AND project_id = ?", path, projectID)
 		row.Scan(&id)
 	}
-	return &SavedProtoSource{ID: id, SourceType: sourceType, Path: path, ImportPaths: importPaths, CreatedAt: now}, nil
+	return &SavedProtoSource{
+		ID:          id,
+		ProjectID:   projectID,
+		SourceType:  sourceType,
+		Path:        path,
+		ImportPaths: importPaths,
+		CreatedAt:   now,
+	}, nil
 }
 
-func (s *Store) ListProtoSources() ([]SavedProtoSource, error) {
+func (s *Store) ListProtoSources(projectID string) ([]SavedProtoSource, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("project id cannot be empty")
+	}
 	rows, err := s.db.Query(`
-		SELECT id, source_type, path, import_paths, created_at
-		FROM saved_proto_sources ORDER BY created_at ASC
-	`)
+		SELECT id, project_id, source_type, path, import_paths, created_at
+		FROM saved_proto_sources
+		WHERE project_id = ?
+		ORDER BY created_at ASC
+	`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +687,7 @@ func (s *Store) ListProtoSources() ([]SavedProtoSource, error) {
 	for rows.Next() {
 		var src SavedProtoSource
 		var ipJSON string
-		if err := rows.Scan(&src.ID, &src.SourceType, &src.Path, &ipJSON, &src.CreatedAt); err != nil {
+		if err := rows.Scan(&src.ID, &src.ProjectID, &src.SourceType, &src.Path, &ipJSON, &src.CreatedAt); err != nil {
 			continue
 		}
 		json.Unmarshal([]byte(ipJSON), &src.ImportPaths)
@@ -446,9 +701,37 @@ func (s *Store) DeleteProtoSource(id int64) error {
 	return err
 }
 
-func (s *Store) ClearProtoSources() error {
-	_, err := s.db.Exec("DELETE FROM saved_proto_sources")
+func (s *Store) ClearProtoSources(projectID string) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return fmt.Errorf("project id cannot be empty")
+	}
+	_, err := s.db.Exec("DELETE FROM saved_proto_sources WHERE project_id = ?", projectID)
 	return err
+}
+
+func (s *Store) ListAllProtoSources() ([]SavedProtoSource, error) {
+	rows, err := s.db.Query(`
+		SELECT id, project_id, source_type, path, import_paths, created_at
+		FROM saved_proto_sources
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sources []SavedProtoSource
+	for rows.Next() {
+		var src SavedProtoSource
+		var ipJSON string
+		if err := rows.Scan(&src.ID, &src.ProjectID, &src.SourceType, &src.Path, &ipJSON, &src.CreatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal([]byte(ipJSON), &src.ImportPaths)
+		sources = append(sources, src)
+	}
+	return sources, nil
 }
 
 // --- Environments ---
@@ -783,6 +1066,8 @@ func (s *Store) DeleteChainTemplate(id int64) error {
 type DecodeHistoryEntry struct {
 	ID               int64  `json:"id"`
 	CreatedAt        string `json:"createdAt"`
+	ProjectID        string `json:"projectId"`
+	ProjectName      string `json:"projectName"`
 	ServiceName      string `json:"serviceName"`
 	MethodName       string `json:"methodName"`
 	Target           string `json:"target"`
@@ -821,6 +1106,14 @@ func (s *Store) SaveDecodeHistory(req models.DecodeRequest, resp *models.DecodeR
 	detected := string(resp.DetectedEncoding)
 	rulesJSON, _ := json.Marshal(req.NestedRules)
 	warningsJSON, _ := json.Marshal(resp.Warnings)
+	projectID := strings.TrimSpace(req.ProjectID)
+	projectName := ""
+	if projectID != "" {
+		_ = s.db.QueryRow(`SELECT name FROM proto_projects WHERE id = ?`, projectID).Scan(&projectName)
+	}
+	if projectName == "" {
+		projectName = projectID
+	}
 
 	messageType := strings.TrimSpace(req.ExplicitMessageType)
 	if messageType == "" && req.ServiceName != "" && req.MethodName != "" {
@@ -832,12 +1125,12 @@ func (s *Store) SaveDecodeHistory(req models.DecodeRequest, resp *models.DecodeR
 	}
 	_, err := s.db.Exec(`
 		INSERT INTO decode_history (
-			service_name, method_name, target, message_type, input_encoding, detected_encoding,
+			project_id, project_name, service_name, method_name, target, message_type, input_encoding, detected_encoding,
 			payload_text, payload_size, result_json, success, error_code, error_msg,
 			elapsed_ms, nested_hits, nested_rules_json, warnings_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		req.ServiceName, req.MethodName, target, messageType, inputEncoding, detected,
+		projectID, projectName, req.ServiceName, req.MethodName, target, messageType, inputEncoding, detected,
 		req.Payload, len(req.Payload), resp.JSON, success, resp.ErrorCode, resp.Error,
 		resp.ElapsedMs, resp.NestedHits, string(rulesJSON), string(warningsJSON),
 	)
@@ -849,7 +1142,7 @@ func (s *Store) ListDecodeHistory(limit int) ([]DecodeHistoryEntry, error) {
 		limit = 200
 	}
 	rows, err := s.db.Query(`
-		SELECT id, created_at, service_name, method_name, target, message_type,
+		SELECT id, created_at, project_id, project_name, service_name, method_name, target, message_type,
 		       input_encoding, detected_encoding, success, error_code, error_msg,
 		       elapsed_ms, payload_size, nested_hits
 		FROM decode_history
@@ -866,7 +1159,7 @@ func (s *Store) ListDecodeHistory(limit int) ([]DecodeHistoryEntry, error) {
 		var e DecodeHistoryEntry
 		var success int
 		if err := rows.Scan(
-			&e.ID, &e.CreatedAt, &e.ServiceName, &e.MethodName, &e.Target, &e.MessageType,
+			&e.ID, &e.CreatedAt, &e.ProjectID, &e.ProjectName, &e.ServiceName, &e.MethodName, &e.Target, &e.MessageType,
 			&e.InputEncoding, &e.DetectedEncoding, &success, &e.ErrorCode, &e.Error,
 			&e.ElapsedMs, &e.PayloadSize, &e.NestedHits,
 		); err != nil {
@@ -880,7 +1173,7 @@ func (s *Store) ListDecodeHistory(limit int) ([]DecodeHistoryEntry, error) {
 
 func (s *Store) GetDecodeHistoryDetail(id int64) (*DecodeHistoryDetail, error) {
 	row := s.db.QueryRow(`
-		SELECT id, created_at, service_name, method_name, target, message_type,
+		SELECT id, created_at, project_id, project_name, service_name, method_name, target, message_type,
 		       input_encoding, detected_encoding, success, error_code, error_msg,
 		       elapsed_ms, payload_size, nested_hits, payload_text, result_json,
 		       nested_rules_json, warnings_json
@@ -892,7 +1185,7 @@ func (s *Store) GetDecodeHistoryDetail(id int64) (*DecodeHistoryDetail, error) {
 	var success int
 	var rulesJSON, warningsJSON string
 	if err := row.Scan(
-		&d.ID, &d.CreatedAt, &d.ServiceName, &d.MethodName, &d.Target, &d.MessageType,
+		&d.ID, &d.CreatedAt, &d.ProjectID, &d.ProjectName, &d.ServiceName, &d.MethodName, &d.Target, &d.MessageType,
 		&d.InputEncoding, &d.DetectedEncoding, &success, &d.ErrorCode, &d.Error,
 		&d.ElapsedMs, &d.PayloadSize, &d.NestedHits, &d.PayloadText, &d.ResultJSON,
 		&rulesJSON, &warningsJSON,

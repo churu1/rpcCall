@@ -42,6 +42,7 @@ interface MethodItem {
   methodName: string;
   fullName: string;
   methodType: string;
+  projectId: string;
 }
 
 const METHOD_TYPE_I18N: Record<string, string> = {
@@ -62,12 +63,24 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [searchAllProjects, setSearchAllProjects] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const keyboardNavRef = useRef(false);
-  const { protoFiles, addTab, removeTab, activeTabId } = useAppStore();
+  const { protoFiles, protoProjects, tabs, addTab, removeTab, activeTabId, activeProjectId, updateTab } = useAppStore();
   const { theme, toggleTheme } = useThemeStore();
   const { t } = useTranslation();
+  const projectNameById = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const project of protoProjects) names[project.id] = project.name;
+    return names;
+  }, [protoProjects]);
+  const activeTabProjectId = useMemo(
+    () => tabs.find((tab) => tab.id === activeTabId)?.projectId ?? null,
+    [tabs, activeTabId]
+  );
+  const scopedProjectId = activeTabProjectId ?? activeProjectId;
+  const scopedProjectName = scopedProjectId ? (projectNameById[scopedProjectId] ?? "") : "";
 
   const allMethods = useMemo<MethodItem[]>(() => {
     const methods: MethodItem[] = [];
@@ -81,12 +94,19 @@ export function CommandPalette() {
             methodName: method.methodName,
             fullName: method.fullName,
             methodType: method.methodType,
+            projectId: file.projectId,
           });
         }
       }
     }
     return methods;
   }, [protoFiles]);
+
+  const searchableMethods = useMemo(() => {
+    if (searchAllProjects) return allMethods;
+    if (!scopedProjectId) return [];
+    return allMethods.filter((method) => method.projectId === scopedProjectId);
+  }, [allMethods, scopedProjectId, searchAllProjects]);
 
   const commands = useMemo<CommandItem[]>(() => {
     const items: CommandItem[] = [
@@ -322,11 +342,12 @@ export function CommandPalette() {
     setOpen(false);
     setQuery("");
     setSelectedIndex(0);
+    setSearchAllProjects(false);
   }, []);
 
   const filteredMethods = useMemo(() => {
     if (!query.trim()) return [];
-    return allMethods
+    return searchableMethods
       .map((m) => {
         const score = Math.max(
           scoreFuzzyText(m.methodName, query),
@@ -338,7 +359,7 @@ export function CommandPalette() {
       .filter((x) => x.score >= 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.m);
-  }, [query, allMethods]);
+  }, [query, searchableMethods]);
 
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands;
@@ -356,7 +377,13 @@ export function CommandPalette() {
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, [query, searchAllProjects, scopedProjectId]);
+
+  const openMethod = useCallback((item: MethodItem) => {
+    const tabId = addTab(item.method);
+    updateTab(tabId, { projectId: item.projectId });
+    close();
+  }, [addTab, updateTab, close]);
 
   const executeSelected = useCallback(() => {
     if (selectedIndex < filteredCommands.length) {
@@ -365,11 +392,10 @@ export function CommandPalette() {
       const methodIdx = selectedIndex - filteredCommands.length;
       const item = filteredMethods[methodIdx];
       if (item) {
-        addTab(item.method);
-        close();
+        openMethod(item);
       }
     }
-  }, [selectedIndex, filteredCommands, filteredMethods, addTab, close]);
+  }, [selectedIndex, filteredCommands, filteredMethods, openMethod]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -511,10 +537,26 @@ export function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
+          <label className="flex items-center gap-1.5 text-xs text-[var(--color-muted-foreground)] select-none">
+            <input
+              type="checkbox"
+              checked={searchAllProjects}
+              onChange={(e) => setSearchAllProjects(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border border-[var(--color-border)] accent-[var(--color-primary)]"
+            />
+            <span>{t("command.searchAllProjects")}</span>
+          </label>
           <kbd className="text-[10px] text-[var(--color-muted-foreground)] bg-[var(--color-secondary)] px-1.5 py-0.5 rounded font-mono">
             ESC
           </kbd>
         </div>
+        {!searchAllProjects && (
+          <div className="px-4 py-1.5 border-b border-[var(--color-border)] text-[11px] text-[var(--color-muted-foreground)] truncate">
+            {scopedProjectId
+              ? t("command.scopeCurrentProject", { project: scopedProjectName || scopedProjectId })
+              : t("command.scopeNoProject")}
+          </div>
+        )}
 
         {/* Results */}
         <div ref={listRef} className="overflow-y-auto max-h-[50vh] py-1" onMouseMove={handleMouseMove}>
@@ -568,10 +610,7 @@ export function CommandPalette() {
                         ? "bg-[var(--color-primary)]/15 text-[var(--color-foreground)]"
                         : "text-[var(--color-foreground)] hover:bg-[var(--color-secondary)]"
                     }`}
-                    onClick={() => {
-                      addTab(item.method);
-                      close();
-                    }}
+                    onClick={() => openMethod(item)}
                     onMouseEnter={() => { if (!keyboardNavRef.current) setSelectedIndex(idx); }}
                   >
                     <span
@@ -587,6 +626,11 @@ export function CommandPalette() {
                       </span>
                       <span className="font-medium">{item.methodName}</span>
                     </span>
+                    {searchAllProjects && (
+                      <span className="text-[10px] text-[var(--color-muted-foreground)] truncate max-w-[120px]">
+                        {projectNameById[item.projectId] ?? item.projectId}
+                      </span>
+                    )}
                   </div>
                 );
               })}

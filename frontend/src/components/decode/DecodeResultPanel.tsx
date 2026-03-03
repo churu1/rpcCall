@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { Copy, GitCompareArrows } from "lucide-react";
+import { Copy, GitCompareArrows, ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { highlightJsonHtml } from "@/components/editor/JsonEditor";
 import { DecodeHistoryPanel } from "./DecodeHistoryPanel";
 import { DecodeDiffViewer } from "./DecodeDiffViewer";
+import { JsonTreeViewer } from "@/components/response/JsonTreeViewer";
 
 export function DecodeResultPanel() {
   const { t } = useTranslation();
   const [result, setResult] = useState<DecodeResponse | null>(null);
   const [batchResult, setBatchResult] = useState<DecodeBatchResponse | null>(null);
   const [rightView, setRightView] = useState<"result" | "history">("result");
+  const [jsonViewMode, setJsonViewMode] = useState<"tree" | "raw">("tree");
+  const [rawTagsExpanded, setRawTagsExpanded] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [diff, setDiff] = useState<{ leftTitle: string; rightTitle: string; leftText: string; rightText: string } | null>(null);
 
@@ -72,6 +75,22 @@ export function DecodeResultPanel() {
         </button>
         {rightView === "result" && result?.detectedEncoding && (
           <span className="px-1.5 py-0.5 rounded bg-[var(--color-secondary)]">{result.detectedEncoding}</span>
+        )}
+        {rightView === "result" && result?.ok && (
+          <div className="flex items-center gap-1">
+            <button
+              className={`px-1.5 py-0.5 rounded text-[10px] ${jsonViewMode === "tree" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "hover:bg-[var(--color-secondary)]"}`}
+              onClick={() => setJsonViewMode("tree")}
+            >
+              {t("response.tree")}
+            </button>
+            <button
+              className={`px-1.5 py-0.5 rounded text-[10px] ${jsonViewMode === "raw" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "hover:bg-[var(--color-secondary)]"}`}
+              onClick={() => setJsonViewMode("raw")}
+            >
+              {t("response.raw")}
+            </button>
+          </div>
         )}
         {rightView === "result" && result && (
           <button
@@ -143,14 +162,39 @@ export function DecodeResultPanel() {
               <div className="h-full">
                 {result.ok ? (
                   <>
+                    {result.rawTags && result.rawTags.length > 0 && (
+                      <div className="border-b bg-[var(--color-secondary)]/40">
+                        <button
+                          className="w-full px-2 py-1 text-[11px] flex items-center gap-1 hover:bg-[var(--color-secondary)]/60"
+                          onClick={() => setRawTagsExpanded((v) => !v)}
+                        >
+                          {rawTagsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          <span className="text-[var(--color-muted-foreground)]">{t("decode.rawTags")}</span>
+                          <span className="text-[10px] text-[var(--color-muted-foreground)]">({result.rawTags.length})</span>
+                        </button>
+                        {rawTagsExpanded && (
+                          <div className="px-2 pb-1 text-[11px] flex items-center gap-1 flex-wrap">
+                            {result.rawTags.map((tag) => (
+                              <span key={`${tag.fieldNumber}-${tag.wireType}`} className="px-1.5 py-0.5 rounded bg-[var(--color-card)] border text-[10px] font-mono">
+                                #{tag.fieldNumber}(w{tag.wireType})x{tag.count}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {result.warnings?.length > 0 && (
                       <div className="px-2 py-1 text-[11px] text-yellow-500 border-b bg-yellow-500/10">
                         {result.warnings.join(" | ")}
                       </div>
                     )}
-                    <pre className="text-xs font-mono p-2 whitespace-pre-wrap">
-                      <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(result.json || "") }} />
-                    </pre>
+                    {jsonViewMode === "tree" ? (
+                      <JsonTreeViewer json={result.json || ""} />
+                    ) : (
+                      <pre className="text-xs font-mono p-2 whitespace-pre-wrap">
+                        <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(result.json || "") }} />
+                      </pre>
+                    )}
                   </>
                 ) : (
                   <div className="p-2 text-xs text-[var(--color-destructive)]">

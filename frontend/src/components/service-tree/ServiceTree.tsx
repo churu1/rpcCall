@@ -6,6 +6,8 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronsUpDown,
+  Plus,
+  Check,
   FolderOpen,
   Package,
   Import,
@@ -181,11 +183,28 @@ function ProtoGroupNode({
 
 export function ServiceTree() {
   const { t } = useTranslation();
-  const { protoFiles, addProtoFile, removeProtoFile, clearProtoFiles, addTab, updateTab, activeTabId, tabs } =
+  const {
+    protoFiles,
+    protoProjects,
+    activeProjectId,
+    setProtoProjects,
+    setActiveProjectId,
+    addProtoFile,
+    removeProtoFile,
+    addTab,
+    updateTab,
+    activeTabId,
+    tabs,
+  } =
     useAppStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
   const loadedRef = useRef(false);
+  const loadedProjectsRef = useRef<Set<string>>(new Set());
+  const loadingProjectRef = useRef<string | null>(null);
   const handlersRef = useRef<{
     handleImportFile: () => void;
     handleImportDir: () => void;
@@ -199,10 +218,10 @@ export function ServiceTree() {
     (async () => {
       try {
         setLoading(true);
-        const files = await window.go.main.App.LoadSavedProtos();
-        if (files && files.length > 0) {
-          files.forEach((f: any) => addProtoFile(f));
-        }
+        const projects = (await window.go.main.App.ListProtoProjects()) || [];
+        setProtoProjects(projects as any);
+        const initialProjectId = activeProjectId || projects[0]?.id || null;
+        setActiveProjectId(initialProjectId);
       } catch {
         // silent
       } finally {
@@ -216,8 +235,13 @@ export function ServiceTree() {
     const onImportDir = () => handlersRef.current.handleImportDir();
     const onReflection = () => handlersRef.current.handleReflection();
     const onClearProtos = () => {
-      clearProtoFiles();
-      window.go.main.App.ClearProtoSources().catch(() => {});
+      if (!activeProjectId) return;
+      loadedProjectsRef.current.delete(activeProjectId);
+      const visible = protoFiles.filter((f) => f.projectId === activeProjectId);
+      for (const f of visible) {
+        removeProtoFile(f.path, f.projectId);
+      }
+      window.go.main.App.ClearProtoSources(activeProjectId).catch(() => {});
     };
     const onReloadProtos = () => handlersRef.current.handleReload();
     document.addEventListener("rpccall:import-file", onImportFile);
@@ -232,11 +256,16 @@ export function ServiceTree() {
       document.removeEventListener("rpccall:clear-protos", onClearProtos);
       document.removeEventListener("rpccall:reload-protos", onReloadProtos);
     };
-  }, [clearProtoFiles]);
+  }, [activeProjectId, protoFiles, removeProtoFile]);
+
+  const visibleFiles = useMemo(
+    () => protoFiles.filter((f) => (activeProjectId ? f.projectId === activeProjectId : false)),
+    [protoFiles, activeProjectId]
+  );
 
   const groups = useMemo<ProtoGroup[]>(() => {
     const map = new Map<string, ProtoFile[]>();
-    for (const file of protoFiles) {
+    for (const file of visibleFiles) {
       const key = deriveGroupKey(file.path);
       const list = map.get(key) || [];
       list.push(file);
@@ -249,12 +278,50 @@ export function ServiceTree() {
       files,
       totalMethods: files.reduce((sum, f) => sum + (f.services ?? []).reduce((s, svc) => s + (svc.methods?.length ?? 0), 0), 0),
     }));
-  }, [protoFiles]);
+  }, [visibleFiles]);
+
+  useEffect(() => {
+    if (!activeProjectId) return;
+    if (loadedProjectsRef.current.has(activeProjectId)) return;
+    if (loadingProjectRef.current === activeProjectId) return;
+    (async () => {
+      loadingProjectRef.current = activeProjectId;
+      setLoading(true);
+      try {
+        const files = await window.go.main.App.LoadSavedProtos(activeProjectId);
+        (files || []).forEach((f: any) => addProtoFile(f));
+        loadedProjectsRef.current.add(activeProjectId);
+      } catch {
+        // ignore
+      } finally {
+        loadingProjectRef.current = null;
+        setLoading(false);
+      }
+    })();
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (tab?.projectId) {
+      setActiveProjectId(tab.projectId);
+    }
+  }, [activeTabId]);
+
+  useEffect(() => {
+    if (!activeProjectId || !activeTabId) return;
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (tab && !tab.projectId) {
+      updateTab(tab.id, { projectId: activeProjectId });
+    }
+  }, [activeProjectId, activeTabId, tabs, updateTab]);
 
   const handleMethodClick = async (method: ServiceMethod) => {
+    if (!activeProjectId) return;
     const tabId = addTab(method);
+    updateTab(tabId, { projectId: activeProjectId });
     try {
       const template = await window.go.main.App.GetMethodTemplate(
+        activeProjectId,
         method.serviceName,
         method.methodName
       );
@@ -268,9 +335,10 @@ export function ServiceTree() {
 
   const handleRemoveGroup = (group: ProtoGroup) => {
     for (const file of group.files) {
-      removeProtoFile(file.path);
+      removeProtoFile(file.path, file.projectId);
     }
-    window.go.main.App.ListProtoSources().then((sources) => {
+    if (!activeProjectId) return;
+    window.go.main.App.ListProtoSources(activeProjectId).then((sources) => {
       if (!sources) return;
       for (const src of sources) {
         const srcKey = deriveGroupKey(src.path);
@@ -282,10 +350,14 @@ export function ServiceTree() {
   };
 
   const handleImportFile = async () => {
+    if (!activeProjectId) {
+      setError(t("decode.selectProjectFirst"));
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
-      const files = await window.go.main.App.OpenProtoFileDialog();
+      const files = await window.go.main.App.OpenProtoFileDialog(activeProjectId);
       if (files) {
         files.forEach((f: any) => addProtoFile(f));
       }
@@ -297,10 +369,14 @@ export function ServiceTree() {
   };
 
   const handleImportDir = async () => {
+    if (!activeProjectId) {
+      setError(t("decode.selectProjectFirst"));
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
-      const files = await window.go.main.App.OpenProtoDirDialog();
+      const files = await window.go.main.App.OpenProtoDirDialog(activeProjectId);
       if (files) {
         files.forEach((f: any) => addProtoFile(f));
       }
@@ -312,6 +388,10 @@ export function ServiceTree() {
   };
 
   const handleReflection = async () => {
+    if (!activeProjectId) {
+      setError(t("decode.selectProjectFirst"));
+      return;
+    }
     const tab = tabs.find((t) => t.id === activeTabId);
     const address = tab?.address || "localhost:50051";
     setError(null);
@@ -321,6 +401,7 @@ export function ServiceTree() {
       if (services && services.length > 0) {
         addProtoFile({
           path: `reflection://${address}`,
+          projectId: activeProjectId,
           services: services,
         });
       } else {
@@ -334,14 +415,16 @@ export function ServiceTree() {
   };
 
   const handleReload = async () => {
+    if (!activeProjectId) return;
     setError(null);
     setLoading(true);
     try {
-      clearProtoFiles();
-      const files = await window.go.main.App.LoadSavedProtos();
+      loadedProjectsRef.current.delete(activeProjectId);
+      const files = await window.go.main.App.LoadSavedProtos(activeProjectId);
       if (files && files.length > 0) {
         files.forEach((f: any) => addProtoFile(f));
       }
+      loadedProjectsRef.current.add(activeProjectId);
     } catch (e: any) {
       setError(typeof e === "string" ? e : e?.message || String(e));
     } finally {
@@ -354,61 +437,156 @@ export function ServiceTree() {
   handlersRef.current.handleReflection = handleReflection;
   handlersRef.current.handleReload = handleReload;
 
+  const handleCreateProject = async () => {
+    const name = newProjectName.trim();
+    if (!name || creatingProject) return;
+    try {
+      setCreatingProject(true);
+      const created = await window.go.main.App.CreateProtoProject(name);
+      if (!created) return;
+      setProtoProjects([...(protoProjects || []), created as any]);
+      setActiveProjectId((created as any).id || null);
+      setNewProjectName("");
+      setShowCreateProject(false);
+      setError(null);
+    } catch (e: any) {
+      setError(typeof e === "string" ? e : e?.message || String(e));
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-muted-foreground)]">
-          {t("services.title")}
-        </span>
-        <div className="flex items-center gap-0.5">
-          {loading && <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />}
-          <button
-            className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-            title={t("services.importFile")}
-            onClick={handleImportFile}
-            disabled={loading}
-          >
-            <Import size={14} />
-          </button>
-          <button
-            className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-            title={t("services.importDir")}
-            onClick={handleImportDir}
-            disabled={loading}
-          >
-            <FolderSearch size={14} />
-          </button>
-          <button
-            className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-            title={t("services.reflection")}
-            onClick={handleReflection}
-            disabled={loading}
-          >
-            <Wifi size={14} />
-          </button>
-          {protoFiles.length > 0 && (
-            <>
-              <button
-                className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-                title={t("services.reload")}
-                onClick={handleReload}
-                disabled={loading}
+      <div className="px-3 py-2 border-b space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-muted-foreground)] shrink-0">
+              {t("services.title")}
+            </span>
+            <div className="flex items-center gap-1 min-w-0 flex-1">
+              <select
+                value={activeProjectId ?? protoProjects[0]?.id ?? ""}
+                onChange={(e) => {
+                  const nextProjectId = e.target.value || null;
+                  setActiveProjectId(nextProjectId);
+                  if (activeTabId && nextProjectId) {
+                    updateTab(activeTabId, { projectId: nextProjectId });
+                  }
+                }}
+                className="h-8 w-full min-w-0 bg-[var(--color-secondary)] border border-[var(--color-input)] rounded px-2 text-xs"
+                disabled={protoProjects.length === 0}
               >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              </button>
+                {protoProjects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
               <button
-                className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
-                title={t("services.clearAll")}
+                className="h-8 w-7 shrink-0 rounded border border-[var(--color-input)] hover:bg-[var(--color-secondary)] flex items-center justify-center"
+                title={t("decode.newProject")}
                 onClick={() => {
-                  clearProtoFiles();
-                  window.go.main.App.ClearProtoSources().catch(() => {});
+                  setShowCreateProject((v) => !v);
+                  setError(null);
                 }}
               >
-                <Trash2 size={14} />
+                <Plus size={12} />
               </button>
-            </>
-          )}
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5">
+            {loading && <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />}
+            <button
+              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              title={t("services.importFile")}
+              onClick={handleImportFile}
+              disabled={loading}
+            >
+              <Import size={14} />
+            </button>
+            <button
+              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              title={t("services.importDir")}
+              onClick={handleImportDir}
+              disabled={loading}
+            >
+              <FolderSearch size={14} />
+            </button>
+            <button
+              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              title={t("services.reflection")}
+              onClick={handleReflection}
+              disabled={loading}
+            >
+              <Wifi size={14} />
+            </button>
+            {visibleFiles.length > 0 && (
+              <>
+                <button
+                  className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                  title={t("services.reload")}
+                  onClick={handleReload}
+                  disabled={loading}
+                >
+                  <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                </button>
+                <button
+                  className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+                  title={t("services.clearAll")}
+                  onClick={() => {
+                    if (!activeProjectId) return;
+                    loadedProjectsRef.current.delete(activeProjectId);
+                    const visible = protoFiles.filter((f) => f.projectId === activeProjectId);
+                    for (const f of visible) {
+                      removeProtoFile(f.path, f.projectId);
+                    }
+                    window.go.main.App.ClearProtoSources(activeProjectId).catch(() => {});
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
+        {showCreateProject && (
+          <div className="flex items-center gap-1">
+            <input
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateProject();
+                if (e.key === "Escape") {
+                  setShowCreateProject(false);
+                  setNewProjectName("");
+                }
+              }}
+              className="h-7 flex-1 bg-[var(--color-secondary)] border border-[var(--color-input)] rounded px-2 text-xs"
+              placeholder={t("decode.newProjectName")}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+            />
+            <button
+              className="h-7 w-7 rounded border border-[var(--color-input)] hover:bg-[var(--color-secondary)] flex items-center justify-center disabled:opacity-50"
+              onClick={handleCreateProject}
+              disabled={!newProjectName.trim() || creatingProject}
+              title={t("common.save")}
+            >
+              {creatingProject ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+            </button>
+            <button
+              className="h-7 w-7 rounded border border-[var(--color-input)] hover:bg-[var(--color-secondary)] flex items-center justify-center"
+              onClick={() => {
+                setShowCreateProject(false);
+                setNewProjectName("");
+              }}
+              title={t("common.cancel")}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (

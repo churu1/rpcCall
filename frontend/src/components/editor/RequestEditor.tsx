@@ -269,14 +269,14 @@ export function RequestEditor() {
   );
 
   useEffect(() => {
-    if (!tab?.method) {
+    if (!tab?.method || !tab?.projectId) {
       setAcFields([]);
       return;
     }
-    window.go.main.App.GetMessageFields(tab.method.serviceName, tab.method.methodName)
+    window.go.main.App.GetMessageFields(tab.projectId, tab.method.serviceName, tab.method.methodName)
       .then((fields) => setAcFields(fields ?? []))
       .catch(() => setAcFields([]));
-  }, [tab?.method?.serviceName, tab?.method?.methodName]);
+  }, [tab?.projectId, tab?.method?.serviceName, tab?.method?.methodName]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -383,7 +383,9 @@ export function RequestEditor() {
     setAiLoading(true);
     setAiError(null);
     try {
+      if (!tab.projectId) return;
       const body = await window.go.main.App.AIGenerateBody(
+        tab.projectId,
         tab.method.serviceName,
         tab.method.methodName
       );

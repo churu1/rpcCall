@@ -29,7 +29,7 @@ func (c *Caller) RunBenchmark(
 	onProgress func(models.BenchmarkProgress),
 	onDone func(models.BenchmarkResult),
 ) error {
-	methodDesc, err := c.findMethodDescriptor(req.ServiceName, req.MethodName)
+	methodDesc, err := c.findMethodDescriptor(req.ProjectID, req.ServiceName, req.MethodName)
 	if err != nil {
 		return err
 	}
@@ -509,6 +509,6 @@ func buildLatencyBuckets(sorted []int64) []models.LatencyBucket {
 }
 
 // FindMethodDescriptor exposes method lookup for benchmark
-func (c *Caller) FindMethodDescriptor(serviceName, methodName string) (*desc.MethodDescriptor, error) {
-	return c.findMethodDescriptor(serviceName, methodName)
+func (c *Caller) FindMethodDescriptor(projectID, serviceName, methodName string) (*desc.MethodDescriptor, error) {
+	return c.findMethodDescriptor(projectID, serviceName, methodName)
 }

@@ -60,7 +60,7 @@
     "addMetadata": "添加元数据"
   },
   "services": {
-    "title": "服务",
+    "title": "项目",
     "importFile": "导入 Proto 文件",
     "importDir": "导入 Proto 目录",
     "reflection": "服务端反射",
@@ -119,6 +119,9 @@
     "exportWorkspace": "导出工作台",
     "importWorkspace": "导入工作台",
     "noResults": "未找到匹配的命令或方法",
+    "searchAllProjects": "全部项目",
+    "scopeCurrentProject": "当前项目：{{project}}",
+    "scopeNoProject": "当前标签页未绑定项目",
     "navigate": "导航",
     "select": "选择",
     "close": "关闭"
@@ -218,7 +221,11 @@
     "failed": "失败",
     "okUpper": "成功",
     "failUpper": "失败",
-    "error": "错误"
+    "rawTags": "原始Tag",
+    "error": "错误",
+    "selectProjectFirst": "请选择 Proto 项目",
+    "newProject": "新建项目",
+    "newProjectName": "请输入新项目名"
   },
   "saveRequest": {
     "title": "保存请求",

@@ -25,8 +25,16 @@ type ServiceDefinition struct {
 }
 
 type ProtoFile struct {
-	Path     string              `json:"path"`
-	Services []ServiceDefinition `json:"services"`
+	Path        string              `json:"path"`
+	ProjectID   string              `json:"projectId"`
+	ProjectName string              `json:"projectName"`
+	Services    []ServiceDefinition `json:"services"`
+}
+
+type ProtoProject struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type MetadataEntry struct {
@@ -35,6 +43,7 @@ type MetadataEntry struct {
 }
 
 type GrpcRequest struct {
+	ProjectID   string          `json:"projectId"`
 	Address     string          `json:"address"`
 	ServiceName string          `json:"serviceName"`
 	MethodName  string          `json:"methodName"`
@@ -65,10 +74,11 @@ type GrpcResponse struct {
 }
 
 type FieldInfo struct {
-	Name     string `json:"name"`
-	TypeName string `json:"typeName"`
-	Repeated bool   `json:"repeated"`
-	MapEntry bool   `json:"mapEntry"`
+	FieldNumber int32  `json:"fieldNumber"`
+	Name        string `json:"name"`
+	TypeName    string `json:"typeName"`
+	Repeated    bool   `json:"repeated"`
+	MapEntry    bool   `json:"mapEntry"`
 }
 
 type HistoryRecord struct {
@@ -130,6 +140,7 @@ type LatencyBucket struct {
 // --- Chain Request ---
 
 type ChainStep struct {
+	ProjectID   string          `json:"projectId"`
 	Address     string          `json:"address"`
 	ServiceName string          `json:"serviceName"`
 	MethodName  string          `json:"methodName"`
@@ -181,6 +192,7 @@ type NestedDecodeRule struct {
 }
 
 type DecodeRequest struct {
+	ProjectID           string             `json:"projectId"`
 	ServiceName         string             `json:"serviceName"`
 	MethodName          string             `json:"methodName"`
 	Target              DecodeTarget       `json:"target"`
@@ -194,6 +206,7 @@ type DecodeResponse struct {
 	OK               bool           `json:"ok"`
 	DetectedEncoding DecodeEncoding `json:"detectedEncoding"`
 	JSON             string         `json:"json"`
+	RawTags          []DecodeRawTag `json:"rawTags,omitempty"`
 	Warnings         []string       `json:"warnings"`
 	ElapsedMs        int64          `json:"elapsedMs"`
 	NestedHits       int            `json:"nestedHits"`
@@ -211,11 +224,18 @@ type DecodeItemResult struct {
 	OK               bool           `json:"ok"`
 	DetectedEncoding DecodeEncoding `json:"detectedEncoding"`
 	JSON             string         `json:"json"`
+	RawTags          []DecodeRawTag `json:"rawTags,omitempty"`
 	NestedHits       int            `json:"nestedHits"`
 	ErrorCode        string         `json:"errorCode,omitempty"`
 	Error            string         `json:"error,omitempty"`
 	Warnings         []string       `json:"warnings"`
 	ElapsedMs        int64          `json:"elapsedMs"`
+}
+
+type DecodeRawTag struct {
+	FieldNumber int32 `json:"fieldNumber"`
+	WireType    int32 `json:"wireType"`
+	Count       int32 `json:"count"`
 }
 
 type DecodeBatchResponse struct {

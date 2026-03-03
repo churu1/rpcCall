@@ -19,7 +19,15 @@ export interface ServiceDefinition {
 
 export interface ProtoFile {
   path: string;
+  projectId: string;
+  projectName?: string;
   services: ServiceDefinition[];
+}
+
+export interface ProtoProject {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 export interface MetadataEntry {
@@ -29,6 +37,7 @@ export interface MetadataEntry {
 }
 
 export interface ChainStepConfig {
+  projectId?: string;
   address: string;
   serviceName: string;
   methodName: string;
@@ -57,17 +66,22 @@ export interface Tab {
   timing: TimingDetail | null;
   chainSteps?: ChainStepConfig[];
   chainResults?: ChainStepResult[];
+  projectId: string | null;
 }
 
 interface AppState {
   protoFiles: ProtoFile[];
+  protoProjects: ProtoProject[];
+  activeProjectId: string | null;
   tabs: Tab[];
   activeTabId: string | null;
   sidebarWidth: number;
 
   addProtoFile: (file: ProtoFile) => void;
-  removeProtoFile: (path: string) => void;
+  removeProtoFile: (path: string, projectId?: string) => void;
   clearProtoFiles: () => void;
+  setProtoProjects: (projects: ProtoProject[]) => void;
+  setActiveProjectId: (projectId: string | null) => void;
 
   addTab: (method?: ServiceMethod) => string;
   removeTab: (id: string) => void;
@@ -102,11 +116,14 @@ function createTab(method?: ServiceMethod): Tab {
     caPath: "",
     timeoutSec: 30,
     timing: null,
+    projectId: null,
   };
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   protoFiles: [],
+  protoProjects: [],
+  activeProjectId: null,
   tabs: [createTab()],
   activeTabId: "tab-1",
   sidebarWidth: 280,
@@ -118,19 +135,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       methods: s.methods ?? [],
     }));
     set((state) => ({
-      protoFiles: [...state.protoFiles.filter((f) => f.path !== safeFile.path), safeFile],
+      protoFiles: [
+        ...state.protoFiles.filter((f) => !(f.path === safeFile.path && f.projectId === safeFile.projectId)),
+        safeFile,
+      ],
     }));
   },
 
-  removeProtoFile: (path) =>
+  removeProtoFile: (path, projectId) =>
     set((state) => ({
-      protoFiles: state.protoFiles.filter((f) => f.path !== path),
+      protoFiles: state.protoFiles.filter((f) => !(f.path === path && (!projectId || f.projectId === projectId))),
     })),
 
   clearProtoFiles: () => set({ protoFiles: [] }),
+  setProtoProjects: (projects) => set({ protoProjects: projects ?? [] }),
+  setActiveProjectId: (projectId) => set({ activeProjectId: projectId }),
 
   addTab: (method) => {
     const tab = createTab(method);
+    const state = get();
+    const active = state.tabs.find((t) => t.id === state.activeTabId);
+    tab.projectId = active?.projectId ?? state.activeProjectId ?? null;
     set((state) => ({
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,

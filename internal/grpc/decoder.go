@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +37,13 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 		OK:       false,
 		Warnings: []string{},
 	}
+	projectID := strings.TrimSpace(req.ProjectID)
+	if projectID == "" {
+		resp.ErrorCode = "message_not_found"
+		resp.Error = "projectId is required"
+		resp.ElapsedMs = time.Since(start).Milliseconds()
+		return resp
+	}
 
 	var msgDesc *desc.MessageDescriptor
 	var err error
@@ -47,7 +55,7 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 			resp.ElapsedMs = time.Since(start).Milliseconds()
 			return resp
 		}
-		msgDesc = d.findMessageDescriptor(msgType)
+		msgDesc = d.findMessageDescriptor(projectID, msgType)
 		if msgDesc == nil {
 			resp.ErrorCode = "message_not_found"
 			resp.Error = fmt.Sprintf("message type %s not found", msgType)
@@ -55,7 +63,7 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 			return resp
 		}
 	} else {
-		methodDesc, methodErr := d.resolveMethodDescriptor(req.ServiceName, req.MethodName)
+		methodDesc, methodErr := d.resolveMethodDescriptor(projectID, req.ServiceName, req.MethodName)
 		if methodErr != nil {
 			resp.ErrorCode = "message_not_found"
 			resp.Error = methodErr.Error()
@@ -78,6 +86,12 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 		resp.Error = parseErr.err.Error()
 		resp.ElapsedMs = time.Since(start).Milliseconds()
 		return resp
+	}
+	rawTags, rawTagErr := scanProtobufTopLevelTags(rawBytes)
+	if rawTagErr != nil {
+		resp.Warnings = append(resp.Warnings, fmt.Sprintf("raw tag scan failed: %v", rawTagErr))
+	} else {
+		resp.RawTags = rawTags
 	}
 
 	msg := dynamic.NewMessage(msgDesc)
@@ -104,9 +118,10 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 		return resp
 	}
 
-	hits, warnings := d.applyNestedRules(doc, req.NestedRules)
+	hits, warnings := d.applyNestedRules(projectID, doc, req.NestedRules, msgDesc)
 	resp.NestedHits = hits
 	resp.Warnings = append(resp.Warnings, warnings...)
+	fillMissingFieldsByDescriptor(doc, msgDesc)
 
 	finalBytes, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
@@ -160,6 +175,7 @@ func (d *Decoder) DecodeBatch(req models.DecodeBatchRequest) *models.DecodeBatch
 					OK:               decoded.OK,
 					DetectedEncoding: decoded.DetectedEncoding,
 					JSON:             decoded.JSON,
+					RawTags:          decoded.RawTags,
 					NestedHits:       decoded.NestedHits,
 					ErrorCode:        decoded.ErrorCode,
 					Error:            decoded.Error,
@@ -187,8 +203,8 @@ func (d *Decoder) DecodeBatch(req models.DecodeBatchRequest) *models.DecodeBatch
 	return out
 }
 
-func (d *Decoder) resolveMethodDescriptor(serviceName, methodName string) (*desc.MethodDescriptor, error) {
-	for _, fd := range d.parser.GetAllFileDescriptors() {
+func (d *Decoder) resolveMethodDescriptor(projectID, serviceName, methodName string) (*desc.MethodDescriptor, error) {
+	for _, fd := range d.parser.GetAllFileDescriptorsByProject(projectID) {
 		for _, svc := range fd.GetServices() {
 			if svc.GetFullyQualifiedName() == serviceName || svc.GetName() == serviceName {
 				for _, md := range svc.GetMethods() {
@@ -200,25 +216,6 @@ func (d *Decoder) resolveMethodDescriptor(serviceName, methodName string) (*desc
 		}
 	}
 
-	if d.reflection != nil {
-		if svc := d.reflection.GetServiceDescriptor(serviceName); svc != nil {
-			for _, md := range svc.GetMethods() {
-				if md.GetName() == methodName {
-					return md, nil
-				}
-			}
-		}
-		for _, svc := range d.reflection.GetAllServiceDescriptors() {
-			if svc.GetName() != serviceName && svc.GetFullyQualifiedName() != serviceName {
-				continue
-			}
-			for _, md := range svc.GetMethods() {
-				if md.GetName() == methodName {
-					return md, nil
-				}
-			}
-		}
-	}
 	return nil, fmt.Errorf("method %s/%s not found", serviceName, methodName)
 }
 
@@ -232,7 +229,7 @@ func (d *Decoder) resolveMessageDescriptor(method *desc.MethodDescriptor, req mo
 		if strings.TrimSpace(req.ExplicitMessageType) == "" {
 			return nil, fmt.Errorf("explicit message type is required when target=message")
 		}
-		md := d.findMessageDescriptor(req.ExplicitMessageType)
+		md := d.findMessageDescriptor(req.ProjectID, req.ExplicitMessageType)
 		if md == nil {
 			return nil, fmt.Errorf("message type %s not found", req.ExplicitMessageType)
 		}
@@ -242,21 +239,11 @@ func (d *Decoder) resolveMessageDescriptor(method *desc.MethodDescriptor, req mo
 	}
 }
 
-func (d *Decoder) findMessageDescriptor(messageType string) *desc.MessageDescriptor {
-	for _, fd := range d.parser.GetAllFileDescriptors() {
-		if md := findMessageInFile(fd, messageType); md != nil {
+func (d *Decoder) findMessageDescriptor(projectID, messageType string) *desc.MessageDescriptor {
+	fds := d.parser.GetAllFileDescriptorsByProject(projectID)
+	for i := len(fds) - 1; i >= 0; i-- {
+		if md := findMessageInFile(fds[i], messageType); md != nil {
 			return md
-		}
-	}
-	if d.reflection != nil {
-		for _, svc := range d.reflection.GetAllServiceDescriptors() {
-			fd := svc.GetFile()
-			if fd == nil {
-				continue
-			}
-			if md := findMessageInFile(fd, messageType); md != nil {
-				return md
-			}
 		}
 	}
 	return nil
@@ -283,7 +270,7 @@ func findMessageRecursive(md *desc.MessageDescriptor, messageType string) *desc.
 	return nil
 }
 
-func (d *Decoder) applyNestedRules(doc any, rules []models.NestedDecodeRule) (int, []string) {
+func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.NestedDecodeRule, rootDesc *desc.MessageDescriptor) (int, []string) {
 	if len(rules) == 0 {
 		return 0, nil
 	}
@@ -295,12 +282,12 @@ func (d *Decoder) applyNestedRules(doc any, rules []models.NestedDecodeRule) (in
 		if path == "" || msgType == "" {
 			continue
 		}
-		md := d.findMessageDescriptor(msgType)
+		md := d.findMessageDescriptor(projectID, msgType)
 		if md == nil {
 			warnings = append(warnings, fmt.Sprintf("nested rule %s: message %s not found", path, msgType))
 			continue
 		}
-		changed, warn := decodeFieldPath(doc, path, md)
+		changed, warn := decodeFieldPath(doc, path, rootDesc, md)
 		hits += changed
 		if warn != "" {
 			warnings = append(warnings, warn)
@@ -309,12 +296,34 @@ func (d *Decoder) applyNestedRules(doc any, rules []models.NestedDecodeRule) (in
 	return hits, warnings
 }
 
-func decodeFieldPath(root any, fieldPath string, md *desc.MessageDescriptor) (int, string) {
-	parts := strings.Split(fieldPath, ".")
+func decodeFieldPath(root any, fieldPath string, rootDesc *desc.MessageDescriptor, decodeDesc *desc.MessageDescriptor) (int, string) {
+	rawParts := strings.Split(fieldPath, ".")
+	parts := make([]string, 0, len(rawParts))
+	for _, p := range rawParts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
 	if len(parts) == 0 {
 		return 0, ""
 	}
-	changed, warn := decodeFieldPathInner(root, parts, md, fieldPath)
+	if rootDesc != nil && len(parts) > 1 {
+		first := parts[0]
+		fullName := rootDesc.GetFullyQualifiedName()
+		shortName := rootDesc.GetName()
+		lastSeg := fullName
+		if i := strings.LastIndex(lastSeg, "."); i >= 0 && i+1 < len(lastSeg) {
+			lastSeg = lastSeg[i+1:]
+		}
+		if strings.EqualFold(first, shortName) || strings.EqualFold(first, fullName) || strings.EqualFold(first, lastSeg) {
+			parts = parts[1:]
+		}
+	}
+	if len(parts) == 0 {
+		return 0, ""
+	}
+	changed, warn := decodeFieldPathInner(root, parts, decodeDesc, fieldPath)
 	return changed, warn
 }
 
@@ -324,7 +333,7 @@ func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, 
 	}
 	switch cur := node.(type) {
 	case map[string]any:
-		next, ok := cur[parts[0]]
+		key, next, ok := lookupPathKey(cur, parts[0])
 		if !ok {
 			return 0, fmt.Sprintf("nested rule %s: field not found", fieldPath)
 		}
@@ -334,7 +343,7 @@ func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, 
 				return 0, fmt.Sprintf("nested rule %s: %v", fieldPath, err)
 			}
 			if changed != nil {
-				cur[parts[0]] = changed
+				cur[key] = changed
 				return 1, ""
 			}
 			return 0, fmt.Sprintf("nested rule %s: field is not decodable string/list", fieldPath)
@@ -353,6 +362,64 @@ func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, 
 	default:
 		return 0, fmt.Sprintf("nested rule %s: unexpected field type", fieldPath)
 	}
+}
+
+func lookupPathKey(m map[string]any, raw string) (string, any, bool) {
+	candidates := []string{raw}
+	snake := toSnakeCase(raw)
+	if snake != raw {
+		candidates = append(candidates, snake)
+	}
+	camel := toLowerCamelCase(raw)
+	if camel != raw {
+		candidates = append(candidates, camel)
+	}
+	for _, k := range candidates {
+		if v, ok := m[k]; ok {
+			return k, v, true
+		}
+	}
+	return "", nil, false
+}
+
+func toSnakeCase(s string) string {
+	if s == "" {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + 8)
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteByte(byte(r - 'A' + 'a'))
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func toLowerCamelCase(s string) string {
+	if s == "" {
+		return s
+	}
+	parts := strings.Split(s, "_")
+	if len(parts) == 1 {
+		return s
+	}
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		if i == 0 {
+			parts[i] = strings.ToLower(p)
+		} else {
+			parts[i] = strings.ToUpper(p[:1]) + strings.ToLower(p[1:])
+		}
+	}
+	return strings.Join(parts, "")
 }
 
 func decodeNodeValue(v any, md *desc.MessageDescriptor) (any, error) {
@@ -407,6 +474,197 @@ func decodeNestedString(encoded string, md *desc.MessageDescriptor) (any, error)
 		return nil, err
 	}
 	return doc, nil
+}
+
+func fillMissingFieldsByDescriptor(node any, md *desc.MessageDescriptor) {
+	if md == nil {
+		return
+	}
+	obj, ok := node.(map[string]any)
+	if !ok {
+		return
+	}
+	for _, f := range md.GetFields() {
+		key := f.GetJSONName()
+		if key == "" {
+			key = toLowerCamelCase(f.GetName())
+		}
+		val, exists := obj[key]
+		if !exists {
+			obj[key] = defaultJSONValueForField(f)
+			continue
+		}
+
+		if f.GetMessageType() == nil {
+			continue
+		}
+
+		if f.IsMap() {
+			mapObj, ok := val.(map[string]any)
+			if !ok {
+				continue
+			}
+			mv := f.GetMapValueType()
+			if mv == nil || mv.GetMessageType() == nil {
+				continue
+			}
+			for mk, mval := range mapObj {
+				if child, ok := mval.(map[string]any); ok {
+					fillMissingFieldsByDescriptor(child, mv.GetMessageType())
+					mapObj[mk] = child
+				}
+			}
+			continue
+		}
+
+		if f.IsRepeated() {
+			arr, ok := val.([]any)
+			if !ok {
+				continue
+			}
+			for i, item := range arr {
+				if child, ok := item.(map[string]any); ok {
+					fillMissingFieldsByDescriptor(child, f.GetMessageType())
+					arr[i] = child
+				}
+			}
+			obj[key] = arr
+			continue
+		}
+
+		if child, ok := val.(map[string]any); ok {
+			fillMissingFieldsByDescriptor(child, f.GetMessageType())
+			obj[key] = child
+		}
+	}
+}
+
+func defaultJSONValueForField(f *desc.FieldDescriptor) any {
+	if f.IsMap() {
+		return map[string]any{}
+	}
+	if f.IsRepeated() {
+		return []any{}
+	}
+	if f.GetMessageType() != nil {
+		return nil
+	}
+	if f.GetEnumType() != nil {
+		vals := f.GetEnumType().GetValues()
+		if len(vals) > 0 {
+			return vals[0].GetName()
+		}
+		return 0
+	}
+	switch f.GetType().String() {
+	case "TYPE_STRING":
+		return ""
+	case "TYPE_BOOL":
+		return false
+	case "TYPE_BYTES":
+		return ""
+	case "TYPE_FLOAT", "TYPE_DOUBLE":
+		return 0.0
+	default:
+		return 0
+	}
+}
+
+func scanProtobufTopLevelTags(b []byte) ([]models.DecodeRawTag, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+	type key struct {
+		field int32
+		wire  int32
+	}
+	counts := map[key]int32{}
+	i := 0
+	for i < len(b) {
+		tag, n, err := readProtoVarintAt(b, i)
+		if err != nil {
+			return nil, err
+		}
+		i += n
+		fieldNum := int32(tag >> 3)
+		wireType := int32(tag & 0x7)
+		if fieldNum <= 0 {
+			return nil, fmt.Errorf("invalid field number 0 at offset %d", i-n)
+		}
+		counts[key{field: fieldNum, wire: wireType}]++
+
+		next, err := skipWireValue(b, i, wireType)
+		if err != nil {
+			return nil, err
+		}
+		i = next
+	}
+
+	out := make([]models.DecodeRawTag, 0, len(counts))
+	for k, c := range counts {
+		out = append(out, models.DecodeRawTag{
+			FieldNumber: k.field,
+			WireType:    k.wire,
+			Count:       c,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].FieldNumber != out[j].FieldNumber {
+			return out[i].FieldNumber < out[j].FieldNumber
+		}
+		return out[i].WireType < out[j].WireType
+	})
+	return out, nil
+}
+
+func skipWireValue(b []byte, idx int, wireType int32) (int, error) {
+	switch wireType {
+	case 0:
+		_, n, err := readProtoVarintAt(b, idx)
+		return idx + n, err
+	case 1:
+		if idx+8 > len(b) {
+			return idx, fmt.Errorf("truncated fixed64 at offset %d", idx)
+		}
+		return idx + 8, nil
+	case 2:
+		l, n, err := readProtoVarintAt(b, idx)
+		if err != nil {
+			return idx, err
+		}
+		start := idx + n
+		end := start + int(l)
+		if end < start || end > len(b) {
+			return idx, fmt.Errorf("truncated bytes field at offset %d", idx)
+		}
+		return end, nil
+	case 5:
+		if idx+4 > len(b) {
+			return idx, fmt.Errorf("truncated fixed32 at offset %d", idx)
+		}
+		return idx + 4, nil
+	default:
+		return idx, fmt.Errorf("unsupported wire type %d at offset %d", wireType, idx)
+	}
+}
+
+func readProtoVarintAt(b []byte, idx int) (uint64, int, error) {
+	var x uint64
+	shift := uint(0)
+	start := idx
+	for idx < len(b) {
+		c := b[idx]
+		idx++
+		x |= uint64(c&0x7f) << shift
+		if c < 0x80 {
+			return x, idx - start, nil
+		}
+		shift += 7
+		if shift >= 64 {
+			return 0, 0, fmt.Errorf("varint overflow at offset %d", start)
+		}
+	}
+	return 0, 0, fmt.Errorf("truncated varint at offset %d", start)
 }
 
 type decodeInputError struct {

@@ -76,6 +76,8 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
     const q = query.trim();
     if (!q) return true;
     const text = [
+      entry.projectName || "",
+      entry.projectId || "",
       entry.serviceName,
       entry.methodName,
       entry.target,
@@ -176,6 +178,8 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
                     </span>
                   </div>
                   <div className="mt-0.5 flex items-center text-[10px] text-[var(--color-muted-foreground)]">
+                    <span className="truncate max-w-[120px]">{entry.projectName || entry.projectId || "-"}</span>
+                    <span className="mx-1">·</span>
                     <span className="truncate">{entry.detectedEncoding || entry.inputEncoding}</span>
                     <span className="mx-1">·</span>
                     <span>{entry.payloadSize}B</span>

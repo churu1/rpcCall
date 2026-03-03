@@ -13,8 +13,8 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (data === null) {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
-        <span className="text-[var(--color-muted-foreground)] italic">null</span>
+        {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
+        <span className="text-[var(--color-syntax-null)] italic">null</span>
       </div>
     );
   }
@@ -22,8 +22,8 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (typeof data === "string") {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
-        <span className="text-green-400">"{data}"</span>
+        {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
+        <span className="text-[var(--color-syntax-string)]">"{data}"</span>
       </div>
     );
   }
@@ -31,8 +31,8 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (typeof data === "number") {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
-        <span className="text-cyan-400">{String(data)}</span>
+        {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
+        <span className="text-[var(--color-syntax-number)]">{String(data)}</span>
       </div>
     );
   }
@@ -40,8 +40,8 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (typeof data === "boolean") {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
-        <span className="text-purple-400">{String(data)}</span>
+        {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
+        <span className="text-[var(--color-syntax-boolean)]">{String(data)}</span>
       </div>
     );
   }
@@ -56,7 +56,7 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
           onClick={toggle}
         >
           {expanded ? <ChevronDown size={12} className="shrink-0" /> : <ChevronRight size={12} className="shrink-0" />}
-          {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
+          {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
           {!expanded && <span className="text-[var(--color-muted-foreground)]">[{preview}]</span>}
           {expanded && <span className="text-[var(--color-muted-foreground)]">[</span>}
         </div>
@@ -83,7 +83,7 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
           onClick={toggle}
         >
           {expanded ? <ChevronDown size={12} className="shrink-0" /> : <ChevronRight size={12} className="shrink-0" />}
-          {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
+          {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
           {!expanded && <span className="text-[var(--color-muted-foreground)]">{`{${preview}}`}</span>}
           {expanded && <span className="text-[var(--color-muted-foreground)]">{"{"}</span>}
         </div>
@@ -101,7 +101,7 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
 
   return (
     <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-      {name !== undefined && <span className="text-[var(--color-foreground)]">{name}:</span>}
+      {name !== undefined && <span className="text-[var(--color-syntax-property)]">{name}:</span>}
       <span>{String(data)}</span>
     </div>
   );

@@ -36,10 +36,14 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
   const [fieldsLoading, setFieldsLoading] = useState(false);
 
   useEffect(() => {
-    window.go.main.App.GetAllMessageTypes()
+    if (!tab?.projectId) {
+      setAllMessageTypes([]);
+      return;
+    }
+    window.go.main.App.GetAllMessageTypes(tab.projectId)
       .then((types) => setAllMessageTypes((types ?? []).filter(Boolean)))
       .catch(() => setAllMessageTypes([]));
-  }, [protoFiles]);
+  }, [protoFiles, tab?.projectId]);
 
   const messageOptions = useMemo<MessageOption[]>(
     () =>
@@ -71,11 +75,16 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
       return;
     }
     setFieldsLoading(true);
-    window.go.main.App.GetMessageTypeFields(explicitMessageType.trim())
+    if (!tab?.projectId) {
+      setMessageFields([]);
+      setFieldsLoading(false);
+      return;
+    }
+    window.go.main.App.GetMessageTypeFields(tab.projectId, explicitMessageType.trim())
       .then((fields) => setMessageFields(fields ?? []))
       .catch(() => setMessageFields([]))
       .finally(() => setFieldsLoading(false));
-  }, [explicitMessageType]);
+  }, [explicitMessageType, tab?.projectId]);
 
   useEffect(() => {
     const applyHistory = (e: Event) => {
@@ -101,9 +110,10 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
     }
   }, [tab?.method?.inputTypeName, explicitMessageType]);
 
-  const canDecode = !!explicitMessageType.trim();
+  const canDecode = !!explicitMessageType.trim() && !!tab?.projectId;
 
   const buildCommon = (): DecodeRequest => ({
+    projectId: tab?.projectId || "",
     serviceName: "",
     methodName: "",
     target: "message",
@@ -222,6 +232,9 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
             ) : (
               messageFields.map((f) => (
                 <div key={`${f.name}-${f.typeName}`} className="px-2 py-1 text-[11px] border-b last:border-b-0 flex items-center gap-2">
+                  <span className="text-[10px] px-1 rounded bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] font-mono">
+                    #{f.fieldNumber}
+                  </span>
                   <span className="font-mono">{f.name}</span>
                   <span className="text-[var(--color-muted-foreground)]">{f.typeName}</span>
                   {f.repeated && <span className="text-[10px] px-1 rounded bg-[var(--color-primary)]/20 text-[var(--color-primary)]">repeated</span>}
@@ -242,11 +255,12 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
                 placeholder={t("decode.fieldPathPlaceholder")}
                 className="flex-1 bg-[var(--color-secondary)] border rounded px-2 py-1 text-xs"
               />
-              <input
+              <SearchableSelect
                 value={r.messageType}
-                onChange={(e) => setRules((prev) => prev.map((x, idx) => idx === i ? { ...x, messageType: e.target.value } : x))}
+                options={messageOptions}
                 placeholder={t("decode.messageTypePlaceholder")}
-                className="flex-1 bg-[var(--color-secondary)] border rounded px-2 py-1 text-xs"
+                onChange={(val) => setRules((prev) => prev.map((x, idx) => idx === i ? { ...x, messageType: val } : x))}
+                className="flex-1"
               />
               <button
                 onClick={() => setRules((prev) => prev.filter((_, idx) => idx !== i))}

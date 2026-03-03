@@ -5,6 +5,7 @@ declare interface AIConfig {
 }
 
 declare interface GrpcRequest {
+  projectId: string;
   address: string;
   serviceName: string;
   methodName: string;
@@ -25,6 +26,7 @@ declare interface TimingDetail {
 }
 
 declare interface FieldInfo {
+  fieldNumber: number;
   name: string;
   typeName: string;
   repeated: boolean;
@@ -98,6 +100,7 @@ declare interface BenchmarkHistoryEntry {
 }
 
 declare interface ChainStep {
+  projectId: string;
   address: string;
   serviceName: string;
   methodName: string;
@@ -178,6 +181,7 @@ declare interface NestedDecodeRule {
 }
 
 declare interface DecodeRequest {
+  projectId: string;
   serviceName: string;
   methodName: string;
   target: DecodeTarget;
@@ -191,6 +195,7 @@ declare interface DecodeResponse {
   ok: boolean;
   detectedEncoding: DecodeEncoding;
   json: string;
+  rawTags?: DecodeRawTag[];
   warnings: string[];
   elapsedMs: number;
   nestedHits: number;
@@ -208,11 +213,18 @@ declare interface DecodeItemResult {
   ok: boolean;
   detectedEncoding: DecodeEncoding;
   json: string;
+  rawTags?: DecodeRawTag[];
   nestedHits: number;
   errorCode?: string;
   error?: string;
   warnings: string[];
   elapsedMs: number;
+}
+
+declare interface DecodeRawTag {
+  fieldNumber: number;
+  wireType: number;
+  count: number;
 }
 
 declare interface DecodeBatchResponse {
@@ -225,6 +237,8 @@ declare interface DecodeBatchResponse {
 declare interface DecodeHistoryEntry {
   id: number;
   createdAt: string;
+  projectId: string;
+  projectName: string;
   serviceName: string;
   methodName: string;
   target: string;
@@ -239,6 +253,12 @@ declare interface DecodeHistoryEntry {
   nestedHits: number;
 }
 
+declare interface ProtoProject {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 declare interface DecodeHistoryDetail extends DecodeHistoryEntry {
   payloadText: string;
   resultJson: string;
@@ -250,10 +270,10 @@ interface Window {
   go: {
     main: {
       App: {
-        OpenProtoFileDialog: () => Promise<any[] | null>;
-        OpenProtoDirDialog: () => Promise<any[] | null>;
+        OpenProtoFileDialog: (projectId: string) => Promise<any[] | null>;
+        OpenProtoDirDialog: (projectId: string) => Promise<any[] | null>;
         ListServicesViaReflection: (address: string) => Promise<any[]>;
-        GetMethodTemplate: (serviceName: string, methodName: string) => Promise<string>;
+        GetMethodTemplate: (projectId: string, serviceName: string, methodName: string) => Promise<string>;
         InvokeUnary: (req: GrpcRequest) => Promise<GrpcResponse>;
         InvokeClientStream: (req: GrpcRequest) => Promise<GrpcResponse>;
         InvokeServerStream: (req: GrpcRequest) => Promise<void>;
@@ -268,10 +288,13 @@ interface Window {
         ListAddresses: () => Promise<{ id: number; name: string; address: string; createdAt: string }[] | null>;
         UpdateAddress: (id: number, name: string, address: string) => Promise<void>;
         DeleteAddress: (id: number) => Promise<void>;
-        LoadSavedProtos: () => Promise<any[] | null>;
-        ListProtoSources: () => Promise<{ id: number; sourceType: string; path: string; importPaths: string[]; createdAt: string }[] | null>;
+        ListProtoProjects: () => Promise<ProtoProject[] | null>;
+        CreateProtoProject: (name: string) => Promise<ProtoProject | null>;
+        DeleteProtoProject: (projectId: string) => Promise<void>;
+        LoadSavedProtos: (projectId: string) => Promise<any[] | null>;
+        ListProtoSources: (projectId: string) => Promise<{ id: number; projectId: string; sourceType: string; path: string; importPaths: string[]; createdAt: string }[] | null>;
         DeleteProtoSource: (id: number) => Promise<void>;
-        ClearProtoSources: () => Promise<void>;
+        ClearProtoSources: (projectId: string) => Promise<void>;
         StartBenchmark: (req: GrpcRequest, cfg: BenchmarkConfig) => Promise<void>;
         StopBenchmark: () => Promise<void>;
         ExportBenchmarkResult: (result: BenchmarkResult, format: string) => Promise<string>;
@@ -293,9 +316,9 @@ interface Window {
         SaveRequestToCollection: (req: SavedRequest) => Promise<SavedRequest | null>;
         ListCollectionRequests: (collectionId: number) => Promise<SavedRequest[] | null>;
         DeleteSavedRequest: (id: number) => Promise<void>;
-        GetMessageFields: (serviceName: string, methodName: string) => Promise<FieldInfo[] | null>;
-        GetMessageTypeFields: (messageType: string) => Promise<FieldInfo[] | null>;
-        GetAllMessageTypes: () => Promise<string[] | null>;
+        GetMessageFields: (projectId: string, serviceName: string, methodName: string) => Promise<FieldInfo[] | null>;
+        GetMessageTypeFields: (projectId: string, messageType: string) => Promise<FieldInfo[] | null>;
+        GetAllMessageTypes: (projectId: string) => Promise<string[] | null>;
         ExportWorkspace: () => Promise<string>;
         ImportWorkspace: () => Promise<void>;
         InvokeChain: (steps: ChainStep[]) => Promise<ChainResult>;
@@ -309,7 +332,7 @@ interface Window {
         GetMockServerPort: () => Promise<number>;
         GetAIConfig: () => Promise<AIConfig>;
         SaveAIConfig: (cfg: AIConfig) => Promise<void>;
-        AIGenerateBody: (serviceName: string, methodName: string) => Promise<string>;
+        AIGenerateBody: (projectId: string, serviceName: string, methodName: string) => Promise<string>;
         AIAnalyzeResponse: (serviceName: string, methodName: string, responseBody: string, statusCode: string) => Promise<string>;
         AIDiagnoseError: (serviceName: string, methodName: string, statusCode: string, errorMessage: string, trailers: { key: string; value: string }[]) => Promise<string>;
         DecodePayload: (req: DecodeRequest) => Promise<DecodeResponse>;

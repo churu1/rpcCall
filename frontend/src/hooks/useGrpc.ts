@@ -15,7 +15,7 @@ export function useGrpc() {
 
   const send = useCallback(async () => {
     const tab = tabs.find((t) => t.id === activeTabId);
-    if (!tab || !tab.method) return;
+    if (!tab || !tab.method || !tab.projectId) return;
 
     updateTab(tab.id, {
       isLoading: true,
@@ -28,6 +28,7 @@ export function useGrpc() {
     });
 
     const request = {
+      projectId: tab.projectId,
       address: tab.address,
       serviceName: tab.method.serviceName,
       methodName: tab.method.methodName,

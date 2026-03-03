@@ -23,6 +23,8 @@ service Echo {
 message Req {
   string name = 1;
   bytes nested = 2;
+  bytes nested_data = 3;
+  Nested profile = 4;
 }
 
 message Resp {
@@ -48,7 +50,7 @@ func setupDecoder(t *testing.T) (*Decoder, []byte) {
 	}
 	decoder := NewDecoder(parser, nil)
 
-	method, err := decoder.resolveMethodDescriptor("Echo", "Ping")
+	method, err := decoder.resolveMethodDescriptor(defaultProjectID, "Echo", "Ping")
 	if err != nil {
 		t.Fatalf("resolve method: %v", err)
 	}
@@ -66,6 +68,7 @@ func setupDecoder(t *testing.T) (*Decoder, []byte) {
 	reqMsg := dynamic.NewMessage(method.GetInputType())
 	reqMsg.SetFieldByName("name", "alice")
 	reqMsg.SetFieldByName("nested", nestedBytes)
+	reqMsg.SetFieldByName("nested_data", nestedBytes)
 	payloadBytes, err := reqMsg.Marshal()
 	if err != nil {
 		t.Fatalf("marshal req: %v", err)
@@ -75,6 +78,9 @@ func setupDecoder(t *testing.T) (*Decoder, []byte) {
 
 func decodeAndAssertOK(t *testing.T, d *Decoder, req models.DecodeRequest) map[string]any {
 	t.Helper()
+	if req.ProjectID == "" {
+		req.ProjectID = defaultProjectID
+	}
 	resp := d.DecodePayload(req)
 	if !resp.OK {
 		t.Fatalf("decode failed: [%s] %s", resp.ErrorCode, resp.Error)
@@ -91,6 +97,7 @@ func TestDecodePayload_MultiEncoding(t *testing.T) {
 
 	hexPayload := hex.EncodeToString(payload)
 	outHex := decodeAndAssertOK(t, d, models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -103,6 +110,7 @@ func TestDecodePayload_MultiEncoding(t *testing.T) {
 
 	b64Payload := base64.StdEncoding.EncodeToString(payload)
 	outB64 := decodeAndAssertOK(t, d, models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -119,6 +127,7 @@ func TestDecodePayload_MultiEncoding(t *testing.T) {
 		sb.WriteString(hex.EncodeToString([]byte{b}))
 	}
 	outEscape := decodeAndAssertOK(t, d, models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -134,6 +143,7 @@ func TestDecodePayload_MultiEncoding(t *testing.T) {
 		t.Fatalf("write raw payload: %v", err)
 	}
 	outRaw := decodeAndAssertOK(t, d, models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -145,6 +155,7 @@ func TestDecodePayload_MultiEncoding(t *testing.T) {
 	}
 
 	outByMessage := decodeAndAssertOK(t, d, models.DecodeRequest{
+		ProjectID:           defaultProjectID,
 		Target:              models.DecodeTargetMessage,
 		ExplicitMessageType: "test.pb.Req",
 		Payload:             hexPayload,
@@ -159,6 +170,7 @@ func TestDecodePayload_ErrorCases(t *testing.T) {
 	d, _ := setupDecoder(t)
 
 	resp := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -170,6 +182,7 @@ func TestDecodePayload_ErrorCases(t *testing.T) {
 	}
 
 	resp2 := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetMessage,
@@ -181,6 +194,7 @@ func TestDecodePayload_ErrorCases(t *testing.T) {
 	}
 
 	resp3 := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -196,6 +210,7 @@ func TestDecodePayload_NestedRules(t *testing.T) {
 	d, payload := setupDecoder(t)
 
 	resp := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
 		ServiceName: "Echo",
 		MethodName:  "Ping",
 		Target:      models.DecodeTargetInput,
@@ -225,10 +240,101 @@ func TestDecodePayload_NestedRules(t *testing.T) {
 	}
 }
 
+func TestDecodePayload_NestedRules_PathVariants(t *testing.T) {
+	d, payload := setupDecoder(t)
+
+	resp := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
+		ServiceName: "Echo",
+		MethodName:  "Ping",
+		Target:      models.DecodeTargetInput,
+		Payload:     hex.EncodeToString(payload),
+		Encoding:    models.DecodeEncodingHex,
+		NestedRules: []models.NestedDecodeRule{
+			{FieldPath: "Req.nested_data", MessageType: "test.pb.Nested"},
+		},
+	})
+	if !resp.OK {
+		t.Fatalf("decode failed: [%s] %s", resp.ErrorCode, resp.Error)
+	}
+	if resp.NestedHits != 1 {
+		t.Fatalf("expected nested hits 1, got %d", resp.NestedHits)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal([]byte(resp.JSON), &out); err != nil {
+		t.Fatalf("parse result json: %v", err)
+	}
+	decoded, ok := out["nestedData"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected nestedData object, got %T", out["nestedData"])
+	}
+	if decoded["inner"] != "value" {
+		t.Fatalf("unexpected nestedData.inner: %v", decoded["inner"])
+	}
+}
+
+func TestDecodePayload_RawTags(t *testing.T) {
+	d, payload := setupDecoder(t)
+	resp := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
+		ServiceName: "Echo",
+		MethodName:  "Ping",
+		Target:      models.DecodeTargetInput,
+		Payload:     hex.EncodeToString(payload),
+		Encoding:    models.DecodeEncodingHex,
+	})
+	if !resp.OK {
+		t.Fatalf("decode failed: [%s] %s", resp.ErrorCode, resp.Error)
+	}
+	if len(resp.RawTags) == 0 {
+		t.Fatalf("expected raw tags, got none")
+	}
+	hasField1 := false
+	hasField2 := false
+	for _, tag := range resp.RawTags {
+		if tag.FieldNumber == 1 {
+			hasField1 = true
+		}
+		if tag.FieldNumber == 2 {
+			hasField2 = true
+		}
+	}
+	if !hasField1 || !hasField2 {
+		t.Fatalf("unexpected raw tags: %+v", resp.RawTags)
+	}
+}
+
+func TestDecodePayload_FillMissingFields(t *testing.T) {
+	d, payload := setupDecoder(t)
+	resp := d.DecodePayload(models.DecodeRequest{
+		ProjectID:   defaultProjectID,
+		ServiceName: "Echo",
+		MethodName:  "Ping",
+		Target:      models.DecodeTargetInput,
+		Payload:     hex.EncodeToString(payload),
+		Encoding:    models.DecodeEncodingHex,
+	})
+	if !resp.OK {
+		t.Fatalf("decode failed: [%s] %s", resp.ErrorCode, resp.Error)
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(resp.JSON), &out); err != nil {
+		t.Fatalf("parse result json: %v", err)
+	}
+	if _, ok := out["profile"]; !ok {
+		t.Fatalf("expected missing message field 'profile' to be present")
+	}
+	if out["profile"] != nil {
+		t.Fatalf("expected profile=null, got %T (%v)", out["profile"], out["profile"])
+	}
+}
+
 func TestDecodeBatch_OrderAndStats(t *testing.T) {
 	d, payload := setupDecoder(t)
 	req := models.DecodeBatchRequest{
 		Common: models.DecodeRequest{
+			ProjectID:   defaultProjectID,
 			ServiceName: "Echo",
 			MethodName:  "Ping",
 			Target:      models.DecodeTargetInput,

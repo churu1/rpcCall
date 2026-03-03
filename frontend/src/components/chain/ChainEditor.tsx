@@ -11,11 +11,17 @@ export function ChainEditor() {
   const tab = tabs.find((t) => t.id === activeTabId);
 
   const allServices = useMemo(() => {
-    return protoFiles.flatMap((f) => f.services ?? []);
-  }, [protoFiles]);
+    return protoFiles.filter((f) => f.projectId === tab?.projectId).flatMap((f) => f.services ?? []);
+  }, [protoFiles, tab?.projectId]);
 
   const defaultSteps = (): ChainStepConfig[] => [
-    { address: tab?.address || "localhost:50051", serviceName: tab?.method?.serviceName || "", methodName: tab?.method?.methodName || "", body: tab?.requestBody || '{\n  \n}' },
+    {
+      projectId: tab?.projectId || undefined,
+      address: tab?.address || "localhost:50051",
+      serviceName: tab?.method?.serviceName || "",
+      methodName: tab?.method?.methodName || "",
+      body: tab?.requestBody || '{\n  \n}',
+    },
   ];
 
   const steps = tab?.chainSteps?.length ? tab.chainSteps : defaultSteps();
@@ -76,7 +82,14 @@ export function ChainEditor() {
   };
 
   const addStep = () => {
-    setSteps([...steps, { address: tab?.address || "localhost:50051", serviceName: "", methodName: "", body: '{\n  \n}', manualInput: allServices.length === 0 }]);
+    setSteps([...steps, {
+      projectId: tab?.projectId || undefined,
+      address: tab?.address || "localhost:50051",
+      serviceName: "",
+      methodName: "",
+      body: '{\n  \n}',
+      manualInput: allServices.length === 0,
+    }]);
   };
 
   const removeStep = (i: number) => {
@@ -95,7 +108,8 @@ export function ChainEditor() {
     updateStep(i, { methodName });
     if (serviceName && methodName) {
       try {
-        const template = await window.go.main.App.GetMethodTemplate(serviceName, methodName);
+        if (!tab?.projectId) return;
+        const template = await window.go.main.App.GetMethodTemplate(tab.projectId, serviceName, methodName);
         if (template) updateStep(i, { methodName, body: template });
       } catch { /* ignore */ }
     }
@@ -109,6 +123,7 @@ export function ChainEditor() {
     try {
       const chainSteps: ChainStep[] = steps.map((s) => ({
         address: s.address,
+        projectId: s.projectId || tab?.projectId || "",
         serviceName: s.serviceName,
         methodName: s.methodName,
         body: s.body,

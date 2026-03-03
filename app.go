@@ -38,12 +38,13 @@ type App struct {
 }
 
 type WorkspaceExport struct {
-	Version      string                     `json:"version"`
-	ExportedAt   string                     `json:"exportedAt"`
-	Addresses    []history.SavedAddress     `json:"addresses"`
-	Environments []history.Environment      `json:"environments"`
-	Collections  []CollectionExport         `json:"collections"`
-	ProtoSources []history.SavedProtoSource `json:"protoSources"`
+	Version       string                     `json:"version"`
+	ExportedAt    string                     `json:"exportedAt"`
+	Addresses     []history.SavedAddress     `json:"addresses"`
+	Environments  []history.Environment      `json:"environments"`
+	Collections   []CollectionExport         `json:"collections"`
+	ProtoProjects []history.ProtoProject     `json:"protoProjects"`
+	ProtoSources  []history.SavedProtoSource `json:"protoSources"`
 }
 
 type CollectionExport struct {
@@ -108,8 +109,12 @@ func (a *App) GetMockServerPort() int {
 	return a.mockServer.GetPort()
 }
 
-func (a *App) OpenProtoFileDialog() ([]models.ProtoFile, error) {
+func (a *App) OpenProtoFileDialog(projectID string) ([]models.ProtoFile, error) {
 	logger.Info("OpenProtoFileDialog called")
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
 	selection, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Select .proto files",
 		Filters: []runtime.FileFilter{
@@ -127,20 +132,24 @@ func (a *App) OpenProtoFileDialog() ([]models.ProtoFile, error) {
 	logger.Info("selected proto file: %s", selection)
 	dir := filepath.Dir(selection)
 	importPaths := []string{dir}
-	result, err := a.ParseProtoFiles([]string{selection}, importPaths)
+	result, err := a.ParseProtoFiles(projectID, []string{selection}, importPaths)
 	if err != nil {
 		logger.Error("ParseProtoFiles failed: %v", err)
 	} else {
 		logger.Info("ParseProtoFiles success: %d files parsed", len(result))
 		if a.history != nil {
-			a.history.SaveProtoSource("file", selection, importPaths)
+			a.history.SaveProtoSource(projectID, "file", selection, importPaths)
 		}
 	}
 	return result, err
 }
 
-func (a *App) OpenProtoDirDialog() ([]models.ProtoFile, error) {
+func (a *App) OpenProtoDirDialog(projectID string) ([]models.ProtoFile, error) {
 	logger.Info("OpenProtoDirDialog called")
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Select directory containing .proto files",
 	})
@@ -153,17 +162,17 @@ func (a *App) OpenProtoDirDialog() ([]models.ProtoFile, error) {
 		return nil, nil
 	}
 	logger.Info("selected proto dir: %s", dir)
-	result, err := a.parser.ParseDirectory(dir)
+	result, err := a.parser.ParseDirectoryWithProject(projectID, dir)
 	if err != nil {
 		logger.Error("ParseDirectory failed: %v", err)
 	} else if a.history != nil {
-		a.history.SaveProtoSource("directory", dir, nil)
+		a.history.SaveProtoSource(projectID, "directory", dir, nil)
 	}
 	return result, err
 }
 
-func (a *App) ParseProtoFiles(filePaths []string, importPaths []string) ([]models.ProtoFile, error) {
-	return a.parser.ParseFiles(filePaths, importPaths)
+func (a *App) ParseProtoFiles(projectID string, filePaths []string, importPaths []string) ([]models.ProtoFile, error) {
+	return a.parser.ParseFilesWithProject(projectID, filePaths, importPaths)
 }
 
 func (a *App) ListServicesViaReflection(address string) ([]models.ServiceDefinition, error) {
@@ -177,8 +186,12 @@ func (a *App) ListServicesViaReflection(address string) ([]models.ServiceDefinit
 	return result, err
 }
 
-func (a *App) GetMethodTemplate(serviceName, methodName string) string {
-	for _, fds := range a.parser.GetAllFileDescriptors() {
+func (a *App) GetMethodTemplate(projectID, serviceName, methodName string) string {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return "{\n  \n}"
+	}
+	for _, fds := range a.parser.GetAllFileDescriptorsByProject(projectID) {
 		for _, svc := range fds.GetServices() {
 			if svc.GetFullyQualifiedName() == serviceName || svc.GetName() == serviceName {
 				for _, md := range svc.GetMethods() {
@@ -189,16 +202,25 @@ func (a *App) GetMethodTemplate(serviceName, methodName string) string {
 			}
 		}
 	}
-
-	svcDesc := a.reflection.GetServiceDescriptor(serviceName)
-	if svcDesc != nil {
-		for _, md := range svcDesc.GetMethods() {
-			if md.GetName() == methodName {
-				return grpclib.GenerateDefaultJSON(md.GetInputType())
+	if a.reflection != nil {
+		if svcDesc := a.reflection.GetServiceDescriptor(serviceName); svcDesc != nil {
+			for _, md := range svcDesc.GetMethods() {
+				if md.GetName() == methodName {
+					return grpclib.GenerateDefaultJSON(md.GetInputType())
+				}
+			}
+		}
+		for _, svcDesc := range a.reflection.GetAllServiceDescriptors() {
+			if svcDesc.GetName() != serviceName && svcDesc.GetFullyQualifiedName() != serviceName {
+				continue
+			}
+			for _, md := range svcDesc.GetMethods() {
+				if md.GetName() == methodName {
+					return grpclib.GenerateDefaultJSON(md.GetInputType())
+				}
 			}
 		}
 	}
-
 	return "{\n  \n}"
 }
 
@@ -308,6 +330,7 @@ func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error)
 
 	for i, step := range steps {
 		req := models.GrpcRequest{
+			ProjectID:   step.ProjectID,
 			Address:     step.Address,
 			ServiceName: step.ServiceName,
 			MethodName:  step.MethodName,
@@ -437,20 +460,51 @@ func (a *App) DeleteAddress(id int64) error {
 
 // --- Saved Proto Sources ---
 
-func (a *App) ListProtoSources() ([]history.SavedProtoSource, error) {
+func (a *App) ListProtoProjects() ([]history.ProtoProject, error) {
 	if a.history == nil {
 		return nil, nil
 	}
-	return a.history.ListProtoSources()
+	return a.history.ListProtoProjects()
 }
 
-func (a *App) LoadSavedProtos() ([]models.ProtoFile, error) {
+func (a *App) CreateProtoProject(name string) (*history.ProtoProject, error) {
 	if a.history == nil {
 		return nil, nil
 	}
-	sources, err := a.history.ListProtoSources()
+	return a.history.CreateProtoProject(name)
+}
+
+func (a *App) DeleteProtoProject(projectID string) error {
+	if a.history == nil {
+		return nil
+	}
+	a.parser.ClearProject(projectID)
+	return a.history.DeleteProtoProject(projectID)
+}
+
+func (a *App) ListProtoSources(projectID string) ([]history.SavedProtoSource, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.ListProtoSources(projectID)
+}
+
+func (a *App) LoadSavedProtos(projectID string) ([]models.ProtoFile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
+	sources, err := a.history.ListProtoSources(projectID)
 	if err != nil {
 		return nil, err
+	}
+	projects, _ := a.history.ListProtoProjects()
+	projectNames := map[string]string{}
+	for _, p := range projects {
+		projectNames[p.ID] = p.Name
 	}
 
 	var allFiles []models.ProtoFile
@@ -463,17 +517,21 @@ func (a *App) LoadSavedProtos() ([]models.ProtoFile, error) {
 				logger.Info("saved proto file no longer exists, skipping: %s", src.Path)
 				continue
 			}
-			files, parseErr = a.parser.ParseFiles([]string{src.Path}, src.ImportPaths)
+			files, parseErr = a.parser.ParseFilesWithProject(projectID, []string{src.Path}, src.ImportPaths)
 		case "directory":
 			if _, statErr := os.Stat(src.Path); statErr != nil {
 				logger.Info("saved proto dir no longer exists, skipping: %s", src.Path)
 				continue
 			}
-			files, parseErr = a.parser.ParseDirectory(src.Path)
+			files, parseErr = a.parser.ParseDirectoryWithProject(projectID, src.Path)
 		}
 		if parseErr != nil {
 			logger.Error("failed to reload proto source %s: %v", src.Path, parseErr)
 			continue
+		}
+		for i := range files {
+			files[i].ProjectID = projectID
+			files[i].ProjectName = projectNames[projectID]
 		}
 		allFiles = append(allFiles, files...)
 	}
@@ -488,11 +546,12 @@ func (a *App) DeleteProtoSource(id int64) error {
 	return a.history.DeleteProtoSource(id)
 }
 
-func (a *App) ClearProtoSources() error {
+func (a *App) ClearProtoSources(projectID string) error {
 	if a.history == nil {
 		return nil
 	}
-	return a.history.ClearProtoSources()
+	a.parser.ClearProject(projectID)
+	return a.history.ClearProtoSources(projectID)
 }
 
 // --- Environments ---
@@ -800,20 +859,34 @@ func (a *App) ExportBenchmarkHTML(result models.BenchmarkResult) (string, error)
 	return savePath, nil
 }
 
-func (a *App) GetMessageFields(serviceName, methodName string) []models.FieldInfo {
-	fields := a.parser.GetMessageFields(serviceName, methodName)
+func (a *App) GetMessageFields(projectID, serviceName, methodName string) []models.FieldInfo {
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
+	fields := a.parser.GetMessageFields(projectID, serviceName, methodName)
 	if fields != nil {
 		return fields
 	}
-	svcDesc := a.reflection.GetServiceDescriptor(serviceName)
-	if svcDesc != nil {
-		for _, md := range svcDesc.GetMethods() {
-			if md.GetName() == methodName {
-				return grpclib.ExtractFieldsFromDesc(md.GetInputType())
+	if a.reflection != nil {
+		if svcDesc := a.reflection.GetServiceDescriptor(serviceName); svcDesc != nil {
+			for _, md := range svcDesc.GetMethods() {
+				if md.GetName() == methodName {
+					return grpclib.ExtractFieldsFromDesc(md.GetInputType())
+				}
+			}
+		}
+		for _, svcDesc := range a.reflection.GetAllServiceDescriptors() {
+			if svcDesc.GetName() != serviceName && svcDesc.GetFullyQualifiedName() != serviceName {
+				continue
+			}
+			for _, md := range svcDesc.GetMethods() {
+				if md.GetName() == methodName {
+					return grpclib.ExtractFieldsFromDesc(md.GetInputType())
+				}
 			}
 		}
 	}
-	return nil
+	return fields
 }
 
 func findMessageDescriptorInFile(fd *desc.FileDescriptor, messageType string) *desc.MessageDescriptor {
@@ -843,28 +916,29 @@ func findMessageDescriptorRecursive(md *desc.MessageDescriptor, messageType stri
 	return nil
 }
 
-func (a *App) GetMessageTypeFields(messageType string) []models.FieldInfo {
+func (a *App) GetMessageTypeFields(projectID, messageType string) []models.FieldInfo {
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
 	mt := strings.TrimSpace(messageType)
 	if mt == "" {
 		return nil
 	}
 
-	for _, fd := range a.parser.GetAllFileDescriptors() {
-		if md := findMessageDescriptorInFile(fd, mt); md != nil {
+	fds := a.parser.GetAllFileDescriptorsByProject(projectID)
+	for i := len(fds) - 1; i >= 0; i-- {
+		if md := findMessageDescriptorInFile(fds[i], mt); md != nil {
 			return grpclib.ExtractFieldsFromDesc(md)
 		}
 	}
 
-	for _, svc := range a.reflection.GetAllServiceDescriptors() {
-		fd := svc.GetFile()
-		if md := findMessageDescriptorInFile(fd, mt); md != nil {
-			return grpclib.ExtractFieldsFromDesc(md)
-		}
-	}
 	return nil
 }
 
-func (a *App) GetAllMessageTypes() []string {
+func (a *App) GetAllMessageTypes(projectID string) []string {
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
 	allMessages := make(map[string]struct{})
 
 	addMessage := func(name string) {
@@ -885,17 +959,7 @@ func (a *App) GetAllMessageTypes() []string {
 		}
 	}
 
-	for _, fd := range a.parser.GetAllFileDescriptors() {
-		for _, md := range fd.GetMessageTypes() {
-			walkDesc(md)
-		}
-	}
-
-	for _, svc := range a.reflection.GetAllServiceDescriptors() {
-		fd := svc.GetFile()
-		if fd == nil {
-			continue
-		}
+	for _, fd := range a.parser.GetAllFileDescriptorsByProject(projectID) {
 		for _, md := range fd.GetMessageTypes() {
 			walkDesc(md)
 		}
@@ -913,6 +977,10 @@ func (a *App) DecodePayload(req models.DecodeRequest) (*models.DecodeResponse, e
 	if a.decoder == nil {
 		return nil, fmt.Errorf("decoder not initialized")
 	}
+	req.ProjectID = strings.TrimSpace(req.ProjectID)
+	if req.ProjectID == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
 	if req.Target == "" {
 		req.Target = models.DecodeTargetInput
 	}
@@ -929,6 +997,10 @@ func (a *App) DecodePayload(req models.DecodeRequest) (*models.DecodeResponse, e
 func (a *App) DecodeBatch(req models.DecodeBatchRequest) (*models.DecodeBatchResponse, error) {
 	if a.decoder == nil {
 		return nil, fmt.Errorf("decoder not initialized")
+	}
+	req.Common.ProjectID = strings.TrimSpace(req.Common.ProjectID)
+	if req.Common.ProjectID == "" {
+		return nil, fmt.Errorf("projectId is required")
 	}
 	if req.Common.Target == "" {
 		req.Common.Target = models.DecodeTargetInput
@@ -1014,7 +1086,11 @@ func (a *App) ExportWorkspace() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("list environments: %w", err)
 	}
-	protoSources, err := a.history.ListProtoSources()
+	protoProjects, err := a.history.ListProtoProjects()
+	if err != nil {
+		return "", fmt.Errorf("list proto projects: %w", err)
+	}
+	protoSources, err := a.history.ListAllProtoSources()
 	if err != nil {
 		return "", fmt.Errorf("list proto sources: %w", err)
 	}
@@ -1036,12 +1112,13 @@ func (a *App) ExportWorkspace() (string, error) {
 	}
 
 	exp := WorkspaceExport{
-		Version:      "1",
-		ExportedAt:   time.Now().Format(time.RFC3339),
-		Addresses:    addresses,
-		Environments: environments,
-		Collections:  collectionExports,
-		ProtoSources: protoSources,
+		Version:       "1",
+		ExportedAt:    time.Now().Format(time.RFC3339),
+		Addresses:     addresses,
+		Environments:  environments,
+		Collections:   collectionExports,
+		ProtoProjects: protoProjects,
+		ProtoSources:  protoSources,
 	}
 	data, err := json.MarshalIndent(exp, "", "  ")
 	if err != nil {
@@ -1108,6 +1185,35 @@ func (a *App) ImportWorkspace() error {
 			}
 		}
 	}
+	projectIDMap := make(map[string]string, len(exp.ProtoProjects))
+	for _, p := range exp.ProtoProjects {
+		exportedID := strings.TrimSpace(p.ID)
+		projectName := strings.TrimSpace(p.Name)
+		created, createErr := a.history.UpsertProtoProject(exportedID, projectName)
+		if createErr != nil {
+			logger.Error("import proto project %s(%s): %v", projectName, exportedID, createErr)
+			continue
+		}
+		if exportedID != "" {
+			projectIDMap[exportedID] = created.ID
+		}
+	}
+	for _, src := range exp.ProtoSources {
+		pid := strings.TrimSpace(src.ProjectID)
+		if pid == "" {
+			pid = "legacy"
+		}
+		if mappedID, ok := projectIDMap[pid]; ok && mappedID != "" {
+			pid = mappedID
+		}
+		if _, err := a.history.UpsertProtoProject(pid, pid); err != nil {
+			logger.Error("ensure proto project %s for source %s: %v", pid, src.Path, err)
+			continue
+		}
+		if _, err := a.history.SaveProtoSource(pid, src.SourceType, src.Path, src.ImportPaths); err != nil {
+			logger.Error("import proto source %s: %v", src.Path, err)
+		}
+	}
 	return nil
 }
 
@@ -1150,14 +1256,14 @@ func (a *App) SaveAIConfig(cfg AIConfig) error {
 	})
 }
 
-func (a *App) AIGenerateBody(serviceName, methodName string) (string, error) {
+func (a *App) AIGenerateBody(projectID, serviceName, methodName string) (string, error) {
 	if a.aiClient == nil {
 		return "", fmt.Errorf("AI client not initialized")
 	}
 	if !a.aiClient.IsConfigured() {
 		return "", fmt.Errorf("AI not configured. Please set API Key and Endpoint in settings.")
 	}
-	fields := a.GetMessageFields(serviceName, methodName)
+	fields := a.GetMessageFields(projectID, serviceName, methodName)
 	logger.Info("AI generate: %s/%s, fields=%d", serviceName, methodName, len(fields))
 	result, err := a.aiClient.GenerateRequestBody(serviceName, methodName, fields)
 	if err != nil {

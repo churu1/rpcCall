@@ -90,7 +90,7 @@ export function BenchmarkPanel() {
   });
 
   const handleStart_ = useCallback(async () => {
-    if (!tab || !tab.method) {
+    if (!tab || !tab.method || !tab.projectId) {
       setError(t("benchmark.selectMethod"));
       return;
     }
@@ -101,6 +101,7 @@ export function BenchmarkPanel() {
     setStatus("running");
 
     const req: GrpcRequest = {
+      projectId: tab.projectId,
       address: tab.address,
       serviceName: tab.method.serviceName,
       methodName: tab.method.methodName,
