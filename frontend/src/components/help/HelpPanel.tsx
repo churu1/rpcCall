@@ -1,4 +1,4 @@
-import { X, Send, FileText, ListFilter, Globe2, FolderHeart, Clock, Gauge, Link2, Server, Lock, Sparkles, Terminal, GitCompareArrows, Palette } from "lucide-react";
+import { X, Send, FileText, ListFilter, Globe2, FolderHeart, Clock, Gauge, Link2, Server, Lock, Sparkles, Terminal, GitCompareArrows, Palette, Binary } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface Props {
@@ -16,6 +16,7 @@ const features = [
   { icon: Gauge, titleKey: "help.benchmark", descKey: "help.benchmarkDesc", color: "text-red-400" },
   { icon: Link2, titleKey: "help.chain", descKey: "help.chainDesc", color: "text-emerald-400" },
   { icon: Server, titleKey: "help.mock", descKey: "help.mockDesc", color: "text-amber-400" },
+  { icon: Binary, titleKey: "help.decode", descKey: "help.decodeDesc", color: "text-cyan-400" },
   { icon: Lock, titleKey: "help.tls", descKey: "help.tlsDesc", color: "text-slate-400" },
   { icon: Sparkles, titleKey: "help.ai", descKey: "help.aiDesc", color: "text-purple-400" },
   { icon: Terminal, titleKey: "help.commandPalette", descKey: "help.commandPaletteDesc", color: "text-teal-400" },

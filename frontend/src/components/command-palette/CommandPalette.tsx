@@ -21,8 +21,10 @@ import {
   Download,
   Upload,
   Sparkles,
+  Binary,
 } from "lucide-react";
 import { useThemeStore } from "@/store/theme-store";
+import { scoreFuzzyText } from "@/lib/fuzzy-search";
 
 interface CommandItem {
   id: string;
@@ -286,6 +288,32 @@ export function CommandPalette() {
           }, 50);
         },
       },
+      {
+        id: "open-decode",
+        label: t("command.openDecode"),
+        category: "DECODE",
+        icon: <Binary size={14} />,
+        shortcut: "⌘ ⇧ D",
+        action: () => {
+          close();
+          setTimeout(() => {
+            document.dispatchEvent(new CustomEvent("rpccall:open-decode"));
+          }, 50);
+        },
+      },
+      {
+        id: "decode-batch",
+        label: t("command.decodeBatch"),
+        category: "DECODE",
+        icon: <Binary size={14} />,
+        shortcut: "⌘ ⇧ B",
+        action: () => {
+          close();
+          setTimeout(() => {
+            document.dispatchEvent(new CustomEvent("rpccall:open-decode-batch"));
+          }, 50);
+        },
+      },
     ];
     return items;
   }, [addTab, theme, toggleTheme, t]);
@@ -298,19 +326,30 @@ export function CommandPalette() {
 
   const filteredMethods = useMemo(() => {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return allMethods.filter(
-      (m) =>
-        m.methodName.toLowerCase().includes(q) ||
-        m.serviceName.toLowerCase().includes(q) ||
-        m.fullName.toLowerCase().includes(q)
-    );
+    return allMethods
+      .map((m) => {
+        const score = Math.max(
+          scoreFuzzyText(m.methodName, query),
+          scoreFuzzyText(m.serviceName, query),
+          scoreFuzzyText(m.fullName, query)
+        );
+        return { m, score };
+      })
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.m);
   }, [query, allMethods]);
 
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands;
-    const q = query.toLowerCase();
-    return commands.filter((c) => c.label.toLowerCase().includes(q));
+    return commands
+      .map((c) => ({
+        c,
+        score: Math.max(scoreFuzzyText(c.label, query), scoreFuzzyText(c.category, query)),
+      }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.c);
   }, [query, commands]);
 
   const totalItems = filteredCommands.length + filteredMethods.length;
@@ -354,7 +393,23 @@ export function CommandPalette() {
 
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        document.dispatchEvent(new CustomEvent("rpccall:invoke"));
+        if (document.querySelector("[data-decode-panel='true']")) {
+          document.dispatchEvent(new CustomEvent("rpccall:decode-run"));
+        } else {
+          document.dispatchEvent(new CustomEvent("rpccall:invoke"));
+        }
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "D" || e.key === "d")) {
+        e.preventDefault();
+        document.dispatchEvent(new CustomEvent("rpccall:open-decode"));
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "B" || e.key === "b")) {
+        e.preventDefault();
+        document.dispatchEvent(new CustomEvent("rpccall:open-decode-batch"));
         return;
       }
 

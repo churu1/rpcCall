@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jhump/protoreflect/desc"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"rpccall/internal/ai"
 	grpclib "rpccall/internal/grpc"
@@ -24,6 +26,7 @@ import (
 type App struct {
 	ctx             context.Context
 	caller          *grpclib.Caller
+	decoder         *grpclib.Decoder
 	parser          *grpclib.ProtoParser
 	reflection      *grpclib.ReflectionClient
 	mockServer      *grpclib.MockServer
@@ -35,12 +38,12 @@ type App struct {
 }
 
 type WorkspaceExport struct {
-	Version      string                      `json:"version"`
-	ExportedAt   string                      `json:"exportedAt"`
-	Addresses    []history.SavedAddress      `json:"addresses"`
-	Environments []history.Environment       `json:"environments"`
-	Collections  []CollectionExport          `json:"collections"`
-	ProtoSources []history.SavedProtoSource  `json:"protoSources"`
+	Version      string                     `json:"version"`
+	ExportedAt   string                     `json:"exportedAt"`
+	Addresses    []history.SavedAddress     `json:"addresses"`
+	Environments []history.Environment      `json:"environments"`
+	Collections  []CollectionExport         `json:"collections"`
+	ProtoSources []history.SavedProtoSource `json:"protoSources"`
 }
 
 type CollectionExport struct {
@@ -68,6 +71,7 @@ func NewApp() *App {
 
 	return &App{
 		caller:     caller,
+		decoder:    grpclib.NewDecoder(parser, reflection),
 		parser:     parser,
 		reflection: reflection,
 		mockServer: grpclib.NewMockServer(),
@@ -203,6 +207,19 @@ func (a *App) SelectCertFile() (string, error) {
 		Title: "Select certificate/key file",
 		Filters: []runtime.FileFilter{
 			{DisplayName: "PEM Files (*.pem, *.crt, *.key)", Pattern: "*.pem;*.crt;*.key;*.cert"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return selection, nil
+}
+
+func (a *App) SelectDecodeFile() (string, error) {
+	selection, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select payload file",
+		Filters: []runtime.FileFilter{
 			{DisplayName: "All Files", Pattern: "*"},
 		},
 	})
@@ -797,6 +814,177 @@ func (a *App) GetMessageFields(serviceName, methodName string) []models.FieldInf
 		}
 	}
 	return nil
+}
+
+func findMessageDescriptorInFile(fd *desc.FileDescriptor, messageType string) *desc.MessageDescriptor {
+	if fd == nil {
+		return nil
+	}
+	for _, md := range fd.GetMessageTypes() {
+		if hit := findMessageDescriptorRecursive(md, messageType); hit != nil {
+			return hit
+		}
+	}
+	return nil
+}
+
+func findMessageDescriptorRecursive(md *desc.MessageDescriptor, messageType string) *desc.MessageDescriptor {
+	if md == nil {
+		return nil
+	}
+	if md.GetFullyQualifiedName() == messageType || md.GetName() == messageType {
+		return md
+	}
+	for _, nested := range md.GetNestedMessageTypes() {
+		if hit := findMessageDescriptorRecursive(nested, messageType); hit != nil {
+			return hit
+		}
+	}
+	return nil
+}
+
+func (a *App) GetMessageTypeFields(messageType string) []models.FieldInfo {
+	mt := strings.TrimSpace(messageType)
+	if mt == "" {
+		return nil
+	}
+
+	for _, fd := range a.parser.GetAllFileDescriptors() {
+		if md := findMessageDescriptorInFile(fd, mt); md != nil {
+			return grpclib.ExtractFieldsFromDesc(md)
+		}
+	}
+
+	for _, svc := range a.reflection.GetAllServiceDescriptors() {
+		fd := svc.GetFile()
+		if md := findMessageDescriptorInFile(fd, mt); md != nil {
+			return grpclib.ExtractFieldsFromDesc(md)
+		}
+	}
+	return nil
+}
+
+func (a *App) GetAllMessageTypes() []string {
+	allMessages := make(map[string]struct{})
+
+	addMessage := func(name string) {
+		if name == "" {
+			return
+		}
+		allMessages[name] = struct{}{}
+	}
+
+	var walkDesc func(md *desc.MessageDescriptor)
+	walkDesc = func(md *desc.MessageDescriptor) {
+		if md == nil {
+			return
+		}
+		addMessage(md.GetFullyQualifiedName())
+		for _, nested := range md.GetNestedMessageTypes() {
+			walkDesc(nested)
+		}
+	}
+
+	for _, fd := range a.parser.GetAllFileDescriptors() {
+		for _, md := range fd.GetMessageTypes() {
+			walkDesc(md)
+		}
+	}
+
+	for _, svc := range a.reflection.GetAllServiceDescriptors() {
+		fd := svc.GetFile()
+		if fd == nil {
+			continue
+		}
+		for _, md := range fd.GetMessageTypes() {
+			walkDesc(md)
+		}
+	}
+
+	out := make([]string, 0, len(allMessages))
+	for k := range allMessages {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (a *App) DecodePayload(req models.DecodeRequest) (*models.DecodeResponse, error) {
+	if a.decoder == nil {
+		return nil, fmt.Errorf("decoder not initialized")
+	}
+	if req.Target == "" {
+		req.Target = models.DecodeTargetInput
+	}
+	if req.Encoding == "" {
+		req.Encoding = models.DecodeEncodingAuto
+	}
+	resp := a.decoder.DecodePayload(req)
+	if a.history != nil {
+		_ = a.history.SaveDecodeHistory(req, resp)
+	}
+	return resp, nil
+}
+
+func (a *App) DecodeBatch(req models.DecodeBatchRequest) (*models.DecodeBatchResponse, error) {
+	if a.decoder == nil {
+		return nil, fmt.Errorf("decoder not initialized")
+	}
+	if req.Common.Target == "" {
+		req.Common.Target = models.DecodeTargetInput
+	}
+	if req.Common.Encoding == "" {
+		req.Common.Encoding = models.DecodeEncodingAuto
+	}
+	resp := a.decoder.DecodeBatch(req)
+	if a.history != nil {
+		for i, item := range resp.Results {
+			itemReq := req.Common
+			if i < len(req.Items) {
+				itemReq.Payload = req.Items[i]
+			}
+			itemResp := &models.DecodeResponse{
+				OK:               item.OK,
+				DetectedEncoding: item.DetectedEncoding,
+				JSON:             item.JSON,
+				Warnings:         item.Warnings,
+				ElapsedMs:        item.ElapsedMs,
+				NestedHits:       item.NestedHits,
+				ErrorCode:        item.ErrorCode,
+				Error:            item.Error,
+			}
+			_ = a.history.SaveDecodeHistory(itemReq, itemResp)
+		}
+	}
+	return resp, nil
+}
+
+func (a *App) GetDecodeHistory(limit int) ([]history.DecodeHistoryEntry, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.ListDecodeHistory(limit)
+}
+
+func (a *App) GetDecodeHistoryDetail(id int64) (*history.DecodeHistoryDetail, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.GetDecodeHistoryDetail(id)
+}
+
+func (a *App) DeleteDecodeHistory(id int64) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.DeleteDecodeHistory(id)
+}
+
+func (a *App) ClearDecodeHistory() error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.ClearDecodeHistory()
 }
 
 func (a *App) ExportWorkspace() (string, error) {

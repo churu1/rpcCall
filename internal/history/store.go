@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"os"
 	"path/filepath"
 	"time"
@@ -158,6 +159,41 @@ func createTables(db *sql.DB) error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS decode_history (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			service_name TEXT NOT NULL DEFAULT '',
+			method_name TEXT NOT NULL DEFAULT '',
+			target TEXT NOT NULL DEFAULT 'input',
+			message_type TEXT NOT NULL DEFAULT '',
+			input_encoding TEXT NOT NULL DEFAULT 'auto',
+			detected_encoding TEXT NOT NULL DEFAULT '',
+			payload_text TEXT NOT NULL DEFAULT '',
+			payload_size INTEGER NOT NULL DEFAULT 0,
+			result_json TEXT NOT NULL DEFAULT '',
+			success INTEGER NOT NULL DEFAULT 0,
+			error_code TEXT NOT NULL DEFAULT '',
+			error_msg TEXT NOT NULL DEFAULT '',
+			elapsed_ms INTEGER NOT NULL DEFAULT 0,
+			nested_hits INTEGER NOT NULL DEFAULT 0,
+			nested_rules_json TEXT NOT NULL DEFAULT '[]',
+			warnings_json TEXT NOT NULL DEFAULT '[]'
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_created_at ON decode_history(created_at DESC)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_service_method ON decode_history(service_name, method_name)`)
 	return err
 }
 
@@ -210,9 +246,9 @@ type HistoryEntry struct {
 
 type HistoryDetail struct {
 	HistoryEntry
-	RequestBody      string              `json:"requestBody"`
+	RequestBody      string                 `json:"requestBody"`
 	RequestMetadata  []models.MetadataEntry `json:"requestMetadata"`
-	ResponseBody     string              `json:"responseBody"`
+	ResponseBody     string                 `json:"responseBody"`
 	ResponseHeaders  []models.MetadataEntry `json:"responseHeaders"`
 	ResponseTrailers []models.MetadataEntry `json:"responseTrailers"`
 }
@@ -739,5 +775,142 @@ func (s *Store) UpdateChainTemplate(id int64, name string, stepsJSON string) err
 
 func (s *Store) DeleteChainTemplate(id int64) error {
 	_, err := s.db.Exec("DELETE FROM chain_templates WHERE id = ?", id)
+	return err
+}
+
+// --- Decode History ---
+
+type DecodeHistoryEntry struct {
+	ID               int64  `json:"id"`
+	CreatedAt        string `json:"createdAt"`
+	ServiceName      string `json:"serviceName"`
+	MethodName       string `json:"methodName"`
+	Target           string `json:"target"`
+	MessageType      string `json:"messageType"`
+	InputEncoding    string `json:"inputEncoding"`
+	DetectedEncoding string `json:"detectedEncoding"`
+	Success          bool   `json:"success"`
+	ErrorCode        string `json:"errorCode,omitempty"`
+	Error            string `json:"error,omitempty"`
+	ElapsedMs        int64  `json:"elapsedMs"`
+	PayloadSize      int    `json:"payloadSize"`
+	NestedHits       int    `json:"nestedHits"`
+}
+
+type DecodeHistoryDetail struct {
+	DecodeHistoryEntry
+	PayloadText string                    `json:"payloadText"`
+	ResultJSON  string                    `json:"resultJson"`
+	NestedRules []models.NestedDecodeRule `json:"nestedRules"`
+	Warnings    []string                  `json:"warnings"`
+}
+
+func (s *Store) SaveDecodeHistory(req models.DecodeRequest, resp *models.DecodeResponse) error {
+	if resp == nil {
+		return fmt.Errorf("decode response cannot be nil")
+	}
+
+	target := string(req.Target)
+	if target == "" {
+		target = string(models.DecodeTargetInput)
+	}
+	inputEncoding := string(req.Encoding)
+	if inputEncoding == "" {
+		inputEncoding = string(models.DecodeEncodingAuto)
+	}
+	detected := string(resp.DetectedEncoding)
+	rulesJSON, _ := json.Marshal(req.NestedRules)
+	warningsJSON, _ := json.Marshal(resp.Warnings)
+
+	messageType := strings.TrimSpace(req.ExplicitMessageType)
+	if messageType == "" && req.ServiceName != "" && req.MethodName != "" {
+		messageType = fmt.Sprintf("%s/%s", req.ServiceName, req.MethodName)
+	}
+	success := 0
+	if resp.OK {
+		success = 1
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO decode_history (
+			service_name, method_name, target, message_type, input_encoding, detected_encoding,
+			payload_text, payload_size, result_json, success, error_code, error_msg,
+			elapsed_ms, nested_hits, nested_rules_json, warnings_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		req.ServiceName, req.MethodName, target, messageType, inputEncoding, detected,
+		req.Payload, len(req.Payload), resp.JSON, success, resp.ErrorCode, resp.Error,
+		resp.ElapsedMs, resp.NestedHits, string(rulesJSON), string(warningsJSON),
+	)
+	return err
+}
+
+func (s *Store) ListDecodeHistory(limit int) ([]DecodeHistoryEntry, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.db.Query(`
+		SELECT id, created_at, service_name, method_name, target, message_type,
+		       input_encoding, detected_encoding, success, error_code, error_msg,
+		       elapsed_ms, payload_size, nested_hits
+		FROM decode_history
+		ORDER BY id DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []DecodeHistoryEntry
+	for rows.Next() {
+		var e DecodeHistoryEntry
+		var success int
+		if err := rows.Scan(
+			&e.ID, &e.CreatedAt, &e.ServiceName, &e.MethodName, &e.Target, &e.MessageType,
+			&e.InputEncoding, &e.DetectedEncoding, &success, &e.ErrorCode, &e.Error,
+			&e.ElapsedMs, &e.PayloadSize, &e.NestedHits,
+		); err != nil {
+			continue
+		}
+		e.Success = success == 1
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+func (s *Store) GetDecodeHistoryDetail(id int64) (*DecodeHistoryDetail, error) {
+	row := s.db.QueryRow(`
+		SELECT id, created_at, service_name, method_name, target, message_type,
+		       input_encoding, detected_encoding, success, error_code, error_msg,
+		       elapsed_ms, payload_size, nested_hits, payload_text, result_json,
+		       nested_rules_json, warnings_json
+		FROM decode_history
+		WHERE id = ?
+	`, id)
+
+	var d DecodeHistoryDetail
+	var success int
+	var rulesJSON, warningsJSON string
+	if err := row.Scan(
+		&d.ID, &d.CreatedAt, &d.ServiceName, &d.MethodName, &d.Target, &d.MessageType,
+		&d.InputEncoding, &d.DetectedEncoding, &success, &d.ErrorCode, &d.Error,
+		&d.ElapsedMs, &d.PayloadSize, &d.NestedHits, &d.PayloadText, &d.ResultJSON,
+		&rulesJSON, &warningsJSON,
+	); err != nil {
+		return nil, err
+	}
+	d.Success = success == 1
+	json.Unmarshal([]byte(rulesJSON), &d.NestedRules)
+	json.Unmarshal([]byte(warningsJSON), &d.Warnings)
+	return &d, nil
+}
+
+func (s *Store) DeleteDecodeHistory(id int64) error {
+	_, err := s.db.Exec("DELETE FROM decode_history WHERE id = ?", id)
+	return err
+}
+
+func (s *Store) ClearDecodeHistory() error {
+	_, err := s.db.Exec("DELETE FROM decode_history")
 	return err
 }

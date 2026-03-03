@@ -2,11 +2,12 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
 import { cn } from "@/lib/utils";
-import { Clock, AlertCircle, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronRight, Stethoscope, X } from "lucide-react";
+import { Clock, AlertCircle, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronRight, Stethoscope, X, Binary } from "lucide-react";
 import { SearchBar, HighlightedText, type SearchMatch } from "@/components/search/SearchBar";
 import { TimingBar } from "./TimingBar";
 import { highlightJsonHtml } from "@/components/editor/JsonEditor";
 import { JsonTreeViewer } from "./JsonTreeViewer";
+import { DecodeResultPanel } from "@/components/decode/DecodeResultPanel";
 
 function ReadonlyMetadataTable({ entries, emptyText }: { entries: MetadataEntry[]; emptyText: string }) {
   if (entries.length === 0) {
@@ -30,7 +31,8 @@ export function ResponseViewer() {
   const { t } = useTranslation();
   const { activeTabId, tabs } = useAppStore();
   const tab = tabs.find((t) => t.id === activeTabId);
-  const [activePanel, setActivePanel] = useState<"body" | "headers" | "trailers" | "chain">("body");
+  const [activePanel, setActivePanel] = useState<"body" | "headers" | "trailers" | "chain" | "decode">("body");
+  const [decodeActive, setDecodeActive] = useState(false);
   const [viewMode, setViewMode] = useState<"raw" | "tree">("raw");
   const [showSearch, setShowSearch] = useState(false);
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
@@ -93,6 +95,16 @@ export function ResponseViewer() {
     setAiError(null);
   };
 
+  const handleDecodePayload = () => {
+    if (!tab?.responseBody) return;
+    document.dispatchEvent(new CustomEvent("rpccall:decode-payload", {
+      detail: {
+        payload: tab.responseBody,
+        messageType: tab.method?.outputTypeName || "",
+      },
+    }));
+  };
+
   const handleHighlight = useCallback((matches: SearchMatch[], currentIndex: number) => {
     setSearchMatches(matches);
     setSearchCurrentIndex(currentIndex);
@@ -129,6 +141,21 @@ export function ResponseViewer() {
     const handler = () => setActivePanel("chain");
     document.addEventListener("rpccall:show-chain-results", handler);
     return () => document.removeEventListener("rpccall:show-chain-results", handler);
+  }, []);
+
+  useEffect(() => {
+    const onDecodeActive = (e: Event) => {
+      const custom = e as CustomEvent<{ active?: boolean }>;
+      const active = !!custom.detail?.active;
+      setDecodeActive(active);
+      if (active) {
+        setActivePanel("decode");
+      } else {
+        setActivePanel((prev) => (prev === "decode" ? "body" : prev));
+      }
+    };
+    window.addEventListener("rpccall:decode-active", onDecodeActive as EventListener);
+    return () => window.removeEventListener("rpccall:decode-active", onDecodeActive as EventListener);
   }, []);
 
   const chainResults = tab?.chainResults;
@@ -168,6 +195,19 @@ export function ResponseViewer() {
                   : `${t("panels.trailers")} (${tab.responseTrailers.length})`}
             </button>
           ))}
+          {decodeActive && (
+            <button
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium transition-colors border-b-2",
+                activePanel === "decode"
+                  ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
+                  : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              )}
+              onClick={() => setActivePanel("decode")}
+            >
+              {t("decode.result")}
+            </button>
+          )}
           {tab.chainResults && tab.chainResults.length > 0 && (
             <button
               className={cn(
@@ -203,6 +243,16 @@ export function ResponseViewer() {
             >
               {aiLoading && aiType === "analyze" ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
               <span className="text-[10px]">{aiLoading && aiType === "analyze" ? t("ai.analyzing") : t("ai.analyze")}</span>
+            </button>
+          )}
+          {tab.responseBody && (
+            <button
+              onClick={handleDecodePayload}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+              title={t("decode.decodeThisPayload")}
+            >
+              <Binary size={12} />
+              <span className="text-[10px]">{t("decode.decode")}</span>
             </button>
           )}
           {tab.statusCode && (
@@ -272,7 +322,9 @@ export function ResponseViewer() {
         </div>
       )}
       <div className="flex-1 overflow-auto selectable">
-        {activePanel === "chain" && tab.chainResults ? (
+        {activePanel === "decode" ? (
+          <DecodeResultPanel />
+        ) : activePanel === "chain" && tab.chainResults ? (
           <ChainResultsView results={tab.chainResults} />
         ) : activePanel === "body" ? (
           tab.responseBody ? (

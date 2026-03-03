@@ -51,7 +51,7 @@ type TimingDetail struct {
 	ConnectMs   float64 `json:"connectMs"`
 	SerializeMs float64 `json:"serializeMs"`
 	RpcMs       float64 `json:"rpcMs"`
-	TotalMs   float64 `json:"totalMs"`
+	TotalMs     float64 `json:"totalMs"`
 }
 
 type GrpcResponse struct {
@@ -71,18 +71,17 @@ type FieldInfo struct {
 	MapEntry bool   `json:"mapEntry"`
 }
 
-
 type HistoryRecord struct {
-	ID        int64       `json:"id"`
-	Timestamp string      `json:"timestamp"`
-	Request   GrpcRequest `json:"request"`
+	ID        int64        `json:"id"`
+	Timestamp string       `json:"timestamp"`
+	Request   GrpcRequest  `json:"request"`
 	Response  GrpcResponse `json:"response"`
 }
 
 // --- Benchmark ---
 
 type BenchmarkConfig struct {
-	Mode          string              `json:"mode"`          // "count", "duration", or "qps"
+	Mode          string              `json:"mode"` // "count", "duration", or "qps"
 	Concurrency   int                 `json:"concurrency"`
 	TotalRequests int                 `json:"totalRequests"` // mode=count
 	DurationSec   int                 `json:"durationSec"`   // mode=duration or qps
@@ -152,4 +151,76 @@ type ChainStepResult struct {
 	Body       string `json:"body"`
 	ElapsedMs  int64  `json:"elapsedMs"`
 	Error      string `json:"error,omitempty"`
+}
+
+// --- Decode ---
+
+type DecodeEncoding string
+
+const (
+	DecodeEncodingAuto   DecodeEncoding = "auto"
+	DecodeEncodingHex    DecodeEncoding = "hex"
+	DecodeEncodingBase64 DecodeEncoding = "base64"
+	DecodeEncodingEscape DecodeEncoding = "escape"
+	DecodeEncodingRaw    DecodeEncoding = "raw"
+)
+
+type DecodeTarget string
+
+const (
+	DecodeTargetInput   DecodeTarget = "input"
+	DecodeTargetOutput  DecodeTarget = "output"
+	DecodeTargetMessage DecodeTarget = "message"
+)
+
+type NestedDecodeRule struct {
+	FieldPath   string   `json:"fieldPath"`
+	MessageType string   `json:"messageType"`
+	ProtoPath   string   `json:"protoPath,omitempty"`
+	ImportPaths []string `json:"importPaths,omitempty"`
+}
+
+type DecodeRequest struct {
+	ServiceName         string             `json:"serviceName"`
+	MethodName          string             `json:"methodName"`
+	Target              DecodeTarget       `json:"target"`
+	ExplicitMessageType string             `json:"explicitMessageType"`
+	Payload             string             `json:"payload"`
+	Encoding            DecodeEncoding     `json:"encoding"`
+	NestedRules         []NestedDecodeRule `json:"nestedRules"`
+}
+
+type DecodeResponse struct {
+	OK               bool           `json:"ok"`
+	DetectedEncoding DecodeEncoding `json:"detectedEncoding"`
+	JSON             string         `json:"json"`
+	Warnings         []string       `json:"warnings"`
+	ElapsedMs        int64          `json:"elapsedMs"`
+	NestedHits       int            `json:"nestedHits"`
+	ErrorCode        string         `json:"errorCode,omitempty"`
+	Error            string         `json:"error,omitempty"`
+}
+
+type DecodeBatchRequest struct {
+	Common DecodeRequest `json:"common"`
+	Items  []string      `json:"items"`
+}
+
+type DecodeItemResult struct {
+	Index            int            `json:"index"`
+	OK               bool           `json:"ok"`
+	DetectedEncoding DecodeEncoding `json:"detectedEncoding"`
+	JSON             string         `json:"json"`
+	NestedHits       int            `json:"nestedHits"`
+	ErrorCode        string         `json:"errorCode,omitempty"`
+	Error            string         `json:"error,omitempty"`
+	Warnings         []string       `json:"warnings"`
+	ElapsedMs        int64          `json:"elapsedMs"`
+}
+
+type DecodeBatchResponse struct {
+	Total   int                `json:"total"`
+	Success int                `json:"success"`
+	Failed  int                `json:"failed"`
+	Results []DecodeItemResult `json:"results"`
 }

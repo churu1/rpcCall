@@ -167,6 +167,85 @@ declare interface SavedRequest {
   createdAt: string;
 }
 
+declare type DecodeEncoding = "auto" | "hex" | "base64" | "escape" | "raw";
+declare type DecodeTarget = "input" | "output" | "message";
+
+declare interface NestedDecodeRule {
+  fieldPath: string;
+  messageType: string;
+  protoPath?: string;
+  importPaths?: string[];
+}
+
+declare interface DecodeRequest {
+  serviceName: string;
+  methodName: string;
+  target: DecodeTarget;
+  explicitMessageType: string;
+  payload: string;
+  encoding: DecodeEncoding;
+  nestedRules: NestedDecodeRule[];
+}
+
+declare interface DecodeResponse {
+  ok: boolean;
+  detectedEncoding: DecodeEncoding;
+  json: string;
+  warnings: string[];
+  elapsedMs: number;
+  nestedHits: number;
+  errorCode?: string;
+  error?: string;
+}
+
+declare interface DecodeBatchRequest {
+  common: DecodeRequest;
+  items: string[];
+}
+
+declare interface DecodeItemResult {
+  index: number;
+  ok: boolean;
+  detectedEncoding: DecodeEncoding;
+  json: string;
+  nestedHits: number;
+  errorCode?: string;
+  error?: string;
+  warnings: string[];
+  elapsedMs: number;
+}
+
+declare interface DecodeBatchResponse {
+  total: number;
+  success: number;
+  failed: number;
+  results: DecodeItemResult[];
+}
+
+declare interface DecodeHistoryEntry {
+  id: number;
+  createdAt: string;
+  serviceName: string;
+  methodName: string;
+  target: string;
+  messageType: string;
+  inputEncoding: string;
+  detectedEncoding: string;
+  success: boolean;
+  errorCode?: string;
+  error?: string;
+  elapsedMs: number;
+  payloadSize: number;
+  nestedHits: number;
+}
+
+declare interface DecodeHistoryDetail extends DecodeHistoryEntry {
+  payloadText: string;
+  resultJson: string;
+  nestedRules: NestedDecodeRule[];
+  warnings: string[];
+}
+
 interface Window {
   go: {
     main: {
@@ -180,6 +259,7 @@ interface Window {
         InvokeServerStream: (req: GrpcRequest) => Promise<void>;
         InvokeBidiStream: (req: GrpcRequest) => Promise<void>;
         SelectCertFile: () => Promise<string>;
+        SelectDecodeFile: () => Promise<string>;
         GetHistory: (limit: number) => Promise<any[]>;
         GetHistoryDetail: (id: number) => Promise<any>;
         DeleteHistory: (id: number) => Promise<void>;
@@ -214,6 +294,8 @@ interface Window {
         ListCollectionRequests: (collectionId: number) => Promise<SavedRequest[] | null>;
         DeleteSavedRequest: (id: number) => Promise<void>;
         GetMessageFields: (serviceName: string, methodName: string) => Promise<FieldInfo[] | null>;
+        GetMessageTypeFields: (messageType: string) => Promise<FieldInfo[] | null>;
+        GetAllMessageTypes: () => Promise<string[] | null>;
         ExportWorkspace: () => Promise<string>;
         ImportWorkspace: () => Promise<void>;
         InvokeChain: (steps: ChainStep[]) => Promise<ChainResult>;
@@ -230,6 +312,12 @@ interface Window {
         AIGenerateBody: (serviceName: string, methodName: string) => Promise<string>;
         AIAnalyzeResponse: (serviceName: string, methodName: string, responseBody: string, statusCode: string) => Promise<string>;
         AIDiagnoseError: (serviceName: string, methodName: string, statusCode: string, errorMessage: string, trailers: { key: string; value: string }[]) => Promise<string>;
+        DecodePayload: (req: DecodeRequest) => Promise<DecodeResponse>;
+        DecodeBatch: (req: DecodeBatchRequest) => Promise<DecodeBatchResponse>;
+        GetDecodeHistory: (limit: number) => Promise<DecodeHistoryEntry[] | null>;
+        GetDecodeHistoryDetail: (id: number) => Promise<DecodeHistoryDetail | null>;
+        DeleteDecodeHistory: (id: number) => Promise<void>;
+        ClearDecodeHistory: () => Promise<void>;
       };
     };
   };

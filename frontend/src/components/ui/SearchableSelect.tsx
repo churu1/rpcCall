@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Search } from "lucide-react";
+import {
+  normalizeSearchText,
+  scoreFuzzyText,
+  subsequenceMatchIndices,
+} from "@/lib/fuzzy-search";
 
 interface Option {
   value: string;
@@ -17,60 +22,24 @@ interface Props {
   className?: string;
 }
 
-function fuzzyMatch(text: string, query: string): number[] | null {
-  const tLower = text.toLowerCase();
-  const qLower = query.toLowerCase();
-  const indices: number[] = [];
-  let qi = 0;
-  for (let ti = 0; ti < tLower.length && qi < qLower.length; ti++) {
-    if (tLower[ti] === qLower[qi]) {
-      indices.push(ti);
-      qi++;
-    }
-  }
-  return qi === qLower.length ? indices : null;
-}
+function scoreOption(option: Option, query: string): number {
+  const labelScore = scoreFuzzyText(option.label, query);
+  const valueScore = scoreFuzzyText(option.value, query);
+  const extraScore = option.searchExtra ? scoreFuzzyText(option.searchExtra, query) : -1;
+  const all = [labelScore, valueScore, extraScore];
+  const best = Math.max(...all);
+  if (best < 0) return -1;
 
-function computeScore(text: string, query: string): number {
-  const tLower = text.toLowerCase();
-  const qLower = query.toLowerCase();
+  // Label matches should win for user-facing readability.
+  let weighted = best;
+  if (best === labelScore) weighted += 800;
+  if (best === valueScore) weighted += 300;
 
-  if (tLower.indexOf(qLower) !== -1) {
-    return 10000 - tLower.indexOf(qLower);
-  }
+  const queryNorm = normalizeSearchText(query);
+  const shortName = option.value.split(".").pop() || option.value;
+  if (shortName.toLowerCase().startsWith(queryNorm)) weighted += 1200;
 
-  const qTokens = qLower.split(/[.\s_/]+/).filter(Boolean);
-  const tTokens = tLower.split(/[.\s_/]+/).filter(Boolean);
-
-  if (qTokens.length > 1) {
-    let matched = 0;
-    let tIdx = 0;
-    for (const qt of qTokens) {
-      while (tIdx < tTokens.length) {
-        if (tTokens[tIdx].startsWith(qt) || tTokens[tIdx].includes(qt)) {
-          matched++;
-          tIdx++;
-          break;
-        }
-        tIdx++;
-      }
-    }
-    if (matched === qTokens.length) {
-      return 5000 + matched * 100;
-    }
-    if (matched > 0) {
-      return 1000 + matched * 100;
-    }
-  }
-
-  const indices = fuzzyMatch(text, query);
-  if (!indices) return -1;
-
-  let consecutive = 0;
-  for (let i = 1; i < indices.length; i++) {
-    if (indices[i] === indices[i - 1] + 1) consecutive++;
-  }
-  return 100 + consecutive * 10 - indices[indices.length - 1] + indices.length;
+  return weighted;
 }
 
 function highlightLabel(label: string, query: string) {
@@ -109,7 +78,7 @@ function highlightLabel(label: string, query: string) {
     }
   }
 
-  const indices = fuzzyMatch(label, query);
+  const indices = subsequenceMatchIndices(label, query);
   if (!indices) return label;
   return buildHighlightParts(label, new Set(indices));
 }
@@ -146,16 +115,16 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
     if (!query) return options;
     return options
       .map((o) => {
-        const scores = [
-          computeScore(o.label, query),
-          computeScore(o.value, query),
-          o.searchExtra ? computeScore(o.searchExtra, query) : -1,
-        ];
-        const best = Math.max(...scores);
-        return { option: o, score: best };
+        return { option: o, score: scoreOption(o, query) };
       })
       .filter((x) => x.score >= 0)
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.option.label.length !== b.option.label.length) {
+          return a.option.label.length - b.option.label.length;
+        }
+        return a.option.label.localeCompare(b.option.label);
+      })
       .map((x) => x.option);
   }, [options, query]);
 

@@ -13,6 +13,8 @@ const shortcutGroups = [
       { keys: "⌘ T", descKey: "shortcuts.newTab" },
       { keys: "⌘ W", descKey: "shortcuts.closeTab" },
       { keys: "⌘ Enter", descKey: "shortcuts.sendRequest" },
+      { keys: "⌘ ⇧ D", descKey: "shortcuts.openDecode" },
+      { keys: "⌘ ⇧ B", descKey: "shortcuts.openDecodeBatch" },
     ],
   },
   {
@@ -25,6 +27,7 @@ const shortcutGroups = [
     titleKey: "shortcuts.editing",
     items: [
       { keys: "⌘ F", descKey: "shortcuts.search" },
+      { keys: "⌘ Enter", descKey: "shortcuts.runDecode" },
       { keys: "Tab", descKey: "shortcuts.indent" },
       { keys: "Esc", descKey: "shortcuts.closeSearch" },
     ],

@@ -88,3 +88,11 @@ func (r *ReflectionClient) ListServices(address string) ([]models.ServiceDefinit
 func (r *ReflectionClient) GetServiceDescriptor(fullName string) *desc.ServiceDescriptor {
 	return r.serviceDescriptors[fullName]
 }
+
+func (r *ReflectionClient) GetAllServiceDescriptors() []*desc.ServiceDescriptor {
+	var out []*desc.ServiceDescriptor
+	for _, svc := range r.serviceDescriptors {
+		out = append(out, svc)
+	}
+	return out
+}

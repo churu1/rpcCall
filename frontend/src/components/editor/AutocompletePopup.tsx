@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { scoreFuzzyText } from "@/lib/fuzzy-search";
 
 interface Props {
   fields: FieldInfo[];
@@ -13,9 +14,14 @@ export function AutocompletePopup({ fields, onSelect, position, visible, onClose
   const [selectedIndex, setSelectedIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
-  const filtered = fields.filter((f) =>
-    f.name.toLowerCase().includes(filter.toLowerCase())
-  );
+  const filtered = fields
+    .map((f) => ({
+      field: f,
+      score: Math.max(scoreFuzzyText(f.name, filter), scoreFuzzyText(f.typeName, filter)),
+    }))
+    .filter((x) => x.score >= 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.field);
 
   useEffect(() => {
     setSelectedIndex(0);

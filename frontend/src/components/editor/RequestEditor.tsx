@@ -7,6 +7,7 @@ import { SearchBar, type SearchMatch } from "@/components/search/SearchBar";
 import { BenchmarkPanel } from "@/components/benchmark/BenchmarkPanel";
 import { ChainEditor } from "@/components/chain/ChainEditor";
 import { MockPanel } from "@/components/mock/MockPanel";
+import { DecodePanel } from "@/components/decode/DecodePanel";
 import { JsonEditor } from "./JsonEditor";
 import { AutocompletePopup } from "./AutocompletePopup";
 
@@ -213,7 +214,11 @@ export function RequestEditor() {
   const { t } = useTranslation();
   const { activeTabId, tabs, updateTab } = useAppStore();
   const tab = tabs.find((t) => t.id === activeTabId);
-  const [activePanel, setActivePanel] = useState<"body" | "metadata" | "benchmark" | "chain" | "mock">("body");
+  const [activePanel, setActivePanel] = useState<"body" | "metadata" | "benchmark" | "chain" | "mock" | "decode">("body");
+  const [decodeSeedPayload, setDecodeSeedPayload] = useState("");
+  const [decodeSeedMessageType, setDecodeSeedMessageType] = useState("");
+  const [decodeSeedTick, setDecodeSeedTick] = useState(0);
+  const [decodeBatchTick, setDecodeBatchTick] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -299,11 +304,41 @@ export function RequestEditor() {
     return () => el.removeEventListener("keydown", handleKeyDown);
   }, [acFields.length, activePanel]);
 
+  useEffect(() => {
+    const openHandler = () => setActivePanel("decode");
+    const openBatchHandler = () => {
+      setActivePanel("decode");
+      setDecodeBatchTick((v) => v + 1);
+    };
+    const decodeFromResponse = (e: Event) => {
+      const custom = e as CustomEvent<{ payload?: string; messageType?: string }>;
+      setDecodeSeedPayload(custom.detail?.payload || "");
+      setDecodeSeedMessageType(custom.detail?.messageType || "");
+      setDecodeSeedTick((v) => v + 1);
+      setActivePanel("decode");
+    };
+    document.addEventListener("rpccall:open-decode", openHandler);
+    document.addEventListener("rpccall:open-decode-batch", openBatchHandler);
+    document.addEventListener("rpccall:decode-payload", decodeFromResponse as EventListener);
+    return () => {
+      document.removeEventListener("rpccall:open-decode", openHandler);
+      document.removeEventListener("rpccall:open-decode-batch", openBatchHandler);
+      document.removeEventListener("rpccall:decode-payload", decodeFromResponse as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("rpccall:decode-active", {
+      detail: { active: activePanel === "decode" },
+    }));
+  }, [activePanel]);
+
   if (!tab) return null;
 
   const panels = [
     { key: "body" as const, label: t("panels.requestBody") },
     { key: "metadata" as const, label: `${t("panels.metadata")} (${tab.metadata.length})` },
+    { key: "decode" as const, label: t("panels.decode") },
     { key: "benchmark" as const, label: t("panels.benchmark") },
     { key: "chain" as const, label: t("panels.chain") },
     { key: "mock" as const, label: t("panels.mock") },
@@ -440,6 +475,13 @@ export function RequestEditor() {
           <ChainEditor />
         ) : activePanel === "mock" ? (
           <MockPanel />
+        ) : activePanel === "decode" ? (
+          <DecodePanel
+            seedPayload={decodeSeedPayload}
+            seedMessageType={decodeSeedMessageType}
+            seedTick={decodeSeedTick}
+            forceBatchTick={decodeBatchTick}
+          />
         ) : (
           <BenchmarkPanel />
         )}
