@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { X, Plus } from "lucide-react";
+import { IconButton } from "@/components/ui/IconButton";
 
 export function TabBar() {
   const { tabs, activeTabId, setActiveTab, removeTab, addTab, reorderTabs } = useAppStore();
@@ -64,7 +65,7 @@ export function TabBar() {
   );
 
   return (
-    <div className="flex items-center h-9 bg-[var(--color-card)] border-b select-none">
+    <div className="flex items-center h-9 bg-[var(--surface-1)] border-b border-[var(--line-soft)] select-none">
       <div className="flex items-center overflow-x-auto flex-1 min-w-0">
         {tabs.map((tab, index) => (
           <div
@@ -77,23 +78,23 @@ export function TabBar() {
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
             className={cn(
-              "flex items-center gap-1.5 px-3 h-9 border-r cursor-pointer text-xs shrink-0 max-w-[200px] group transition-all duration-200 relative",
+              "flex items-center gap-1.5 px-3 h-9 border-r border-[var(--line-soft)] cursor-pointer text-xs shrink-0 max-w-[220px] group transition-all duration-150 relative",
               tab.id === activeTabId
-                ? "bg-[var(--color-background)] text-[var(--color-foreground)]"
-                : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-secondary)]",
+                ? "bg-[var(--surface-0)] text-[var(--text-strong)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-normal)] hover:bg-[var(--surface-2)]",
               dragIndex !== null && dragIndex !== index && "transition-transform",
-              dragOverIndex === index && dragIndex !== index && "bg-[var(--color-primary)]/5",
-              justDroppedId === tab.id && "bg-[var(--color-primary)]/10"
+              dragOverIndex === index && dragIndex !== index && "bg-[var(--state-info)]/10",
+              justDroppedId === tab.id && "bg-[var(--state-info)]/15"
             )}
             onClick={() => setActiveTab(tab.id)}
             title={tab.method ? `${tab.method.serviceName}/${tab.method.methodName}` : tab.title}
           >
             {dragOverIndex === index && dragIndex !== null && dragIndex !== index && (
-              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-[var(--color-primary)] rounded-full" />
+              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-[var(--state-info)] rounded-full" />
             )}
             <span className="truncate">{tab.title}</span>
             <button
-              className="opacity-0 group-hover:opacity-100 hover:bg-[var(--color-muted)] rounded p-0.5 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 hover:bg-[var(--surface-1)] rounded p-0.5 transition-opacity"
               onClick={(e) => {
                 e.stopPropagation();
                 removeTab(tab.id);
@@ -104,12 +105,12 @@ export function TabBar() {
           </div>
         ))}
       </div>
-      <button
-        className="flex items-center justify-center w-9 h-9 hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+      <IconButton
+        className="w-9 h-9 rounded-none border-y-0 border-r-0 border-l border-[var(--line-soft)] bg-[var(--surface-1)]"
         onClick={() => addTab()}
       >
         <Plus size={14} />
-      </button>
+      </IconButton>
     </div>
   );
 }

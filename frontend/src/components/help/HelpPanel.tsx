@@ -1,5 +1,6 @@
 import { X, Send, FileText, ListFilter, Globe2, FolderHeart, Clock, Gauge, Link2, Server, Lock, Sparkles, Terminal, GitCompareArrows, Palette, Binary } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface Props {
   onClose: () => void;
@@ -30,33 +31,33 @@ export function HelpPanel({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-[var(--color-card)] border rounded-lg shadow-xl w-[560px] max-h-[80vh] flex flex-col"
+        className="bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-lg shadow-[var(--elevation-2)] w-[560px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line-soft)]">
           <h3 className="text-sm font-medium">{t("help.title")}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
+          <IconButton size="sm" className="border-0 bg-transparent" onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
         <div className="overflow-auto p-3 flex flex-col gap-1.5">
           {features.map((f) => (
             <div
               key={f.titleKey}
-              className="flex gap-3 p-2.5 rounded-md hover:bg-[var(--color-secondary)] transition-colors"
+              className="flex gap-3 p-2.5 rounded-md hover:bg-[var(--surface-2)] transition-colors"
             >
               <div className="shrink-0 mt-0.5">
                 <f.icon size={16} className={f.color} />
               </div>
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-xs font-medium text-[var(--color-foreground)]">
+                <span className="text-xs font-medium text-[var(--text-strong)]">
                   {t(f.titleKey)}
                 </span>
-                <span className="text-[11px] text-[var(--color-muted-foreground)] leading-relaxed">
+                <span className="text-[11px] text-[var(--text-muted)] leading-relaxed">
                   {t(f.descKey)}
                 </span>
                 {f.tipKey && (
-                  <kbd className="self-start mt-0.5 text-[10px] text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-1.5 py-0.5 rounded font-mono">
+                  <kbd className="self-start mt-0.5 text-[10px] text-[var(--state-info)] bg-[var(--state-info)]/10 px-1.5 py-0.5 rounded font-mono border border-[var(--line-soft)]">
                     {t(f.tipKey)}
                   </kbd>
                 )}

@@ -2,6 +2,9 @@ import { useMemo } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { Card } from "@/components/ui/Card";
+import { IconButton } from "@/components/ui/IconButton";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 interface Props {
   leftTitle: string;
@@ -71,29 +74,32 @@ export function DecodeDiffViewer({ leftTitle, rightTitle, leftText, rightText, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-[var(--color-card)] border rounded-lg shadow-xl w-[90vw] max-w-[1100px] max-h-[80vh] flex flex-col"
+      <Card
+        className="w-[92vw] max-w-[1100px] max-h-[82vh] flex flex-col p-0 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="text-sm font-medium">{t("decode.diffTitle")}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
-            <X size={14} />
-          </button>
-        </div>
-        <div className="flex border-b text-[10px] text-[var(--color-muted-foreground)]">
-          <div className="flex-1 px-3 py-1.5 border-r truncate">{leftTitle}</div>
+        <SectionHeader
+          title={t("decode.diffTitle")}
+          className="h-11 px-3 text-xs"
+          right={(
+            <IconButton onClick={onClose} size="sm" title={t("common.close")} aria-label={t("common.close")}>
+              <X size={14} />
+            </IconButton>
+          )}
+        />
+        <div className="flex border-b border-[var(--line-soft)] text-[10px] text-[var(--text-muted)]">
+          <div className="flex-1 px-3 py-1.5 border-r border-[var(--line-soft)] truncate">{leftTitle}</div>
           <div className="flex-1 px-3 py-1.5 truncate">{rightTitle}</div>
         </div>
         <div className="flex flex-1 min-h-0 overflow-auto">
-          <div className="flex-1 border-r overflow-auto">
-            <pre className="text-[11px] font-mono p-2 leading-5">
+          <div className="flex-1 border-r border-[var(--line-soft)] overflow-auto">
+            <pre className="text-[11px] text-[var(--text-normal)] font-mono p-2 leading-5">
               {diff.left.map((line, idx) => (
                 <div
                   key={idx}
                   className={cn(
                     "px-1 -mx-1",
-                    line.type === "removed" && "bg-red-500/15 text-red-400",
+                    line.type === "removed" && "bg-[var(--state-error)]/14 text-[var(--state-error)]",
                     line.content === "" && line.type === "same" && "h-5"
                   )}
                 >
@@ -103,13 +109,13 @@ export function DecodeDiffViewer({ leftTitle, rightTitle, leftText, rightText, o
             </pre>
           </div>
           <div className="flex-1 overflow-auto">
-            <pre className="text-[11px] font-mono p-2 leading-5">
+            <pre className="text-[11px] text-[var(--text-normal)] font-mono p-2 leading-5">
               {diff.right.map((line, idx) => (
                 <div
                   key={idx}
                   className={cn(
                     "px-1 -mx-1",
-                    line.type === "added" && "bg-green-500/15 text-green-400",
+                    line.type === "added" && "bg-[var(--state-success)]/14 text-[var(--state-success)]",
                     line.content === "" && line.type === "same" && "h-5"
                   )}
                 >
@@ -119,7 +125,7 @@ export function DecodeDiffViewer({ leftTitle, rightTitle, leftText, rightText, o
             </pre>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -5,6 +5,9 @@ import { Play, Square, Download, RotateCcw, History } from "lucide-react";
 import { VariableConfig } from "./VariableConfig";
 import { BenchmarkChart, MetricCards } from "./BenchmarkChart";
 import { BenchmarkHistory } from "./BenchmarkHistory";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 type BenchmarkStatus = "idle" | "running" | "done";
 
@@ -158,16 +161,16 @@ export function BenchmarkPanel() {
   // --- Config Form ---
   if (status === "idle") {
     return (
-      <div className="flex flex-col gap-3 p-3 text-xs">
+      <div className="flex flex-col gap-3 p-3 text-xs bg-[var(--surface-1)] h-full overflow-auto">
         {error && (
-          <div className="px-2 py-1.5 rounded bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] text-[11px]">
+          <div className="px-2 py-1.5 rounded border border-[var(--state-error)]/25 bg-[var(--state-error)]/10 text-[var(--state-error)] text-[11px]">
             {error}
           </div>
         )}
 
         {/* Mode */}
         <div className="flex items-center gap-3">
-          <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.mode")}</label>
+          <label className="text-[11px] text-[var(--text-muted)] w-16 shrink-0">{t("benchmark.mode")}</label>
           <div className="flex gap-2">
             {(["count", "duration", "qps"] as const).map((m) => (
               <button
@@ -175,8 +178,8 @@ export function BenchmarkPanel() {
                 onClick={() => setConfig((c) => ({ ...c, mode: m }))}
                 className={`px-3 py-1 rounded text-[11px] border transition-colors ${
                   config.mode === m
-                    ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-foreground)]"
-                    : "border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:border-[var(--color-muted-foreground)]"
+                    ? "border-[var(--state-info)]/35 bg-[var(--state-info)]/12 text-[var(--text-strong)]"
+                    : "border-[var(--line-soft)] text-[var(--text-muted)] hover:border-[var(--line-strong)]"
                 }`}
               >
                 {m === "count" ? t("benchmark.byCount") : m === "duration" ? t("benchmark.byDuration") : t("benchmark.byQps")}
@@ -188,14 +191,14 @@ export function BenchmarkPanel() {
         {/* Concurrency */}
         {config.mode !== "qps" && (
           <div className="flex items-center gap-3">
-            <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.concurrency")}</label>
-            <input
+            <label className="text-[11px] text-[var(--text-muted)] w-16 shrink-0">{t("benchmark.concurrency")}</label>
+            <Input
               type="number"
               min={1}
               max={10000}
               value={config.concurrency}
               onChange={(e) => setConfig((c) => ({ ...c, concurrency: Math.max(1, Number(e.target.value)) }))}
-              className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+              className="w-24"
             />
           </div>
         )}
@@ -203,94 +206,94 @@ export function BenchmarkPanel() {
         {/* Count / Duration / QPS */}
         {config.mode === "count" && (
           <div className="flex items-center gap-3">
-            <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.totalRequests")}</label>
-            <input
+            <label className="text-[11px] text-[var(--text-muted)] w-16 shrink-0">{t("benchmark.totalRequests")}</label>
+            <Input
               type="number"
               min={1}
               value={config.totalRequests}
               onChange={(e) => setConfig((c) => ({ ...c, totalRequests: Math.max(1, Number(e.target.value)) }))}
-              className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+              className="w-24"
             />
           </div>
         )}
         {config.mode === "duration" && (
           <div className="flex items-center gap-3">
-            <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.duration")}</label>
+            <label className="text-[11px] text-[var(--text-muted)] w-16 shrink-0">{t("benchmark.duration")}</label>
             <div className="flex items-center gap-1">
-              <input
+              <Input
                 type="number"
                 min={1}
                 value={config.durationSec}
                 onChange={(e) => setConfig((c) => ({ ...c, durationSec: Math.max(1, Number(e.target.value)) }))}
-                className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                className="w-24"
               />
-              <span className="text-[var(--color-muted-foreground)]">{t("benchmark.seconds")}</span>
+              <span className="text-[var(--text-muted)]">{t("benchmark.seconds")}</span>
             </div>
           </div>
         )}
         {config.mode === "qps" && (
           <>
             <div className="flex items-center gap-3">
-              <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.targetQps")}</label>
+              <label className="text-[11px] text-[var(--text-muted)] w-16 shrink-0">{t("benchmark.targetQps")}</label>
               <div className="flex items-center gap-1">
-                <input
+                <Input
                   type="number"
                   min={1}
                   value={config.targetQps}
                   onChange={(e) => setConfig((c) => ({ ...c, targetQps: Math.max(1, Number(e.target.value)) }))}
-                  className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                  className="w-24"
                 />
-                <span className="text-[var(--color-muted-foreground)]">req/s</span>
+                <span className="text-[var(--text-muted)]">req/s</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-[11px] text-[var(--color-muted-foreground)] w-16 shrink-0">{t("benchmark.duration")}</label>
+              <label className="text-[11px] text-[var(--text-muted)] w-16 shrink-0">{t("benchmark.duration")}</label>
               <div className="flex items-center gap-1">
-                <input
+                <Input
                   type="number"
                   min={1}
                   value={config.durationSec}
                   onChange={(e) => setConfig((c) => ({ ...c, durationSec: Math.max(1, Number(e.target.value)) }))}
-                  className="w-24 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                  className="w-24"
                 />
-                <span className="text-[var(--color-muted-foreground)]">{t("benchmark.seconds")}</span>
+                <span className="text-[var(--text-muted)]">{t("benchmark.seconds")}</span>
               </div>
             </div>
           </>
         )}
 
         {/* Ramp-up */}
-        <div className="flex flex-col gap-2 p-2 rounded border border-[var(--color-border)]">
+        <Card className="flex flex-col gap-2 p-2">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={config.rampUpEnabled}
               onChange={(e) => setConfig((c) => ({ ...c, rampUpEnabled: e.target.checked }))}
             />
-            <span className="text-[11px] text-[var(--color-muted-foreground)]">{t("benchmark.rampUp")}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{t("benchmark.rampUp")}</span>
           </label>
           {config.rampUpEnabled && (
             <div className="flex items-center gap-2 ml-5">
-              <span className="text-[10px] text-[var(--color-muted-foreground)]">{t("benchmark.every")}</span>
-              <input
+              <span className="text-[10px] text-[var(--text-muted)]">{t("benchmark.every")}</span>
+              <Input
                 type="number"
                 min={1}
                 value={config.rampUpStepSec}
                 onChange={(e) => setConfig((c) => ({ ...c, rampUpStepSec: Math.max(1, Number(e.target.value)) }))}
-                className="w-16 bg-[var(--color-secondary)] px-2 py-0.5 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px]"
+                className="w-16 h-7 text-[11px]"
               />
-              <span className="text-[10px] text-[var(--color-muted-foreground)]">{t("benchmark.secIncrease")}</span>
-              <input
+              <span className="text-[10px] text-[var(--text-muted)]">{t("benchmark.secIncrease")}</span>
+              <Input
                 type="number"
                 min={1}
                 value={config.rampUpStepAdd}
                 onChange={(e) => setConfig((c) => ({ ...c, rampUpStepAdd: Math.max(1, Number(e.target.value)) }))}
-                className="w-16 bg-[var(--color-secondary)] px-2 py-0.5 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px]"
+                className="w-16 h-7 text-[11px]"
               />
-              <span className="text-[10px] text-[var(--color-muted-foreground)]">{t("benchmark.concurrencyUnit")}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">{t("benchmark.concurrencyUnit")}</span>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Variables */}
         <VariableConfig
@@ -299,18 +302,20 @@ export function BenchmarkPanel() {
         />
 
         {/* Start button */}
-        <button
+        <Button
           onClick={handleStart_}
-          className="flex items-center justify-center gap-2 mt-2 px-4 py-2 rounded bg-[var(--color-primary)] text-white text-xs font-medium hover:bg-[var(--color-primary)]/80 transition-colors"
+          variant="primary"
+          className="mt-2 self-start px-4"
         >
           <Play size={14} /> {t("benchmark.start")}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setShowHistory(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded border border-[var(--color-border)] text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-secondary)] transition-colors"
+          variant="secondary"
+          className="self-start px-4"
         >
           <History size={14} /> {t("benchmark.history")}
-        </button>
+        </Button>
         {showHistory && (
           <BenchmarkHistory
             onClose={() => setShowHistory(false)}
@@ -327,26 +332,27 @@ export function BenchmarkPanel() {
   // --- Running ---
   if (status === "running") {
     return (
-      <div className="flex flex-col gap-3 p-3" ref={chartContainerRef}>
+      <div className="flex flex-col gap-3 p-3 bg-[var(--surface-1)] h-full overflow-auto" ref={chartContainerRef}>
         {latestProgress && <MetricCards progress={latestProgress} />}
 
         <BenchmarkChart history={progressHistory} width={chartWidth} height={180} />
 
-        <button
+        <Button
           onClick={handleStop_}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-[var(--color-destructive)] text-white text-xs font-medium hover:bg-[var(--color-destructive)]/80 transition-colors self-center"
+          variant="danger"
+          className="self-start px-4"
         >
           <Square size={14} /> {t("benchmark.stop")}
-        </button>
+        </Button>
       </div>
     );
   }
 
   // --- Done ---
   return (
-    <div className="flex flex-col gap-3 p-3" ref={chartContainerRef}>
+    <div className="flex flex-col gap-3 p-3 bg-[var(--surface-1)] h-full overflow-auto" ref={chartContainerRef}>
       {error && (
-        <div className="px-2 py-1.5 rounded bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] text-[11px]">
+        <div className="px-2 py-1.5 rounded border border-[var(--state-error)]/25 bg-[var(--state-error)]/10 text-[var(--state-error)] text-[11px]">
           {error}
         </div>
       )}
@@ -354,30 +360,30 @@ export function BenchmarkPanel() {
       {result && (
         <>
           {/* Summary */}
-          <div className="text-[11px] font-medium text-[var(--color-muted-foreground)]">{t("benchmark.summary")}</div>
+          <div className="text-[11px] font-medium text-[var(--text-muted)]">{t("benchmark.summary")}</div>
           <MetricCards progress={result} />
 
           {/* Latency distribution */}
-          <div className="text-[11px] font-medium text-[var(--color-muted-foreground)] mt-2">{t("benchmark.latencyDist")}</div>
+          <div className="text-[11px] font-medium text-[var(--text-muted)] mt-2">{t("benchmark.latencyDist")}</div>
           <div className="grid grid-cols-5 gap-2 text-[11px]">
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-muted-foreground)]">{t("benchmark.min")}</span>
+              <span className="text-[var(--text-muted)]">{t("benchmark.min")}</span>
               <span className="font-mono">{result.minLatencyMs.toFixed(1)}ms</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-muted-foreground)]">{t("benchmark.p50")}</span>
+              <span className="text-[var(--text-muted)]">{t("benchmark.p50")}</span>
               <span className="font-mono">{result.p50Ms.toFixed(1)}ms</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-muted-foreground)]">{t("benchmark.p90")}</span>
+              <span className="text-[var(--text-muted)]">{t("benchmark.p90")}</span>
               <span className="font-mono">{result.p90Ms.toFixed(1)}ms</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-muted-foreground)]">{t("benchmark.p99")}</span>
+              <span className="text-[var(--text-muted)]">{t("benchmark.p99")}</span>
               <span className="font-mono">{result.p99Ms.toFixed(1)}ms</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-muted-foreground)]">{t("benchmark.max")}</span>
+              <span className="text-[var(--text-muted)]">{t("benchmark.max")}</span>
               <span className="font-mono">{result.maxLatencyMs.toFixed(1)}ms</span>
             </div>
           </div>
@@ -390,7 +396,7 @@ export function BenchmarkPanel() {
           {/* QPS / Latency chart over time */}
           {progressHistory.length > 1 && (
             <>
-              <div className="text-[11px] font-medium text-[var(--color-muted-foreground)] mt-2">
+              <div className="text-[11px] font-medium text-[var(--text-muted)] mt-2">
                 {t("benchmark.qpsTrend")}
               </div>
               <BenchmarkChart history={progressHistory} width={chartWidth} height={160} />
@@ -400,17 +406,17 @@ export function BenchmarkPanel() {
           {/* Error codes */}
           {result.errorCodes && Object.keys(result.errorCodes).length > 0 && (
             <>
-              <div className="text-[11px] font-medium text-[var(--color-muted-foreground)] mt-2">
+              <div className="text-[11px] font-medium text-[var(--text-muted)] mt-2">
                 {t("benchmark.errorCodes")}
               </div>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(result.errorCodes).map(([code, count]) => (
                   <div
                     key={code}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--color-destructive)]/10 text-[11px]"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--state-error)]/10 text-[11px]"
                   >
-                    <span className="font-mono text-[var(--color-destructive)]">{code}</span>
-                    <span className="text-[var(--color-muted-foreground)]">×{count}</span>
+                    <span className="font-mono text-[var(--state-error)]">{code}</span>
+                    <span className="text-[var(--text-muted)]">×{count}</span>
                   </div>
                 ))}
               </div>
@@ -419,41 +425,41 @@ export function BenchmarkPanel() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 mt-3">
-            <button
+            <Button
               onClick={() => handleExport("json")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--color-secondary)] text-xs hover:bg-[var(--color-secondary)]/80 border border-[var(--color-border)]"
+              variant="secondary"
             >
               <Download size={12} /> {t("benchmark.exportJson")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleExport("csv")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--color-secondary)] text-xs hover:bg-[var(--color-secondary)]/80 border border-[var(--color-border)]"
+              variant="secondary"
             >
               <Download size={12} /> {t("benchmark.exportCsv")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleExport("html")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--color-secondary)] text-xs hover:bg-[var(--color-secondary)]/80 border border-[var(--color-border)]"
+              variant="secondary"
             >
               <Download size={12} /> {t("benchmark.exportHtml")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowHistory(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--color-secondary)] text-xs hover:bg-[var(--color-secondary)]/80 border border-[var(--color-border)]"
+              variant="secondary"
             >
               <History size={12} /> {t("benchmark.history")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setStatus("idle");
                 setResult(null);
                 setProgressHistory([]);
                 setError(null);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--color-primary)] text-white text-xs hover:bg-[var(--color-primary)]/80"
+              variant="primary"
             >
               <RotateCcw size={12} /> {t("benchmark.reset")}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -502,7 +508,7 @@ function LatencyHistogram({
                 width={barW}
                 height={barH}
                 rx={1}
-                fill="var(--color-primary)"
+                fill="var(--state-info)"
                 opacity={0.8}
               />
               {b.count > 0 && (
@@ -510,7 +516,7 @@ function LatencyHistogram({
                   x={x + barW / 2}
                   y={y - 3}
                   textAnchor="middle"
-                  fill="var(--color-muted-foreground)"
+                  fill="var(--text-muted)"
                   fontSize={8}
                 >
                   {b.count}
@@ -520,7 +526,7 @@ function LatencyHistogram({
                 x={x + barW / 2}
                 y={chartH + 12}
                 textAnchor="middle"
-                fill="var(--color-muted-foreground)"
+                fill="var(--text-muted)"
                 fontSize={7}
                 transform={`rotate(-30, ${x + barW / 2}, ${chartH + 12})`}
               >
@@ -529,7 +535,7 @@ function LatencyHistogram({
             </g>
           );
         })}
-        <line x1={0} y1={chartH} x2={chartW} y2={chartH} stroke="var(--color-border)" />
+        <line x1={0} y1={chartH} x2={chartW} y2={chartH} stroke="var(--line-soft)" />
       </g>
     </svg>
   );

@@ -14,14 +14,14 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center h-screen bg-[var(--color-background)] text-[var(--color-foreground)] gap-4 p-8">
+        <div className="flex flex-col items-center justify-center h-screen bg-[var(--surface-0)] text-[var(--text-normal)] gap-4 p-8">
           <div className="text-lg font-medium">界面渲染出错</div>
-          <div className="text-sm text-[var(--color-muted-foreground)] max-w-md text-center">
+          <div className="text-sm text-[var(--text-muted)] max-w-md text-center">
             {this.state.error}
           </div>
           <button
             onClick={() => this.setState({ hasError: false, error: "" })}
-            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md text-sm hover:bg-[var(--color-primary)]/80"
+            className="px-4 py-2 bg-[var(--state-info)] text-white rounded-md text-sm hover:bg-[var(--state-info)]/80"
           >
             重新加载界面
           </button>

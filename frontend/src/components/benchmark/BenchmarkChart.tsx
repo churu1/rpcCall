@@ -76,7 +76,7 @@ export function BenchmarkChart({
   if (history.length < 2) {
     return (
       <div
-        className="flex items-center justify-center text-xs text-[var(--color-muted-foreground)]"
+        className="flex items-center justify-center text-xs text-[var(--text-muted)]"
         style={{ width, height }}
       >
         等待数据...
@@ -99,7 +99,7 @@ export function BenchmarkChart({
               y1={y}
               x2={chartW}
               y2={y}
-              stroke="var(--color-border)"
+              stroke="var(--line-soft)"
               strokeDasharray="3,3"
               opacity={0.5}
             />
@@ -112,17 +112,17 @@ export function BenchmarkChart({
         <path d={latPath} fill="none" stroke="#f59e0b" strokeWidth={2} />
 
         {/* X axis */}
-        <line x1={0} y1={chartH} x2={chartW} y2={chartH} stroke="var(--color-border)" />
+        <line x1={0} y1={chartH} x2={chartW} y2={chartH} stroke="var(--line-soft)" />
         {xTicks.map((t, i) => {
           const x = (t / maxTime) * chartW;
           return (
             <g key={`xt-${i}`}>
-              <line x1={x} y1={chartH} x2={x} y2={chartH + 4} stroke="var(--color-muted-foreground)" />
+              <line x1={x} y1={chartH} x2={x} y2={chartH + 4} stroke="var(--text-muted)" />
               <text
                 x={x}
                 y={chartH + 16}
                 textAnchor="middle"
-                fill="var(--color-muted-foreground)"
+                fill="var(--text-muted)"
                 fontSize={9}
               >
                 {t}s
@@ -132,7 +132,7 @@ export function BenchmarkChart({
         })}
 
         {/* Y axis left - QPS */}
-        <line x1={0} y1={0} x2={0} y2={chartH} stroke="var(--color-border)" />
+        <line x1={0} y1={0} x2={0} y2={chartH} stroke="var(--line-soft)" />
         {yQpsTicks.map((v, i) => {
           const y = chartH - (v / maxQps) * chartH;
           return (
@@ -153,7 +153,7 @@ export function BenchmarkChart({
         </text>
 
         {/* Y axis right - Latency */}
-        <line x1={chartW} y1={0} x2={chartW} y2={chartH} stroke="var(--color-border)" />
+        <line x1={chartW} y1={0} x2={chartW} y2={chartH} stroke="var(--line-soft)" />
         {yLatTicks.map((v, i) => {
           const y = chartH - (v / maxLat) * chartH;
           return (
@@ -184,11 +184,11 @@ export function BenchmarkChart({
       {/* Legend */}
       <g transform={`translate(${padding.left + 10},${padding.top + 6})`}>
         <rect x={0} y={0} width={8} height={8} rx={1} fill="#22c55e" />
-        <text x={12} y={7} fill="var(--color-muted-foreground)" fontSize={9}>
+        <text x={12} y={7} fill="var(--text-muted)" fontSize={9}>
           QPS
         </text>
         <rect x={45} y={0} width={8} height={8} rx={1} fill="#f59e0b" />
-        <text x={57} y={7} fill="var(--color-muted-foreground)" fontSize={9}>
+        <text x={57} y={7} fill="var(--text-muted)" fontSize={9}>
           平均延迟
         </text>
       </g>
@@ -207,13 +207,13 @@ interface MetricCardProps {
 
 function MetricCard({ label, value, unit, color }: MetricCardProps) {
   return (
-    <div className="flex flex-col items-center p-2 rounded bg-[var(--color-secondary)] border border-[var(--color-border)] min-w-[80px]">
-      <span className="text-[10px] text-[var(--color-muted-foreground)]">{label}</span>
-      <span className="text-sm font-semibold" style={{ color: color || "var(--color-foreground)" }}>
+    <div className="flex flex-col items-center p-2 rounded bg-[var(--surface-1)] border border-[var(--line-soft)] min-w-[80px]">
+      <span className="text-[10px] text-[var(--text-muted)]">{label}</span>
+      <span className="text-sm font-semibold" style={{ color: color || "var(--text-normal)" }}>
         {typeof value === "number" ? value.toFixed(1) : value}
       </span>
       {unit && (
-        <span className="text-[9px] text-[var(--color-muted-foreground)]">{unit}</span>
+        <span className="text-[9px] text-[var(--text-muted)]">{unit}</span>
       )}
     </div>
   );

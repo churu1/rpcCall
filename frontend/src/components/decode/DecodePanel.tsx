@@ -3,6 +3,10 @@ import { useAppStore } from "@/store/app-store";
 import { Plus, Trash2, Play, FolderOpen, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Card } from "@/components/ui/Card";
 
 interface Props {
   seedPayload?: string;
@@ -271,8 +275,8 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
   }, [selectedTemplateId, loadTemplates]);
 
   return (
-    <div className="h-full flex flex-col min-w-0 p-2 gap-2 bg-[var(--color-background)]" data-decode-panel="true">
-      <div className="rounded-lg border bg-[var(--color-card)] p-2 flex flex-col gap-2">
+    <div className="h-full flex flex-col min-w-0 p-2 gap-2 bg-[var(--surface-0)]" data-decode-panel="true">
+      <Card className="p-2 flex flex-col gap-2">
         <SearchableSelect
           value={explicitMessageType}
           options={messageOptions}
@@ -281,7 +285,7 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
           className="w-[430px] max-w-full"
         />
         <div className="grid grid-cols-[1.2fr_1fr_auto_auto] gap-2 items-center">
-          <select
+          <Select
             value={selectedTemplateId}
             onChange={(e) => {
               const id = e.target.value;
@@ -289,7 +293,7 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
               const hit = templates.find((tpl) => String(tpl.id) === id);
               if (hit) applyTemplate(hit);
             }}
-            className="bg-[var(--color-secondary)] border rounded px-2 py-1.5 text-xs"
+            className="text-xs"
             disabled={!currentProjectId}
           >
             <option value="">{t("decode.selectTemplate")}</option>
@@ -298,106 +302,109 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
                 {tpl.name}
               </option>
             ))}
-          </select>
-          <input
+          </Select>
+          <Input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
             placeholder={t("decode.templateNamePlaceholder")}
-            className="bg-[var(--color-secondary)] border rounded px-2 py-1.5 text-xs min-w-0"
+            className="text-xs min-w-0"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
           />
-          <button
+          <Button
             onClick={handleSaveTemplate}
             disabled={!currentProjectId || !explicitMessageType.trim()}
-            className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border hover:bg-[var(--color-secondary)] disabled:opacity-50"
+            size="sm"
             title={t("decode.saveTemplate")}
           >
             <Save size={12} />
             {t("decode.saveTemplate")}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleDeleteTemplate}
             disabled={!hasSelectedTemplate}
-            className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border hover:bg-[var(--color-secondary)] disabled:opacity-50 text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+            variant="danger"
+            size="sm"
+            className="px-2"
             title={t("decode.deleteTemplate")}
           >
             <Trash2 size={12} />
-          </button>
+          </Button>
         </div>
 
         <div className="grid grid-cols-[auto_auto_auto] gap-2 items-center">
-          <select
+          <Select
             value={encoding}
             onChange={(e) => setEncoding(e.target.value as DecodeEncoding)}
-            className="bg-[var(--color-secondary)] border rounded px-2 py-1.5 text-xs"
+            className="text-xs"
           >
             {ENCODINGS.map((e) => (
               <option key={e} value={e}>{e}</option>
             ))}
-          </select>
+          </Select>
           <label className="text-xs flex items-center gap-1">
             <input type="checkbox" checked={batchMode} onChange={(e) => setBatchMode(e.target.checked)} />
             {t("decode.batch")}
           </label>
           {!batchMode && (
-            <button
+            <Button
               onClick={handleChooseFile}
-              className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border hover:bg-[var(--color-secondary)]"
+              size="sm"
               title={t("decode.chooseFile")}
             >
               <FolderOpen size={12} />
               {t("decode.chooseFile")}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={runDecode}
             disabled={!canDecode || running}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-[var(--color-primary)] text-white disabled:opacity-50"
+            variant="primary"
+            size="sm"
           >
             <Play size={12} />
             {running ? t("decode.decoding") : t("decode.decode")}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       <div className="flex-1 min-h-0 grid grid-rows-[auto_auto_1fr] gap-2">
-        <div className="rounded-lg border bg-[var(--color-card)] flex flex-col">
-          <div className="px-2 py-1.5 text-[11px] border-b text-[var(--color-muted-foreground)]">
+        <Card className="flex flex-col">
+          <div className="px-2 py-1.5 text-[11px] border-b text-[var(--text-muted)]">
             {t("decode.fieldsTitle")}
           </div>
           <div className="max-h-[140px] overflow-auto">
             {fieldsLoading ? (
-              <div className="px-2 py-2 text-[11px] text-[var(--color-muted-foreground)]">{t("decode.loadingFields")}</div>
+              <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">{t("decode.loadingFields")}</div>
             ) : messageFields.length === 0 ? (
-              <div className="px-2 py-2 text-[11px] text-[var(--color-muted-foreground)]">{t("decode.noFields")}</div>
+              <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">{t("decode.noFields")}</div>
             ) : (
               messageFields.map((f) => (
                 <div key={`${f.name}-${f.typeName}`} className="px-2 py-1 text-[11px] border-b last:border-b-0 flex items-center gap-2">
-                  <span className="text-[10px] px-1 rounded bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] font-mono">
+                  <span className="text-[10px] px-1 rounded bg-[var(--surface-1)] text-[var(--text-muted)] font-mono">
                     #{f.fieldNumber}
                   </span>
                   <span className="font-mono">{f.name}</span>
-                  <span className="text-[var(--color-muted-foreground)]">{f.typeName}</span>
-                  {f.repeated && <span className="text-[10px] px-1 rounded bg-[var(--color-primary)]/20 text-[var(--color-primary)]">repeated</span>}
-                  {f.mapEntry && <span className="text-[10px] px-1 rounded bg-[var(--color-primary)]/20 text-[var(--color-primary)]">map</span>}
+                  <span className="text-[var(--text-muted)]">{f.typeName}</span>
+                  {f.repeated && <span className="text-[10px] px-1 rounded bg-[var(--state-info)]/20 text-[var(--state-info)]">repeated</span>}
+                  {f.mapEntry && <span className="text-[10px] px-1 rounded bg-[var(--state-info)]/20 text-[var(--state-info)]">map</span>}
                 </div>
               ))
             )}
           </div>
-        </div>
+        </Card>
 
-        <div className="rounded-lg border bg-[var(--color-card)] p-2 flex flex-col gap-1">
-          <div className="text-[11px] text-[var(--color-muted-foreground)]">{t("decode.nestedRules")}</div>
+        <Card className="p-2 flex flex-col gap-1">
+          <div className="text-[11px] text-[var(--text-muted)]">{t("decode.nestedRules")}</div>
           {rules.map((r, i) => (
             <div key={i} className="flex items-center gap-1">
-              <input
+              <Input
                 value={r.fieldPath}
                 onChange={(e) => setRules((prev) => prev.map((x, idx) => idx === i ? { ...x, fieldPath: e.target.value } : x))}
                 placeholder={t("decode.fieldPathPlaceholder")}
-                className="flex-1 bg-[var(--color-secondary)] border rounded px-2 py-1 text-xs"
+                className="flex-1 h-7 text-xs"
               />
               <SearchableSelect
                 value={r.messageType}
@@ -406,24 +413,28 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
                 onChange={(val) => setRules((prev) => prev.map((x, idx) => idx === i ? { ...x, messageType: val } : x))}
                 className="flex-1"
               />
-              <button
+              <Button
                 onClick={() => setRules((prev) => prev.filter((_, idx) => idx !== i))}
-                className="p-1 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+                variant="danger"
+                size="sm"
+                className="h-7 w-7 px-0"
               >
                 <Trash2 size={11} />
-              </button>
+              </Button>
             </div>
           ))}
-          <button
+          <Button
             onClick={() => setRules((prev) => [...prev, { fieldPath: "", messageType: "" }])}
-            className="self-start text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)] flex items-center gap-1"
+            variant="ghost"
+            size="sm"
+            className="self-start"
           >
             <Plus size={11} /> {t("decode.addRule")}
-          </button>
-        </div>
+          </Button>
+        </Card>
 
-        <div className="rounded-lg border bg-[var(--color-card)] flex flex-col min-h-0">
-          <div className="px-2 py-1.5 text-[11px] border-b text-[var(--color-muted-foreground)]">
+        <Card className="flex flex-col min-h-0">
+          <div className="px-2 py-1.5 text-[11px] border-b text-[var(--text-muted)]">
             {batchMode ? t("decode.batchPayloadLabel") : t("decode.payload")}
           </div>
           <textarea
@@ -432,8 +443,11 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
             className="flex-1 min-h-0 bg-transparent text-xs p-2 font-mono resize-none focus:outline-none"
             placeholder={batchMode ? t("decode.batchPayloadPlaceholder") : t("decode.payloadPlaceholder")}
             spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
           />
-        </div>
+        </Card>
       </div>
     </div>
   );

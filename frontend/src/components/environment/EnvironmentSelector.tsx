@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useEnvStore } from "@/store/env-store";
 import { Globe, ChevronDown, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   onManage: () => void;
@@ -29,20 +30,24 @@ export function EnvironmentSelector({ onManage }: Props) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+        className={cn(
+          "h-7 min-w-[96px] max-w-[140px] px-2 rounded-md border border-[var(--line-soft)] bg-[var(--surface-0)]",
+          "inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] whitespace-nowrap transition-colors",
+          "hover:bg-[var(--surface-1)] hover:text-[var(--text-normal)]"
+        )}
       >
-        <Globe size={13} />
-        <span className="max-w-[120px] truncate">
+        <Globe size={12} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-left leading-none">
           {activeEnv ? activeEnv.name : t("environment.noEnv")}
         </span>
-        <ChevronDown size={11} />
+        <ChevronDown size={11} className={cn("shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-52 bg-[var(--color-popover)] border rounded-md shadow-lg z-50 py-1">
+        <div className="absolute right-0 top-full mt-1 w-52 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] z-50 py-1">
           <button
             onClick={() => { setActive(0); setOpen(false); }}
-            className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-secondary)] ${!activeEnv ? "text-[var(--color-primary)] font-medium" : "text-[var(--color-foreground)]"}`}
+            className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-2)] ${!activeEnv ? "text-[var(--state-info)] font-medium" : "text-[var(--text-normal)]"}`}
           >
             {t("environment.noEnv")}
           </button>
@@ -50,18 +55,18 @@ export function EnvironmentSelector({ onManage }: Props) {
             <button
               key={env.id}
               onClick={() => { setActive(env.id); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-secondary)] ${env.isActive ? "text-[var(--color-primary)] font-medium" : "text-[var(--color-foreground)]"}`}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-2)] ${env.isActive ? "text-[var(--state-info)] font-medium" : "text-[var(--text-normal)]"}`}
             >
               {env.name}
-              <span className="ml-1 text-[var(--color-muted-foreground)]">
+              <span className="ml-1 text-[var(--text-muted)]">
                 ({Object.keys(env.variables ?? {}).length} {t("environment.vars")})
               </span>
             </button>
           ))}
-          <div className="border-t my-1" />
+          <div className="border-t border-[var(--line-soft)] my-1" />
           <button
             onClick={() => { onManage(); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] flex items-center gap-1"
+            className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface-2)] text-[var(--text-muted)] flex items-center gap-1"
           >
             <Settings size={11} /> {t("environment.manage")}
           </button>

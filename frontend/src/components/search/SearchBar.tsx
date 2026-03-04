@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
+import { Input } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface SearchBarProps {
   visible: boolean;
@@ -109,10 +111,12 @@ export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: S
   if (!visible) return null;
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[var(--color-card)] border-b border-[var(--color-border)] shrink-0">
-      <input
+    <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[var(--surface-0)] border-b border-[var(--line-soft)] shrink-0">
+      <Input
         ref={inputRef}
         type="text"
+        autoComplete="off"
+        spellCheck={false}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -121,34 +125,34 @@ export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: S
         }}
         onKeyDown={handleKeyDown}
         placeholder="Search..."
-        className="flex-1 bg-[var(--color-secondary)] text-xs px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)] min-w-0"
+        className="flex-1 text-xs min-w-0"
       />
-      <span className="text-[10px] text-[var(--color-muted-foreground)] shrink-0 w-[48px] text-center tabular-nums">
+      <span className="text-[10px] text-[var(--text-muted)] shrink-0 w-[48px] text-center tabular-nums">
         {matches.length > 0 ? `${currentIndex + 1}/${matches.length}` : query ? "0/0" : ""}
       </span>
-      <button
+      <IconButton
         onClick={() => { navigatedRef.current = true; goPrev(); inputRef.current?.focus(); }}
         disabled={matches.length === 0}
-        className="p-0.5 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] disabled:opacity-30"
+        size="sm"
         title="Previous (Shift+Enter)"
       >
         <ChevronUp size={14} />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         onClick={() => { navigatedRef.current = true; goNext(); inputRef.current?.focus(); }}
         disabled={matches.length === 0}
-        className="p-0.5 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] disabled:opacity-30"
+        size="sm"
         title="Next (Enter)"
       >
         <ChevronDown size={14} />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         onClick={onClose}
-        className="p-0.5 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+        size="sm"
         title="Close (Esc)"
       >
         <X size={14} />
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -179,8 +183,8 @@ export function HighlightedText({
         key={i}
         className={
           isCurrent
-            ? "bg-orange-400/80 text-[var(--color-foreground)] rounded-sm px-[1px]"
-            : "bg-yellow-300/40 text-[var(--color-foreground)] rounded-sm px-[1px]"
+            ? "bg-[var(--state-warn)]/40 text-[var(--text-strong)] rounded-sm px-[1px]"
+            : "bg-[var(--state-warn)]/22 text-[var(--text-normal)] rounded-sm px-[1px]"
         }
         {...(isCurrent ? { "data-current-match": "true" } : {})}
       >

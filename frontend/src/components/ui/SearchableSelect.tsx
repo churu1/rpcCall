@@ -52,7 +52,7 @@ function highlightLabel(label: string, query: string) {
     return (
       <>
         {label.slice(0, exactIdx)}
-        <span className="text-[var(--color-primary)] font-semibold">{label.slice(exactIdx, exactIdx + query.length)}</span>
+        <span className="text-[var(--state-info)] font-semibold">{label.slice(exactIdx, exactIdx + query.length)}</span>
         {label.slice(exactIdx + query.length)}
       </>
     );
@@ -90,7 +90,7 @@ function buildHighlightParts(label: string, matchSet: Set<number>) {
     if (matchSet.has(i)) {
       let j = i;
       while (j < label.length && matchSet.has(j)) j++;
-      parts.push(<span key={i} className="text-[var(--color-primary)] font-semibold">{label.slice(i, j)}</span>);
+      parts.push(<span key={i} className="text-[var(--state-info)] font-semibold">{label.slice(i, j)}</span>);
       i = j;
     } else {
       let j = i;
@@ -192,21 +192,21 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
         disabled={disabled}
         onClick={() => !disabled && setOpen(!open)}
         className={cn(
-          "w-full flex items-center justify-between gap-1 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] text-[11px] font-mono text-left",
+          "w-full h-8 flex items-center justify-between gap-1 bg-[var(--surface-2)] px-2.5 py-1 rounded-md border border-[var(--line-strong)] text-[11px] font-mono text-left text-[var(--text-normal)]",
           disabled && "opacity-50 cursor-not-allowed",
-          !disabled && "hover:border-[var(--color-ring)]"
+          !disabled && "hover:border-[var(--focus-ring)]/55"
         )}
       >
-        <span className={cn("truncate", !selectedLabel && "text-[var(--color-muted-foreground)]")}>
+        <span className={cn("truncate", !selectedLabel && "text-[var(--text-muted)]")}>
           {selectedLabel || placeholder || ""}
         </span>
-        <ChevronDown size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />
+        <ChevronDown size={12} className="shrink-0 text-[var(--text-muted)]" />
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg flex flex-col overflow-hidden">
-          <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--color-border)]">
-            <Search size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] flex flex-col overflow-hidden">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--line-soft)]">
+            <Search size={12} className="shrink-0 text-[var(--text-muted)]" />
             <input
               ref={inputRef}
               value={query}
@@ -219,12 +219,12 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
               spellCheck={false}
               data-form-type="other"
               data-lpignore="true"
-              className="flex-1 bg-transparent text-[11px] focus:outline-none text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]"
+              className="flex-1 bg-transparent text-[11px] focus:outline-none text-[var(--text-normal)] placeholder:text-[var(--text-muted)]"
             />
           </div>
           <div ref={listRef} className="max-h-[160px] overflow-y-auto">
             {filtered.length === 0 ? (
-              <div className="px-2 py-3 text-[11px] text-center text-[var(--color-muted-foreground)]">
+              <div className="px-2 py-3 text-[11px] text-center text-[var(--text-muted)]">
                 No matches
               </div>
             ) : (
@@ -234,14 +234,14 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
                   title={opt.value}
                   className={cn(
                     "flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-mono cursor-pointer",
-                    idx === highlightIndex && "bg-[var(--color-accent)]",
-                    idx !== highlightIndex && "hover:bg-[var(--color-secondary)]"
+                    idx === highlightIndex && "bg-[var(--surface-1)] text-[var(--text-strong)]",
+                    idx !== highlightIndex && "hover:bg-[var(--surface-1)] text-[var(--text-normal)]"
                   )}
                   onMouseEnter={() => setHighlightIndex(idx)}
                   onClick={() => select(opt.value)}
                 >
                   {opt.value === value && (
-                    <span className="w-1 h-1 rounded-full bg-[var(--color-primary)] shrink-0" />
+                    <span className="w-1 h-1 rounded-full bg-[var(--state-info)] shrink-0" />
                   )}
                   <span className="truncate">{highlightLabel(opt.label, query)}</span>
                 </div>

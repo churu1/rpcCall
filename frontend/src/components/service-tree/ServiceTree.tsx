@@ -18,6 +18,9 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 
 function MethodTypeTag({ type }: { type: string }) {
   const colors: Record<string, string> = {
@@ -53,13 +56,13 @@ function ServiceNode({
   return (
     <div>
       <div
-        className="flex items-center gap-1 px-2 py-1 hover:bg-[var(--color-secondary)] cursor-pointer text-xs ml-3"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-[var(--surface-1)] cursor-pointer text-xs ml-3"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <FolderOpen size={12} className="text-[var(--color-primary)]" />
+        <FolderOpen size={12} className="text-[var(--state-info)]" />
         <span className="truncate font-medium">{service.name}</span>
-        <span className="text-[10px] text-[var(--color-muted-foreground)] ml-auto">
+        <span className="text-[10px] text-[var(--text-muted)] ml-auto">
           {service.methods.length}
         </span>
       </div>
@@ -68,11 +71,11 @@ function ServiceNode({
           {service.methods.map((method) => (
             <div
               key={method.fullName}
-              className="flex items-center gap-1.5 px-2 py-1 hover:bg-[var(--color-secondary)] cursor-pointer text-xs"
+              className="flex items-center gap-1.5 px-2 py-1 hover:bg-[var(--surface-1)] cursor-pointer text-xs"
               onClick={() => onMethodClick(method)}
             >
               <MethodTypeTag type={method.methodType} />
-              <span className="truncate text-[var(--color-muted-foreground)]">
+              <span className="truncate text-[var(--text-muted)]">
                 {method.methodName}
               </span>
             </div>
@@ -132,22 +135,22 @@ function ProtoGroupNode({
   }, []);
 
   return (
-    <div className="border-b border-[var(--color-border)]/50">
+    <div className="border-b border-[var(--line-soft)]/50">
       <div
-        className="flex items-center gap-1 px-2 py-1.5 hover:bg-[var(--color-secondary)] cursor-pointer text-xs group/source"
+        className="flex items-center gap-1 px-2 py-1.5 hover:bg-[var(--surface-1)] cursor-pointer text-xs group/source"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <Package size={12} className="text-[var(--color-primary)] shrink-0" />
+        <Package size={12} className="text-[var(--state-info)] shrink-0" />
         <span className="truncate font-medium" title={group.fullPath}>
           {group.displayName}
         </span>
-        <span className="text-[10px] text-[var(--color-muted-foreground)] ml-auto shrink-0">
+        <span className="text-[10px] text-[var(--text-muted)] ml-auto shrink-0">
           {allServices.length}s/{group.totalMethods}m
         </span>
         {expanded && (
           <button
-            className="opacity-0 group-hover/source:opacity-100 p-0.5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-opacity shrink-0"
+            className="opacity-0 group-hover/source:opacity-100 p-0.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-muted)] hover:text-[var(--text-normal)] transition-opacity shrink-0"
             title={expandServices ? "收起所有方法" : "展开所有方法"}
             onClick={toggleAllServices}
           >
@@ -155,7 +158,7 @@ function ProtoGroupNode({
           </button>
         )}
         <button
-          className="opacity-0 group-hover/source:opacity-100 p-0.5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)] transition-opacity shrink-0"
+          className="opacity-0 group-hover/source:opacity-100 p-0.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-muted)] hover:text-[var(--state-error)] transition-opacity shrink-0"
           title="移除此项目"
           onClick={(e) => {
             e.stopPropagation();
@@ -457,14 +460,11 @@ export function ServiceTree() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2 border-b space-y-2">
+    <div className="flex flex-col h-full bg-[var(--surface-1)]">
+      <div className="px-3 py-2 border-b border-[var(--line-soft)] space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-muted-foreground)] shrink-0">
-              {t("services.title")}
-            </span>
-            <div className="flex items-center gap-1 min-w-0 flex-1">
+          <div className="flex items-center gap-1 min-w-0 flex-1 pr-2">
+            <div className="relative flex-1 min-w-[96px]">
               <select
                 value={activeProjectId ?? protoProjects[0]?.id ?? ""}
                 onChange={(e) => {
@@ -474,63 +474,75 @@ export function ServiceTree() {
                     updateTab(activeTabId, { projectId: nextProjectId });
                   }
                 }}
-                className="h-8 w-full min-w-0 bg-[var(--color-secondary)] border border-[var(--color-input)] rounded px-2 text-xs"
+                className="ui-input h-8 w-full pr-7 appearance-none"
                 disabled={protoProjects.length === 0}
               >
                 {protoProjects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
-              <button
-                className="h-8 w-7 shrink-0 rounded border border-[var(--color-input)] hover:bg-[var(--color-secondary)] flex items-center justify-center"
-                title={t("decode.newProject")}
-                onClick={() => {
-                  setShowCreateProject((v) => !v);
-                  setError(null);
-                }}
-              >
-                <Plus size={12} />
-              </button>
+              <ChevronDown
+                size={12}
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+              />
             </div>
+            <IconButton
+              className="h-8 w-7 shrink-0 relative z-10"
+              title={t("decode.newProject")}
+              onClick={() => {
+                setShowCreateProject((v) => !v);
+                setError(null);
+              }}
+            >
+              <Plus size={12} />
+            </IconButton>
           </div>
-          <div className="flex items-center gap-0.5">
-            {loading && <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />}
-            <button
-              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+          <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-[var(--line-soft)]">
+            <div className="h-4 w-4 flex items-center justify-center">
+              {loading && <Loader2 size={14} className="animate-spin text-[var(--state-info)]" />}
+            </div>
+            <IconButton
+              size="sm"
+              className="h-7 w-7 shrink-0 border-[var(--line-soft)] bg-[var(--surface-0)]"
               title={t("services.importFile")}
               onClick={handleImportFile}
               disabled={loading}
             >
-              <Import size={14} />
-            </button>
-            <button
-              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              <Import size={12} />
+            </IconButton>
+            <IconButton
+              size="sm"
+              className="h-7 w-7 shrink-0 border-[var(--line-soft)] bg-[var(--surface-0)]"
               title={t("services.importDir")}
               onClick={handleImportDir}
               disabled={loading}
             >
-              <FolderSearch size={14} />
-            </button>
-            <button
-              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              <FolderSearch size={12} />
+            </IconButton>
+            <IconButton
+              size="sm"
+              className="h-7 w-7 shrink-0 border-[var(--line-soft)] bg-[var(--surface-0)]"
               title={t("services.reflection")}
               onClick={handleReflection}
               disabled={loading}
             >
-              <Wifi size={14} />
-            </button>
+              <Wifi size={12} />
+            </IconButton>
             {visibleFiles.length > 0 && (
               <>
-                <button
-                  className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                <IconButton
+                  size="sm"
+                  className="h-7 w-7 shrink-0 border-[var(--line-soft)] bg-[var(--surface-0)]"
                   title={t("services.reload")}
                   onClick={handleReload}
                   disabled={loading}
                 >
-                  <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                </button>
-                <button
-                  className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+                  <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  tone="danger"
+                  className="h-7 w-7 shrink-0 border-[var(--line-soft)] bg-[var(--surface-0)]"
                   title={t("services.clearAll")}
                   onClick={() => {
                     if (!activeProjectId) return;
@@ -542,15 +554,15 @@ export function ServiceTree() {
                     window.go.main.App.ClearProtoSources(activeProjectId).catch(() => {});
                   }}
                 >
-                  <Trash2 size={14} />
-                </button>
+                  <Trash2 size={12} />
+                </IconButton>
               </>
             )}
           </div>
         </div>
         {showCreateProject && (
           <div className="flex items-center gap-1">
-            <input
+            <Input
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               onKeyDown={(e) => {
@@ -560,23 +572,27 @@ export function ServiceTree() {
                   setNewProjectName("");
                 }
               }}
-              className="h-7 flex-1 bg-[var(--color-secondary)] border border-[var(--color-input)] rounded px-2 text-xs"
+              className="h-7 flex-1"
               placeholder={t("decode.newProjectName")}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
             />
-            <button
-              className="h-7 w-7 rounded border border-[var(--color-input)] hover:bg-[var(--color-secondary)] flex items-center justify-center disabled:opacity-50"
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 px-0"
               onClick={handleCreateProject}
               disabled={!newProjectName.trim() || creatingProject}
               title={t("common.save")}
             >
               {creatingProject ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-            </button>
-            <button
-              className="h-7 w-7 rounded border border-[var(--color-input)] hover:bg-[var(--color-secondary)] flex items-center justify-center"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 px-0"
               onClick={() => {
                 setShowCreateProject(false);
                 setNewProjectName("");
@@ -584,20 +600,20 @@ export function ServiceTree() {
               title={t("common.cancel")}
             >
               <X size={12} />
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {error && (
-        <div className="px-3 py-1.5 text-[10px] text-[var(--color-destructive)] bg-[var(--color-destructive)]/10 border-b">
+        <div className="px-3 py-1.5 text-[10px] text-[var(--state-error)] bg-[var(--state-error)]/10 border-b">
           {error}
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto">
         {groups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--color-muted-foreground)] text-xs px-4 text-center gap-2">
+          <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)] text-xs px-4 text-center gap-2">
             <FolderOpen size={32} className="opacity-30" />
             <p>{t("services.noServices")}</p>
           </div>

@@ -1,28 +1,44 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0f1117;
-  --color-foreground: #e4e4e7;
-  --color-card: #18181b;
-  --color-card-foreground: #e4e4e7;
-  --color-popover: #18181b;
-  --color-popover-foreground: #e4e4e7;
-  --color-primary: #6d28d9;
+  --color-background: #0d1117;
+  --color-foreground: #e6edf3;
+  --color-card: #121a25;
+  --color-card-foreground: #e6edf3;
+  --color-popover: #131c29;
+  --color-popover-foreground: #e6edf3;
+  --color-primary: #2f81f7;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #27272a;
-  --color-secondary-foreground: #e4e4e7;
-  --color-muted: #27272a;
-  --color-muted-foreground: #a1a1aa;
-  --color-accent: #27272a;
-  --color-accent-foreground: #e4e4e7;
-  --color-destructive: #dc2626;
+  --color-secondary: #1b2635;
+  --color-secondary-foreground: #d8e0ea;
+  --color-muted: #1a2533;
+  --color-muted-foreground: #8fa2b8;
+  --color-accent: #1f2d3f;
+  --color-accent-foreground: #dbe6f2;
+  --color-destructive: #f85149;
   --color-destructive-foreground: #ffffff;
-  --color-border: #3f3f46;
-  --color-input: #3f3f46;
-  --color-ring: #6d28d9;
-  --color-sidebar: #18181b;
-  --color-sidebar-foreground: #a1a1aa;
-  --color-sidebar-active: #6d28d9;
+  --color-border: #2d3c50;
+  --color-input: #33455d;
+  --color-ring: #58a6ff;
+  --color-sidebar: #0f1623;
+  --color-sidebar-foreground: #8fa2b8;
+  --color-sidebar-active: #2f81f7;
+
+  --surface-0: #0d1117;
+  --surface-1: #121a25;
+  --surface-2: #1b2635;
+  --text-strong: #f0f6fc;
+  --text-normal: #d8e0ea;
+  --text-muted: #8fa2b8;
+  --line-soft: #243347;
+  --line-strong: #33455d;
+  --state-success: #3fb950;
+  --state-warn: #d29922;
+  --state-error: #f85149;
+  --state-info: #58a6ff;
+  --focus-ring: #58a6ff;
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --elevation-2: 0 8px 24px rgba(0, 0, 0, 0.3);
 
   --color-method-unary: #22c55e;
   --color-method-server-stream: #3b82f6;
@@ -32,7 +48,7 @@
   --color-syntax-property: #93c5fd;
   --color-syntax-string: #86efac;
   --color-syntax-number: #fde68a;
-  --color-syntax-boolean: #c4b5fd;
+  --color-syntax-boolean: #79c0ff;
   --color-syntax-null: #fca5a5;
 
   --radius-sm: 0.25rem;
@@ -65,7 +81,7 @@ input,
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -128,6 +144,80 @@ body {
 }
 .json-editor-pre {
   min-height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 35%, transparent);
+}
+
+.ui-card {
+  background: var(--surface-1);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  box-shadow: var(--elevation-1);
+}
+
+.ui-input {
+  height: 30px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--text-normal);
+  font-size: 12px;
+}
+
+.ui-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ui-btn {
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text-normal);
+  padding: 0 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.ui-btn:hover {
+  background: color-mix(in srgb, var(--surface-2) 75%, var(--state-info) 25%);
+}
+
+.ui-btn-primary {
+  border-color: color-mix(in srgb, var(--state-info) 45%, var(--line-strong) 55%);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+.ui-btn-primary:hover {
+  background: color-mix(in srgb, var(--color-primary) 86%, white 14%);
+}
+
+.ui-badge {
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-2) 82%, black 18%);
+  padding: 1px 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 input[type="text"]::-webkit-contacts-auto-fill-button,

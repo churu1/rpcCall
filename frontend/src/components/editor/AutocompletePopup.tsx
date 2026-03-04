@@ -73,7 +73,7 @@ export function AutocompletePopup({ fields, onSelect, position, visible, onClose
   return (
     <div
       ref={ref}
-      className="fixed z-[100] bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg max-h-[200px] overflow-y-auto min-w-[200px]"
+      className="fixed z-[100] bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-lg max-h-[200px] overflow-y-auto min-w-[200px]"
       style={{ top: position.top, left: position.left }}
     >
       {filtered.map((field, i) => (
@@ -81,18 +81,18 @@ export function AutocompletePopup({ fields, onSelect, position, visible, onClose
           key={field.name}
           className={`flex items-center justify-between gap-3 px-3 py-1.5 text-xs cursor-pointer ${
             i === selectedIndex
-              ? "bg-[var(--color-primary)]/15 text-[var(--color-foreground)]"
-              : "text-[var(--color-foreground)] hover:bg-[var(--color-secondary)]"
+              ? "bg-[var(--state-info)]/15 text-[var(--text-normal)]"
+              : "text-[var(--text-normal)] hover:bg-[var(--surface-1)]"
           }`}
           onClick={() => onSelect(field)}
           onMouseEnter={() => setSelectedIndex(i)}
         >
           <span className="font-mono">
             {field.name}
-            {field.repeated && !field.mapEntry && <span className="text-[var(--color-muted-foreground)]">[]</span>}
-            {field.mapEntry && <span className="text-[var(--color-muted-foreground)]">{"{}"}</span>}
+            {field.repeated && !field.mapEntry && <span className="text-[var(--text-muted)]">[]</span>}
+            {field.mapEntry && <span className="text-[var(--text-muted)]">{"{}"}</span>}
           </span>
-          <span className="text-[10px] text-[var(--color-muted-foreground)] font-mono">{field.typeName}</span>
+          <span className="text-[10px] text-[var(--text-muted)] font-mono">{field.typeName}</span>
         </div>
       ))}
     </div>

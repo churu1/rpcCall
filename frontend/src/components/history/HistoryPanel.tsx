@@ -4,6 +4,8 @@ import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { Clock, Trash2, RefreshCw, CheckCircle2, AlertCircle, ChevronUp, ChevronDown, GitCompareArrows } from "lucide-react";
 import { DiffViewer } from "./DiffViewer";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface HistoryEntry {
   id: number;
@@ -138,10 +140,10 @@ export function HistoryPanel() {
   };
 
   return (
-    <div className={cn("border-t bg-[var(--color-card)]", collapsed ? "h-8" : "h-48")}>
-      <div className="flex items-center justify-between px-3 h-8 border-b">
+    <div className={cn("border-t border-[var(--line-soft)] bg-[var(--surface-1)]", collapsed ? "h-8" : "h-48")}>
+      <div className="flex items-center justify-between px-3 h-8 border-b border-[var(--line-soft)]">
         <button
-          className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+          className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-normal)]"
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -149,43 +151,48 @@ export function HistoryPanel() {
         </button>
         <div className="flex items-center gap-1">
           {compareIds.size === 2 && (
-            <button
+            <Button
               onClick={handleCompare}
-              className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/80"
+              size="sm"
+              variant="primary"
+              className="h-6 px-2 text-[10px]"
               title={t("history.compare")}
             >
               <GitCompareArrows size={11} />
               {t("history.compare")}
-            </button>
+            </Button>
           )}
           {compareIds.size === 1 && (
-            <span className="flex items-center gap-1 text-[10px] text-[var(--color-primary)]">
-              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[var(--color-primary)] text-white text-[8px] font-bold">A</span>
+            <span className="flex items-center gap-1 text-[10px] text-[var(--state-info)]">
+              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[var(--state-info)] text-white text-[8px] font-bold">A</span>
               {t("history.selectToCompare")}
             </span>
           )}
-          <button
+          <IconButton
+            size="sm"
+            className="h-6 w-6 border-0 bg-transparent"
             onClick={loadHistory}
-            className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
             title={t("services.reload")}
           >
             <RefreshCw size={12} />
-          </button>
+          </IconButton>
           {entries.length > 0 && (
-            <button
+            <IconButton
+              size="sm"
+              tone="danger"
+              className="h-6 w-6 border-0 bg-transparent"
               onClick={handleClearAll}
-              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
               title={t("history.clear")}
             >
               <Trash2 size={12} />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
       {!collapsed && (
         <div className="overflow-y-auto" style={{ height: "calc(100% - 2rem)" }}>
           {entries.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-[var(--color-muted-foreground)] text-xs">
+            <div className="flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
               {t("history.noHistory")}
             </div>
           ) : (
@@ -197,34 +204,34 @@ export function HistoryPanel() {
               <div
                 key={entry.id}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs border-b border-[var(--color-border)]/50 group transition-colors duration-150",
+                  "flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs border-b border-[var(--line-soft)] group transition-colors duration-150",
                   selectedId === entry.id && !isCompare
-                    ? "bg-[var(--color-primary)]/10 border-l-2 border-l-[var(--color-primary)] pl-2.5"
+                    ? "bg-[var(--state-info)]/12 border-l-2 border-l-[var(--state-info)] pl-2.5"
                     : isCompare
-                      ? "bg-[var(--color-primary)]/8 border-l-2 border-l-[var(--color-primary)] pl-2.5"
-                      : "hover:bg-[var(--color-secondary)]"
+                      ? "bg-[var(--state-info)]/8 border-l-2 border-l-[var(--state-info)] pl-2.5"
+                      : "hover:bg-[var(--surface-2)]"
                 )}
                 onClick={(e) => handleClick(entry, e)}
               >
                 {isCompare ? (
-                  <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--color-primary)] text-white text-[9px] font-bold shrink-0">
+                  <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--state-info)] text-white text-[9px] font-bold shrink-0">
                     {compareIndex === 0 ? "A" : "B"}
                   </span>
                 ) : entry.statusCode === "OK" ? (
                   <CheckCircle2 size={12} className="text-[var(--color-method-unary)] shrink-0" />
                 ) : (
-                  <AlertCircle size={12} className="text-[var(--color-destructive)] shrink-0" />
+                  <AlertCircle size={12} className="text-[var(--state-error)] shrink-0" />
                 )}
-                <span className="text-[var(--color-muted-foreground)] font-mono text-[10px] shrink-0">
-                  {new Date(entry.timestamp).toLocaleTimeString()}
-                </span>
+                  <span className="text-[var(--text-muted)] font-mono text-[10px] shrink-0">
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </span>
                 <span className="truncate font-medium">
                   {entry.serviceName}/{entry.methodName}
                 </span>
-                <span className="text-[var(--color-muted-foreground)] truncate">
+                <span className="text-[var(--text-muted)] truncate">
                   {entry.address}
                 </span>
-                <span className="flex items-center gap-0.5 text-[var(--color-muted-foreground)] shrink-0 ml-auto">
+                <span className="flex items-center gap-0.5 text-[var(--text-muted)] shrink-0 ml-auto">
                   <Clock size={10} />
                   {entry.elapsedMs}ms
                 </span>
@@ -233,7 +240,7 @@ export function HistoryPanel() {
                     e.stopPropagation();
                     handleDelete(entry.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--color-muted)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--surface-1)] rounded text-[var(--text-muted)] hover:text-[var(--state-error)]"
                 >
                   <Trash2 size={10} />
                 </button>

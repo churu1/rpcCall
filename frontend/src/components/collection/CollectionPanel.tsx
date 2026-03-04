@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
+import { IconButton } from "@/components/ui/IconButton";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import {
   ChevronRight,
   ChevronDown,
@@ -122,60 +124,67 @@ export function CollectionPanel() {
   };
 
   return (
-    <div className="flex flex-col border-t">
-      <div className="flex items-center justify-between px-3 py-2">
-        <span className="text-[10px] font-semibold text-[var(--color-muted-foreground)] uppercase tracking-wider">
-          {t("collections.title")}
-        </span>
-        <button
-          onClick={handleNewCollection}
-          className="p-0.5 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-          title={t("collections.newCollection")}
-        >
-          <Plus size={12} />
-        </button>
-      </div>
+    <div className="flex flex-col border-t border-[var(--line-soft)]">
+      <SectionHeader
+        title={t("collections.title")}
+        right={(
+          <IconButton
+            onClick={handleNewCollection}
+            size="sm"
+            title={t("collections.newCollection")}
+            aria-label={t("collections.newCollection")}
+          >
+            <Plus size={14} />
+          </IconButton>
+        )}
+      />
       {loading && (
-        <div className="px-3 py-1 text-[10px] text-[var(--color-muted-foreground)]">{t("collections.loading")}</div>
+        <div className="px-3 py-1.5 text-[11px] text-[var(--text-muted)]">{t("collections.loading")}</div>
       )}
-      <div className="flex flex-col">
+      <div className="flex flex-col pb-1">
         {collections.map(({ collection, requests }) => (
-          <div key={collection.id}>
-            <button
+          <div key={collection.id} className="group">
+            <div
               onClick={() => toggle(collection.id)}
-              className="flex items-center gap-1.5 w-full px-3 py-1.5 text-xs hover:bg-[var(--color-secondary)] group"
+              className="flex items-center gap-1.5 w-full px-3 py-1.5 text-xs hover:bg-[var(--surface-1)] cursor-pointer"
             >
               {expanded.has(collection.id) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              <FolderOpen size={12} className="text-[var(--color-muted-foreground)]" />
-              <span className="truncate flex-1 text-left">{collection.name}</span>
-              <span className="text-[10px] text-[var(--color-muted-foreground)]">{requests.length}</span>
-              <button
+              <FolderOpen size={12} className="text-[var(--text-muted)]" />
+              <span className="truncate flex-1 text-left text-[var(--text-normal)]">{collection.name}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">{requests.length}</span>
+              <IconButton
                 onClick={(e) => handleDeleteCollection(e, collection.id)}
-                className="hidden group-hover:block p-0.5 hover:text-[var(--color-destructive)]"
+                tone="danger"
+                size="sm"
+                className="opacity-0 group-hover:opacity-100 h-5 w-5 border-transparent bg-transparent"
+                title={t("common.delete")}
               >
-                <Trash2 size={10} />
-              </button>
-            </button>
+                <Trash2 size={11} />
+              </IconButton>
+            </div>
             {expanded.has(collection.id) && (
               <div className="flex flex-col">
                 {requests.map((req) => (
-                  <button
+                  <div
                     key={req.id}
                     onClick={() => handleLoadRequest(req)}
-                    className="flex items-center gap-1.5 pl-8 pr-3 py-1 text-[11px] hover:bg-[var(--color-secondary)] group/req"
+                    className="flex items-center gap-1.5 pl-8 pr-3 py-1 text-[11px] hover:bg-[var(--surface-1)] cursor-pointer group/req"
                   >
-                    <FileText size={10} className="text-[var(--color-muted-foreground)] shrink-0" />
-                    <span className="truncate flex-1 text-left">{req.name}</span>
-                    <button
+                    <FileText size={10} className="text-[var(--text-muted)] shrink-0" />
+                    <span className="truncate flex-1 text-left text-[var(--text-normal)]">{req.name}</span>
+                    <IconButton
                       onClick={(e) => handleDeleteRequest(e, req.id)}
-                      className="hidden group-hover/req:block p-0.5 hover:text-[var(--color-destructive)]"
+                      tone="danger"
+                      size="sm"
+                      className="opacity-0 group-hover/req:opacity-100 h-5 w-5 border-transparent bg-transparent"
+                      title={t("common.delete")}
                     >
-                      <Trash2 size={10} />
-                    </button>
-                  </button>
+                      <Trash2 size={11} />
+                    </IconButton>
+                  </div>
                 ))}
                 {requests.length === 0 && (
-                  <div className="pl-8 pr-3 py-1 text-[10px] text-[var(--color-muted-foreground)]">
+                  <div className="pl-8 pr-3 py-1.5 text-[10px] text-[var(--text-muted)]">
                     {t("collections.noRequests")}
                   </div>
                 )}
@@ -184,7 +193,7 @@ export function CollectionPanel() {
           </div>
         ))}
         {collections.length === 0 && !loading && (
-          <div className="px-3 py-2 text-[10px] text-[var(--color-muted-foreground)]">
+          <div className="px-3 py-2 text-[10px] text-[var(--text-muted)]">
             {t("collections.noCollections")}
           </div>
         )}

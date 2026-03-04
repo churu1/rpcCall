@@ -1,13 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
-import { cn } from "@/lib/utils";
-import { Plus, Trash2, Braces, List, WrapText, Minimize2, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Trash2, Braces, WrapText, Minimize2, Sparkles, Loader2 } from "lucide-react";
 import { SearchBar, type SearchMatch } from "@/components/search/SearchBar";
 import { BenchmarkPanel } from "@/components/benchmark/BenchmarkPanel";
 import { ChainEditor } from "@/components/chain/ChainEditor";
 import { MockPanel } from "@/components/mock/MockPanel";
 import { DecodePanel } from "@/components/decode/DecodePanel";
+import { PanelTabs } from "@/components/ui/PanelTabs";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
 import { JsonEditor } from "./JsonEditor";
 import { AutocompletePopup } from "./AutocompletePopup";
 
@@ -95,38 +98,38 @@ function MetadataTable({
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between px-2 pt-2">
-          <span className="text-[10px] text-[var(--color-muted-foreground)]">
+          <span className="text-[10px] text-[var(--text-muted)]">
             {t("metadata.jsonFormat")}
           </span>
           <div className="flex gap-1">
             <button
               onClick={handleJsonFormat}
-              className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] flex items-center gap-0.5"
+              className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-muted)] flex items-center gap-0.5"
             >
               <WrapText size={10} /> {t("editor.format")}
             </button>
             <button
               onClick={handleJsonMinify}
-              className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] flex items-center gap-0.5"
+              className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-muted)] flex items-center gap-0.5"
             >
               <Minimize2 size={10} /> {t("editor.minify")}
             </button>
             <button
               onClick={() => setJsonMode(false)}
-              className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)]"
+              className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-muted)]"
             >
               {t("common.cancel")}
             </button>
             <button
               onClick={applyJson}
-              className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/80"
+              className="text-[10px] px-2 py-0.5 rounded bg-[var(--state-info)] text-white hover:bg-[var(--state-info)]/80"
             >
               {t("metadata.apply")}
             </button>
           </div>
         </div>
         {jsonError && (
-          <div className="px-2 pt-1 text-[10px] text-[var(--color-destructive)]">{jsonError}</div>
+          <div className="px-2 pt-1 text-[10px] text-[var(--state-error)]">{jsonError}</div>
         )}
         <textarea
           ref={jsonTextareaRef}
@@ -153,6 +156,9 @@ function MetadataTable({
           className="flex-1 bg-transparent text-xs p-2 resize-none focus:outline-none font-mono leading-relaxed"
           placeholder={'{\n  "authorization": "Bearer token...",\n  "x-request-id": "abc123"\n}'}
           spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
           autoFocus
         />
       </div>
@@ -164,7 +170,7 @@ function MetadataTable({
       <div className="flex items-center justify-end mb-1">
         <button
           onClick={switchToJson}
-          className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)]"
+          className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-normal)] px-1.5 py-0.5 rounded hover:bg-[var(--surface-1)]"
           title="切换为 JSON 编辑模式"
         >
           <Braces size={11} /> JSON
@@ -178,23 +184,23 @@ function MetadataTable({
             onChange={(e) => updateEntry(i, { enabled: e.target.checked })}
             className="shrink-0"
           />
-          <input
+          <Input
             type="text"
             value={entry.key}
             onChange={(e) => updateEntry(i, { key: e.target.value })}
             placeholder="key"
-            className="flex-1 bg-[var(--color-secondary)] text-xs px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+            className="flex-1 text-xs"
           />
-          <input
+          <Input
             type="text"
             value={entry.value}
             onChange={(e) => updateEntry(i, { value: e.target.value })}
             placeholder="value"
-            className="flex-1 bg-[var(--color-secondary)] text-xs px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+            className="flex-1 text-xs"
           />
           <button
             onClick={() => removeEntry(i)}
-            className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+            className="p-1 hover:bg-[var(--surface-1)] rounded text-[var(--text-muted)] hover:text-[var(--state-error)]"
           >
             <Trash2 size={12} />
           </button>
@@ -202,7 +208,7 @@ function MetadataTable({
       ))}
       <button
         onClick={addEntry}
-        className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] py-1"
+        className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-normal)] py-1"
       >
         <Plus size={12} /> {t("metadata.addMetadata")}
       </button>
@@ -399,56 +405,49 @@ export function RequestEditor() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" ref={containerRef} tabIndex={-1}>
-      <div className="border-b min-h-[33px] relative" style={{ display: "grid", gridTemplateColumns: (activePanel === "body" || activePanel === "metadata") ? "1fr auto" : "1fr" }}>
+    <div className="flex flex-col h-full overflow-hidden bg-[var(--surface-1)]" ref={containerRef} tabIndex={-1}>
+      <div className="border-b border-[var(--line-soft)] min-h-[33px] relative" style={{ display: "grid", gridTemplateColumns: (activePanel === "body" || activePanel === "metadata") ? "1fr auto" : "1fr" }}>
         <div className="overflow-x-auto scrollbar-none flex items-center" style={{ minWidth: 0 }}>
-          {panels.map((panel) => (
-            <button
-              key={panel.key}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium transition-colors border-b-2 whitespace-nowrap shrink-0",
-                activePanel === panel.key
-                  ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
-                  : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-              )}
-              onClick={() => setActivePanel(panel.key)}
-            >
-              {panel.label}
-            </button>
-          ))}
+          <PanelTabs tabs={panels} active={activePanel} onChange={setActivePanel} />
         </div>
         {(activePanel === "body" || activePanel === "metadata") && (
-          <div className="flex items-center gap-0.5 pr-2 shrink-0 border-l pl-2">
+          <div className="flex items-center gap-1 pr-2 shrink-0 border-l border-[var(--line-soft)] pl-2">
             {activePanel === "body" && tab.method && (
-              <button
+              <IconButton
                 onClick={handleAIGenerate}
                 disabled={aiLoading}
-                className="flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)] disabled:opacity-50"
+                size="sm"
+                tone="primary"
+                className="h-7 w-7 border-transparent bg-transparent"
                 title={t("ai.generate")}
+                aria-label={t("ai.generate")}
               >
                 {aiLoading ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                {" "}{t("ai.generate")}
-              </button>
+              </IconButton>
             )}
-            <button
+            <IconButton
               onClick={activePanel === "body" ? handleFormat : handleMetadataFormat}
-              className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)]"
+              size="sm"
+              className="h-7 w-7 border-transparent bg-transparent"
               title={t("editor.format")}
+              aria-label={t("editor.format")}
             >
-              <WrapText size={11} /> {t("editor.format")}
-            </button>
-            <button
+              <WrapText size={11} />
+            </IconButton>
+            <IconButton
               onClick={activePanel === "body" ? handleMinify : handleMetadataMinify}
-              className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)]"
+              size="sm"
+              className="h-7 w-7 border-transparent bg-transparent"
               title={t("editor.minify")}
+              aria-label={t("editor.minify")}
             >
-              <Minimize2 size={11} /> {t("editor.minify")}
-            </button>
+              <Minimize2 size={11} />
+            </IconButton>
           </div>
         )}
       </div>
       {aiError && (
-        <div className="px-3 py-1.5 text-[11px] text-[var(--color-destructive)] bg-[var(--color-destructive)]/10 border-b">
+        <div className="px-3 py-1.5 text-[11px] text-[var(--state-error)] bg-[var(--state-error)]/10 border-b border-[var(--line-soft)]">
           AI: {aiError}
         </div>
       )}

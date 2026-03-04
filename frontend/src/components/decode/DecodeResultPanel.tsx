@@ -5,6 +5,9 @@ import { highlightJsonHtml } from "@/components/editor/JsonEditor";
 import { DecodeHistoryPanel } from "./DecodeHistoryPanel";
 import { DecodeDiffViewer } from "./DecodeDiffViewer";
 import { JsonTreeViewer } from "@/components/response/JsonTreeViewer";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { PanelTabs } from "@/components/ui/PanelTabs";
 
 export function DecodeResultPanel() {
   const { t } = useTranslation();
@@ -60,45 +63,39 @@ export function DecodeResultPanel() {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="px-3 py-1.5 border-b text-[11px] text-[var(--color-muted-foreground)] flex items-center gap-2">
-        <button
-          className={`px-2 py-0.5 rounded ${rightView === "result" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "hover:bg-[var(--color-secondary)]"}`}
-          onClick={() => setRightView("result")}
-        >
-          {t("decode.result")}
-        </button>
-        <button
-          className={`px-2 py-0.5 rounded ${rightView === "history" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "hover:bg-[var(--color-secondary)]"}`}
-          onClick={() => setRightView("history")}
-        >
-          {t("decode.historyTitle")}
-        </button>
+      <div className="px-3 py-1.5 border-b border-[var(--line-soft)] text-[11px] text-[var(--text-muted)] flex items-center gap-2">
+        <PanelTabs
+          tabs={[
+            { key: "result", label: t("decode.result") },
+            { key: "history", label: t("decode.historyTitle") },
+          ]}
+          active={rightView}
+          onChange={setRightView}
+          className="px-0 py-0"
+        />
         {rightView === "result" && result?.detectedEncoding && (
-          <span className="px-1.5 py-0.5 rounded bg-[var(--color-secondary)]">{result.detectedEncoding}</span>
+          <Badge>{result.detectedEncoding}</Badge>
         )}
         {rightView === "result" && result?.ok && (
-          <div className="flex items-center gap-1">
-            <button
-              className={`px-1.5 py-0.5 rounded text-[10px] ${jsonViewMode === "tree" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "hover:bg-[var(--color-secondary)]"}`}
-              onClick={() => setJsonViewMode("tree")}
-            >
-              {t("response.tree")}
-            </button>
-            <button
-              className={`px-1.5 py-0.5 rounded text-[10px] ${jsonViewMode === "raw" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "hover:bg-[var(--color-secondary)]"}`}
-              onClick={() => setJsonViewMode("raw")}
-            >
-              {t("response.raw")}
-            </button>
-          </div>
+          <PanelTabs
+            tabs={[
+              { key: "tree", label: t("response.tree") },
+              { key: "raw", label: t("response.raw") },
+            ]}
+            active={jsonViewMode}
+            onChange={setJsonViewMode}
+            className="px-0 py-0"
+          />
         )}
         {rightView === "result" && result && (
-          <button
-            className="ml-auto text-[10px] px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)] flex items-center gap-1"
+          <Button
+            className="ml-auto"
+            variant="ghost"
+            size="sm"
             onClick={() => navigator.clipboard.writeText(result.json || result.error || "")}
           >
             <Copy size={10} /> {t("decode.copy")}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -111,15 +108,17 @@ export function DecodeResultPanel() {
               <div className="h-full flex flex-col">
                 <div className="px-2 py-1 border-b text-[11px] flex items-center gap-2">
                   <span>{t("decode.total")} {batchResult.total}</span>
-                  <span className="text-green-500">{t("decode.ok")} {batchResult.success}</span>
-                  <span className="text-[var(--color-destructive)]">{t("decode.failed")} {batchResult.failed}</span>
-                  <button
+                  <span className="text-[var(--state-success)]">{t("decode.ok")} {batchResult.success}</span>
+                  <span className="text-[var(--state-error)]">{t("decode.failed")} {batchResult.failed}</span>
+                  <Button
                     onClick={compareSelected}
                     disabled={selectedItems.size !== 2}
-                    className="ml-auto text-[10px] px-1.5 py-0.5 rounded hover:bg-[var(--color-secondary)] disabled:opacity-50 flex items-center gap-1"
+                    className="ml-auto"
+                    variant="ghost"
+                    size="sm"
                   >
                     <GitCompareArrows size={11} /> {t("decode.compare")}
-                  </button>
+                  </Button>
                 </div>
                 <div className="flex-1 overflow-auto">
                   {batchResult.results.map((item) => {
@@ -127,7 +126,7 @@ export function DecodeResultPanel() {
                     return (
                       <div
                         key={item.index}
-                        className={`p-2 border-b cursor-pointer ${selected ? "bg-[var(--color-primary)]/10" : "hover:bg-[var(--color-secondary)]"}`}
+                        className={`p-2 border-b border-[var(--line-soft)] cursor-pointer ${selected ? "bg-[var(--state-info)]/10" : "hover:bg-[var(--surface-1)]"}`}
                         onClick={() => {
                           setSelectedItems((prev) => {
                             const next = new Set(prev);
@@ -144,13 +143,13 @@ export function DecodeResultPanel() {
                       >
                         <div className="text-[11px] flex items-center gap-2">
                           <span>#{item.index + 1}</span>
-                          <span className={item.ok ? "text-green-500" : "text-[var(--color-destructive)]"}>
+                          <span className={item.ok ? "text-[var(--state-success)]" : "text-[var(--state-error)]"}>
                             {item.ok ? t("decode.okUpper") : t("decode.failUpper")}
                           </span>
-                          <span className="text-[var(--color-muted-foreground)]">{item.detectedEncoding}</span>
-                          <span className="ml-auto text-[var(--color-muted-foreground)]">{item.elapsedMs}ms</span>
+                          <span className="text-[var(--text-muted)]">{item.detectedEncoding}</span>
+                          <span className="ml-auto text-[var(--text-muted)]">{item.elapsedMs}ms</span>
                         </div>
-                        <pre className="mt-1 text-[11px] whitespace-pre-wrap text-[var(--color-muted-foreground)] max-h-[90px] overflow-auto">
+                        <pre className="mt-1 text-[11px] whitespace-pre-wrap text-[var(--text-muted)] max-h-[90px] overflow-auto">
                           {item.ok ? item.json : `[${item.errorCode}] ${item.error}`}
                         </pre>
                       </div>
@@ -163,19 +162,21 @@ export function DecodeResultPanel() {
                 {result.ok ? (
                   <>
                     {result.rawTags && result.rawTags.length > 0 && (
-                      <div className="border-b bg-[var(--color-secondary)]/40">
-                        <button
-                          className="w-full px-2 py-1 text-[11px] flex items-center gap-1 hover:bg-[var(--color-secondary)]/60"
+                      <div className="border-b border-[var(--line-soft)] bg-[var(--surface-1)]">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start px-2 text-[11px]"
                           onClick={() => setRawTagsExpanded((v) => !v)}
                         >
                           {rawTagsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                          <span className="text-[var(--color-muted-foreground)]">{t("decode.rawTags")}</span>
-                          <span className="text-[10px] text-[var(--color-muted-foreground)]">({result.rawTags.length})</span>
-                        </button>
+                          <span className="text-[var(--text-muted)]">{t("decode.rawTags")}</span>
+                          <span className="text-[10px] text-[var(--text-muted)]">({result.rawTags.length})</span>
+                        </Button>
                         {rawTagsExpanded && (
                           <div className="px-2 pb-1 text-[11px] flex items-center gap-1 flex-wrap">
                             {result.rawTags.map((tag) => (
-                              <span key={`${tag.fieldNumber}-${tag.wireType}`} className="px-1.5 py-0.5 rounded bg-[var(--color-card)] border text-[10px] font-mono">
+                              <span key={`${tag.fieldNumber}-${tag.wireType}`} className="px-1.5 py-0.5 rounded bg-[var(--surface-0)] border border-[var(--line-soft)] text-[10px] font-mono text-[var(--text-normal)]">
                                 #{tag.fieldNumber}(w{tag.wireType})x{tag.count}
                               </span>
                             ))}
@@ -184,26 +185,26 @@ export function DecodeResultPanel() {
                       </div>
                     )}
                     {result.warnings?.length > 0 && (
-                      <div className="px-2 py-1 text-[11px] text-yellow-500 border-b bg-yellow-500/10">
+                      <div className="px-2 py-1 text-[11px] text-[var(--state-warn)] border-b border-[var(--line-soft)] bg-[var(--state-warn)]/10">
                         {result.warnings.join(" | ")}
                       </div>
                     )}
                     {jsonViewMode === "tree" ? (
                       <JsonTreeViewer json={result.json || ""} />
                     ) : (
-                      <pre className="text-xs font-mono p-2 whitespace-pre-wrap">
+                      <pre className="text-xs font-mono p-2 whitespace-pre-wrap text-[var(--text-normal)]">
                         <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(result.json || "") }} />
                       </pre>
                     )}
                   </>
                 ) : (
-                  <div className="p-2 text-xs text-[var(--color-destructive)]">
+                  <div className="p-2 text-xs text-[var(--state-error)]">
                     [{result.errorCode || t("decode.error")}] {result.error || t("decode.decodeFailed")}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-[var(--color-muted-foreground)]">
+              <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)]">
                 {t("decode.resultPlaceholder")}
               </div>
             )}

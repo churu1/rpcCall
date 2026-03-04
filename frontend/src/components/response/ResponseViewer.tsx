@@ -8,19 +8,23 @@ import { TimingBar } from "./TimingBar";
 import { highlightJsonHtml } from "@/components/editor/JsonEditor";
 import { JsonTreeViewer } from "./JsonTreeViewer";
 import { DecodeResultPanel } from "@/components/decode/DecodeResultPanel";
+import { PanelTabs } from "@/components/ui/PanelTabs";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
 
 function ReadonlyMetadataTable({ entries, emptyText }: { entries: MetadataEntry[]; emptyText: string }) {
   if (entries.length === 0) {
     return (
-      <div className="p-3 text-xs text-[var(--color-muted-foreground)]">{emptyText}</div>
+      <div className="p-3 text-xs text-[var(--text-muted)]">{emptyText}</div>
     );
   }
   return (
     <div className="flex flex-col gap-0.5 p-2">
       {entries.map((entry, i) => (
         <div key={i} className="flex items-center gap-2 text-xs font-[var(--font-mono)]">
-          <span className="text-[var(--color-primary)] shrink-0">{entry.key}:</span>
-          <span className="text-[var(--color-muted-foreground)] truncate">{entry.value}</span>
+          <span className="text-[var(--state-info)] shrink-0">{entry.key}:</span>
+          <span className="text-[var(--text-muted)] truncate">{entry.value}</span>
         </div>
       ))}
     </div>
@@ -167,102 +171,79 @@ export function ResponseViewer() {
 
   if (!tab) return null;
 
+  const responseTabs: { key: "body" | "headers" | "trailers" | "decode" | "chain"; label: string }[] = [
+    { key: "body", label: t("panels.response") },
+    { key: "headers", label: `${t("panels.headers")} (${tab.responseMetadata.length})` },
+    { key: "trailers", label: `${t("panels.trailers")} (${tab.responseTrailers.length})` },
+  ];
+  if (decodeActive) responseTabs.push({ key: "decode", label: t("decode.result") });
+  if (tab.chainResults && tab.chainResults.length > 0) {
+    responseTabs.push({ key: "chain", label: `${t("chain.results")} (${tab.chainResults.length})` });
+  }
+
   const statusColor = tab.statusCode
     ? tab.statusCode === "OK"
-      ? "text-[var(--color-method-unary)]"
-      : "text-[var(--color-destructive)]"
+      ? "text-[var(--state-success)]"
+      : "text-[var(--state-error)]"
     : "";
 
   return (
-    <div className="flex flex-col h-full" ref={containerRef} tabIndex={-1}>
-      <div className="flex items-center justify-between border-b">
-        <div className="flex items-center">
-          {(["body", "headers", "trailers"] as const).map((panel) => (
-            <button
-              key={panel}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium transition-colors border-b-2",
-                activePanel === panel
-                  ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
-                  : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-              )}
-              onClick={() => setActivePanel(panel)}
-            >
-              {panel === "body"
-                ? t("panels.response")
-                : panel === "headers"
-                  ? `${t("panels.headers")} (${tab.responseMetadata.length})`
-                  : `${t("panels.trailers")} (${tab.responseTrailers.length})`}
-            </button>
-          ))}
-          {decodeActive && (
-            <button
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium transition-colors border-b-2",
-                activePanel === "decode"
-                  ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
-                  : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-              )}
-              onClick={() => setActivePanel("decode")}
-            >
-              {t("decode.result")}
-            </button>
-          )}
-          {tab.chainResults && tab.chainResults.length > 0 && (
-            <button
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium transition-colors border-b-2",
-                activePanel === "chain"
-                  ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
-                  : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-              )}
-              onClick={() => setActivePanel("chain")}
-            >
-              {t("chain.results")} ({tab.chainResults.length})
-            </button>
-          )}
+    <div className="flex flex-col h-full bg-[var(--surface-1)]" ref={containerRef} tabIndex={-1}>
+      <div className="flex items-center justify-between border-b border-[var(--line-soft)]">
+        <div className="flex items-center overflow-x-auto scrollbar-none">
+          <PanelTabs
+            active={activePanel}
+            onChange={(k) => setActivePanel(k)}
+            tabs={responseTabs}
+          />
         </div>
-        <div className="flex items-center gap-2 px-3 text-xs">
+        <div className="flex items-center gap-1 px-2 text-xs shrink-0">
           {tab.statusCode && tab.statusCode !== "OK" && tab.method && (
-            <button
+            <IconButton
               onClick={handleAIDiagnose}
               disabled={aiLoading}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/10 transition-colors disabled:opacity-50"
+              size="sm"
+              tone="danger"
+              className="h-7 w-7 border-transparent bg-transparent"
               title={t("ai.diagnose")}
+              aria-label={t("ai.diagnose")}
             >
               {aiLoading && aiType === "diagnose" ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
-              <span className="text-[10px]">{aiLoading && aiType === "diagnose" ? t("ai.diagnosing") : t("ai.diagnose")}</span>
-            </button>
+            </IconButton>
           )}
           {tab.responseBody && tab.method && (
-            <button
+            <IconButton
               onClick={handleAIAnalyze}
               disabled={aiLoading}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors disabled:opacity-50"
+              size="sm"
+              tone="primary"
+              className="h-7 w-7 border-transparent bg-transparent"
               title={t("ai.analyze")}
+              aria-label={t("ai.analyze")}
             >
               {aiLoading && aiType === "analyze" ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              <span className="text-[10px]">{aiLoading && aiType === "analyze" ? t("ai.analyzing") : t("ai.analyze")}</span>
-            </button>
+            </IconButton>
           )}
           {tab.responseBody && (
-            <button
+            <IconButton
               onClick={handleDecodePayload}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+              size="sm"
+              tone="primary"
+              className="h-7 w-7 border-transparent bg-transparent"
               title={t("decode.decodeThisPayload")}
+              aria-label={t("decode.decodeThisPayload")}
             >
               <Binary size={12} />
-              <span className="text-[10px]">{t("decode.decode")}</span>
-            </button>
+            </IconButton>
           )}
           {tab.statusCode && (
             <span className={cn("flex items-center gap-1 font-medium", statusColor)}>
               {tab.statusCode === "OK" ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-              {tab.statusCode}
+              <Badge tone={tab.statusCode === "OK" ? "success" : "danger"}>{tab.statusCode}</Badge>
             </span>
           )}
           {tab.elapsedMs !== null && (
-            <span className="flex items-center gap-1 text-[var(--color-muted-foreground)]">
+            <span className="flex items-center gap-1 text-[var(--text-muted)]">
               <Clock size={12} />
               {tab.elapsedMs}ms
             </span>
@@ -282,39 +263,33 @@ export function ResponseViewer() {
       )}
       {activePanel === "body" && tab.responseBody && (
         <div className="flex items-center gap-1 px-3 py-1 border-b">
-          <button
-            onClick={() => setViewMode("raw")}
-            className={cn("text-[10px] px-2 py-0.5 rounded", viewMode === "raw" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]")}
-          >
-            {t("response.raw")}
-          </button>
-          <button
-            onClick={() => setViewMode("tree")}
-            className={cn("text-[10px] px-2 py-0.5 rounded", viewMode === "tree" ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]" : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]")}
-          >
-            {t("response.tree")}
-          </button>
+          <PanelTabs
+            active={viewMode}
+            onChange={(k) => setViewMode(k)}
+            tabs={[
+              { key: "raw", label: t("response.raw") },
+              { key: "tree", label: t("response.tree") },
+            ]}
+            className="px-0 py-0"
+          />
         </div>
       )}
       {(aiResult || aiError) && (
-        <div className="border-b">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--color-muted)]/30">
-            <span className="text-[11px] font-medium text-[var(--color-foreground)] flex items-center gap-1.5">
+        <div className="border-b border-[var(--line-soft)]">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--surface-1)]">
+            <span className="text-[11px] font-medium text-[var(--text-strong)] flex items-center gap-1.5">
               {aiType === "diagnose" ? <Stethoscope size={12} /> : <Sparkles size={12} />}
               {aiType === "diagnose" ? t("ai.diagnosisTitle") : t("ai.analysisTitle")}
             </span>
-            <button
-              onClick={closeAIPanel}
-              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-            >
+            <IconButton onClick={closeAIPanel} size="sm" title={t("common.close")} aria-label={t("common.close")}>
               <X size={14} />
-            </button>
+            </IconButton>
           </div>
           <div className="max-h-[200px] overflow-auto px-3 py-2">
             {aiError ? (
-              <div className="text-[11px] text-[var(--color-destructive)]">{aiError}</div>
+              <div className="text-[11px] text-[var(--state-error)]">{aiError}</div>
             ) : (
-              <pre className="text-[11px] leading-relaxed whitespace-pre-wrap text-[var(--color-foreground)] font-[var(--font-mono)]">
+              <pre className="text-[11px] leading-relaxed whitespace-pre-wrap text-[var(--text-normal)] font-[var(--font-mono)]">
                 {aiResult}
               </pre>
             )}
@@ -344,7 +319,7 @@ export function ResponseViewer() {
               </pre>
             )
           ) : (
-            <div className="flex items-center justify-center h-full text-[var(--color-muted-foreground)] text-xs">
+            <div className="flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
               {t("response.noResponse")}
             </div>
           )
@@ -378,9 +353,9 @@ function ChainResultsView({ results }: { results: ChainStepResult[] }) {
   return (
     <div className="flex flex-col gap-1 p-2">
       {results.map((r) => (
-        <div key={r.index} className="border border-[var(--color-border)] rounded overflow-hidden">
+        <div key={r.index} className="border border-[var(--line-soft)] rounded-lg overflow-hidden bg-[var(--surface-0)]">
           <div
-            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--color-secondary)] transition-colors"
+            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface-1)] transition-colors"
             onClick={() => toggle(r.index)}
           >
             {expanded.has(r.index) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -388,24 +363,24 @@ function ChainResultsView({ results }: { results: ChainStepResult[] }) {
             <span className={cn(
               "text-[10px] font-mono px-1.5 py-0.5 rounded",
               r.statusCode === "OK"
-                ? "text-green-500 bg-green-500/10"
-                : "text-[var(--color-destructive)] bg-[var(--color-destructive)]/10"
+                ? "text-[var(--state-success)] bg-[var(--state-success)]/12"
+                : "text-[var(--state-error)] bg-[var(--state-error)]/12"
             )}>
               {r.statusCode}
             </span>
-            <span className="text-[10px] text-[var(--color-muted-foreground)] ml-auto flex items-center gap-1">
+            <span className="text-[10px] text-[var(--text-muted)] ml-auto flex items-center gap-1">
               <Clock size={10} />
               {r.elapsedMs}ms
             </span>
           </div>
           {expanded.has(r.index) && (
-            <pre className="px-3 py-2 text-xs font-[var(--font-mono)] bg-[var(--color-secondary)] border-t border-[var(--color-border)] whitespace-pre-wrap overflow-auto max-h-[300px] leading-relaxed">
+            <pre className="px-3 py-2 text-xs font-[var(--font-mono)] bg-[var(--surface-1)] border-t border-[var(--line-soft)] whitespace-pre-wrap overflow-auto max-h-[300px] leading-relaxed">
               {r.error ? (
-                <span className="text-[var(--color-destructive)]">{r.error}</span>
+                <span className="text-[var(--state-error)]">{r.error}</span>
               ) : r.body ? (
                 <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(r.body) }} />
               ) : (
-                <span className="text-[var(--color-muted-foreground)]">{t("chain.empty")}</span>
+                <span className="text-[var(--text-muted)]">{t("chain.empty")}</span>
               )}
             </pre>
           )}

@@ -522,36 +522,40 @@ export function CommandPalette() {
     >
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative w-[520px] max-h-[60vh] bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-[560px] max-h-[62vh] bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-xl shadow-[var(--elevation-2)] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--color-border)]">
-          <Search size={16} className="text-[var(--color-muted-foreground)] shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--line-soft)] bg-[var(--surface-1)]">
+          <Search size={16} className="text-[var(--text-muted)] shrink-0" />
           <input
             ref={inputRef}
             type="text"
             placeholder={t("command.placeholder")}
-            className="flex-1 bg-transparent text-sm text-[var(--color-foreground)] outline-none placeholder:text-[var(--color-muted-foreground)]"
+            className="flex-1 bg-transparent text-sm text-[var(--text-normal)] outline-none placeholder:text-[var(--text-muted)]"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
           />
-          <label className="flex items-center gap-1.5 text-xs text-[var(--color-muted-foreground)] select-none">
+          <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] select-none">
             <input
               type="checkbox"
               checked={searchAllProjects}
               onChange={(e) => setSearchAllProjects(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border border-[var(--color-border)] accent-[var(--color-primary)]"
+              className="h-3.5 w-3.5 rounded border border-[var(--line-strong)] accent-[var(--state-info)]"
             />
             <span>{t("command.searchAllProjects")}</span>
           </label>
-          <kbd className="text-[10px] text-[var(--color-muted-foreground)] bg-[var(--color-secondary)] px-1.5 py-0.5 rounded font-mono">
+          <kbd className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded font-mono border border-[var(--line-soft)]">
             ESC
           </kbd>
         </div>
         {!searchAllProjects && (
-          <div className="px-4 py-1.5 border-b border-[var(--color-border)] text-[11px] text-[var(--color-muted-foreground)] truncate">
+          <div className="px-4 py-1.5 border-b border-[var(--line-soft)] text-[11px] text-[var(--text-muted)] truncate bg-[var(--surface-1)]">
             {scopedProjectId
               ? t("command.scopeCurrentProject", { project: scopedProjectName || scopedProjectId })
               : t("command.scopeNoProject")}
@@ -563,7 +567,7 @@ export function CommandPalette() {
           {/* Command groups */}
           {Object.entries(groupedCommands).map(([category, cmds]) => (
             <div key={category}>
-              <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--color-muted-foreground)] uppercase tracking-wider">
+              <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 {category}
               </div>
               {cmds.map((cmd) => {
@@ -574,16 +578,16 @@ export function CommandPalette() {
                     data-index={idx}
                     className={`flex items-center gap-3 px-4 py-2 cursor-pointer text-sm transition-colors ${
                       idx === selectedIndex
-                        ? "bg-[var(--color-primary)]/15 text-[var(--color-foreground)]"
-                        : "text-[var(--color-foreground)] hover:bg-[var(--color-secondary)]"
+                        ? "bg-[var(--state-info)]/16 text-[var(--text-strong)]"
+                        : "text-[var(--text-normal)] hover:bg-[var(--surface-2)]"
                     }`}
                     onClick={cmd.action}
                     onMouseEnter={() => { if (!keyboardNavRef.current) setSelectedIndex(idx); }}
                   >
-                    <span className="text-[var(--color-muted-foreground)]">{cmd.icon}</span>
+                    <span className="text-[var(--text-muted)]">{cmd.icon}</span>
                     <span className="flex-1">{cmd.label}</span>
                     {cmd.shortcut && (
-                      <kbd className="text-[10px] text-[var(--color-muted-foreground)] bg-[var(--color-secondary)] px-1.5 py-0.5 rounded font-mono flex items-center gap-0.5">
+                      <kbd className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded font-mono flex items-center gap-0.5 border border-[var(--line-soft)]">
                         {cmd.shortcut}
                       </kbd>
                     )}
@@ -596,7 +600,7 @@ export function CommandPalette() {
           {/* Method results */}
           {filteredMethods.length > 0 && (
             <div>
-              <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--color-muted-foreground)] uppercase tracking-wider">
+              <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 METHODS ({filteredMethods.length})
               </div>
               {filteredMethods.map((item) => {
@@ -607,8 +611,8 @@ export function CommandPalette() {
                     data-index={idx}
                     className={`flex items-center gap-3 px-4 py-2 cursor-pointer text-sm transition-colors ${
                       idx === selectedIndex
-                        ? "bg-[var(--color-primary)]/15 text-[var(--color-foreground)]"
-                        : "text-[var(--color-foreground)] hover:bg-[var(--color-secondary)]"
+                        ? "bg-[var(--state-info)]/16 text-[var(--text-strong)]"
+                        : "text-[var(--text-normal)] hover:bg-[var(--surface-2)]"
                     }`}
                     onClick={() => openMethod(item)}
                     onMouseEnter={() => { if (!keyboardNavRef.current) setSelectedIndex(idx); }}
@@ -621,13 +625,13 @@ export function CommandPalette() {
                       {METHOD_TYPE_I18N[item.methodType] ? t(METHOD_TYPE_I18N[item.methodType]) : item.methodType}
                     </span>
                     <span className="flex-1 truncate">
-                      <span className="text-[var(--color-muted-foreground)]">
+                      <span className="text-[var(--text-muted)]">
                         {item.serviceName}/
                       </span>
                       <span className="font-medium">{item.methodName}</span>
                     </span>
                     {searchAllProjects && (
-                      <span className="text-[10px] text-[var(--color-muted-foreground)] truncate max-w-[120px]">
+                      <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[120px]">
                         {projectNameById[item.projectId] ?? item.projectId}
                       </span>
                     )}
@@ -639,24 +643,24 @@ export function CommandPalette() {
 
           {/* Empty state */}
           {totalItems === 0 && (
-            <div className="px-4 py-8 text-center text-sm text-[var(--color-muted-foreground)]">
+            <div className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">
               {t("command.noResults")}
             </div>
           )}
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-2 border-t border-[var(--color-border)] flex items-center gap-3 text-[10px] text-[var(--color-muted-foreground)]">
+        <div className="px-4 py-2 border-t border-[var(--line-soft)] flex items-center gap-3 text-[10px] text-[var(--text-muted)] bg-[var(--surface-1)]">
           <span className="flex items-center gap-1">
-            <kbd className="bg-[var(--color-secondary)] px-1 py-0.5 rounded font-mono">↑↓</kbd>
+            <kbd className="bg-[var(--surface-2)] border border-[var(--line-soft)] px-1 py-0.5 rounded font-mono">↑↓</kbd>
             {t("command.navigate")}
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="bg-[var(--color-secondary)] px-1 py-0.5 rounded font-mono">↵</kbd>
+            <kbd className="bg-[var(--surface-2)] border border-[var(--line-soft)] px-1 py-0.5 rounded font-mono">↵</kbd>
             {t("command.select")}
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="bg-[var(--color-secondary)] px-1 py-0.5 rounded font-mono">esc</kbd>
+            <kbd className="bg-[var(--surface-2)] border border-[var(--line-soft)] px-1 py-0.5 rounded font-mono">esc</kbd>
             {t("command.close")}
           </span>
         </div>

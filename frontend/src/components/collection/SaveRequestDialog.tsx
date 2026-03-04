@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
 import { X, Save, Plus } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface Props {
   onClose: () => void;
@@ -76,61 +80,62 @@ export function SaveRequestDialog({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-[var(--color-card)] border rounded-lg shadow-xl w-[420px] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-lg shadow-[var(--elevation-2)] w-[420px] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line-soft)]">
           <h3 className="text-sm font-medium">{t("saveRequest.title")}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
+          <IconButton size="sm" className="border-0 bg-transparent" onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
         <div className="p-4 flex flex-col gap-3">
           <div>
-            <label className="text-[10px] text-[var(--color-muted-foreground)] mb-1 block">{t("saveRequest.requestName")}</label>
-            <input
+            <label className="text-[10px] text-[var(--text-muted)] mb-1 block">{t("saveRequest.requestName")}</label>
+            <Input
               value={requestName}
               onChange={(e) => setRequestName(e.target.value)}
-              className="w-full bg-[var(--color-secondary)] text-xs px-2 py-1.5 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+              className="w-full"
               placeholder={t("saveRequest.placeholder")}
               autoFocus
             />
           </div>
           <div>
-            <label className="text-[10px] text-[var(--color-muted-foreground)] mb-1 block">{t("saveRequest.collection")}</label>
+            <label className="text-[10px] text-[var(--text-muted)] mb-1 block">{t("saveRequest.collection")}</label>
             {collections.length > 0 ? (
-              <select
+              <Select
                 value={selectedCollectionId}
                 onChange={(e) => {
                   setSelectedCollectionId(Number(e.target.value));
                   setNewCollectionName("");
                 }}
-                className="w-full bg-[var(--color-secondary)] text-xs px-2 py-1.5 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                className="w-full"
               >
                 {collections.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
-              </select>
+              </Select>
             ) : (
-              <div className="text-[10px] text-[var(--color-muted-foreground)] mb-1">{t("saveRequest.noCollections")}</div>
+              <div className="text-[10px] text-[var(--text-muted)] mb-1">{t("saveRequest.noCollections")}</div>
             )}
           </div>
           <div>
-            <label className="text-[10px] text-[var(--color-muted-foreground)] mb-1 flex items-center gap-1">
+            <label className="text-[10px] text-[var(--text-muted)] mb-1 flex items-center gap-1">
               <Plus size={10} /> {t("saveRequest.orCreateNew")}
             </label>
-            <input
+            <Input
               value={newCollectionName}
               onChange={(e) => setNewCollectionName(e.target.value)}
-              className="w-full bg-[var(--color-secondary)] text-xs px-2 py-1.5 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+              className="w-full"
               placeholder={t("saveRequest.newCollectionPlaceholder")}
             />
           </div>
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || !requestName.trim()}
-            className="flex items-center justify-center gap-1 text-xs px-3 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary)]/80 disabled:opacity-50 mt-1"
+            variant="primary"
+            className="mt-1"
           >
             <Save size={12} /> {saving ? t("saveRequest.saving") : t("saveRequest.save")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

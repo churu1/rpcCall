@@ -4,6 +4,9 @@ import { useAppStore, type MethodType } from "@/store/app-store";
 import { useGrpc } from "@/hooks/useGrpc";
 import { cn } from "@/lib/utils";
 import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save, Shield, ShieldOff, FileKey, FolderOpen } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
 
 interface SavedAddress {
   id: number;
@@ -136,11 +139,11 @@ export function AddressBar() {
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-b">
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--line-soft)] bg-[var(--surface-1)]">
       {methodLabel && (
         <span
           className={cn(
-            "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--color-secondary)] shrink-0",
+            "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--line-soft)] shrink-0",
             methodColor
           )}
         >
@@ -149,13 +152,13 @@ export function AddressBar() {
       )}
 
       <div className="relative flex-1" ref={dropdownRef}>
-        <div className="flex items-center rounded-md focus-within:ring-1 focus-within:ring-[var(--color-ring)]">
-          <input
+        <div className="flex items-center rounded-md focus-within:ring-2 focus-within:ring-[var(--focus-ring)]/25">
+          <Input
             type="text"
             value={tab.address}
             onChange={(e) => updateTab(tab.id, { address: e.target.value })}
             placeholder={t("addressBar.placeholder")}
-            className="flex-1 bg-[var(--color-secondary)] text-sm px-3 py-1.5 rounded-l-md border border-r-0 border-[var(--color-input)] focus:outline-none text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]"
+            className="flex-1 h-8 bg-[var(--surface-2)] text-sm px-3 py-1.5 rounded-l-md border border-r-0 border-[var(--line-strong)] focus:outline-none text-[var(--text-normal)] placeholder:text-[var(--text-muted)]"
             onKeyDown={(e) => {
               if (e.key === "Enter" && tab.method && !tab.isLoading) send();
             }}
@@ -165,58 +168,62 @@ export function AddressBar() {
               if (!showDropdown) loadAddresses();
               setShowDropdown(!showDropdown);
             }}
-            className="px-1.5 py-1.5 border border-l-0 border-[var(--color-input)] bg-[var(--color-secondary)] rounded-r-md hover:bg-[var(--color-accent)] transition-colors h-[34px] flex items-center"
+            className="px-1.5 py-1.5 border border-l-0 border-[var(--line-strong)] bg-[var(--surface-2)] rounded-r-md hover:bg-[var(--surface-1)] transition-colors h-8 flex items-center"
             title={t("addressBar.selectAddress")}
           >
-            <ChevronDown size={14} className={cn("text-[var(--color-muted-foreground)] transition-transform", showDropdown && "rotate-180")} />
+            <ChevronDown size={14} className={cn("text-[var(--text-muted)] transition-transform", showDropdown && "rotate-180")} />
           </button>
-          <button
+          <IconButton
+            size="sm"
             onClick={() => document.dispatchEvent(new CustomEvent("rpccall:save-request"))}
-            className="ml-1 p-1.5 rounded-md hover:bg-[var(--color-accent)] transition-colors text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            className="ml-1"
             title={t("addressBar.saveToCollection")}
           >
             <Save size={14} />
-          </button>
+          </IconButton>
           <div className="relative" ref={saveInputRef}>
-            <button
+            <IconButton
+              size="sm"
               onClick={() => {
                 if (!tab.address.trim()) return;
                 setSaveName("");
                 setShowSaveInput(!showSaveInput);
               }}
-              className="ml-1 p-1.5 rounded-md hover:bg-[var(--color-accent)] transition-colors text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              className="ml-1"
               title={t("addressBar.saveAddress")}
             >
               <Bookmark size={14} />
-            </button>
+            </IconButton>
             {showSaveInput && (
-              <div className="absolute top-full right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg z-50 p-2 w-[260px]">
-                <div className="text-xs text-[var(--color-muted-foreground)] mb-1.5">{t("addressBar.setAlias")}</div>
-                <div className="text-[10px] font-mono text-[var(--color-muted-foreground)] mb-2 truncate">{tab.address}</div>
-                <input
+              <div className="absolute top-full right-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] z-50 p-2 w-[260px]">
+                <div className="text-xs text-[var(--text-muted)] mb-1.5">{t("addressBar.setAlias")}</div>
+                <div className="text-[10px] font-mono text-[var(--text-muted)] mb-2 truncate">{tab.address}</div>
+                <Input
                   autoFocus
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
                   placeholder={t("addressBar.aliasPlaceholder")}
-                  className="w-full text-xs bg-[var(--color-secondary)] px-2 py-1.5 rounded border border-[var(--color-input)] text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] mb-2"
+                  className="ui-input w-full text-xs mb-2"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSaveAddress();
                     if (e.key === "Escape") setShowSaveInput(false);
                   }}
                 />
                 <div className="flex justify-end gap-1.5">
-                  <button
+                  <Button
                     onClick={() => setShowSaveInput(false)}
-                    className="px-2 py-1 text-xs rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)]"
+                    variant="ghost"
+                    size="sm"
                   >
                     {t("common.cancel")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={handleSaveAddress}
-                    className="px-2 py-1 text-xs rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/80"
+                    variant="primary"
+                    size="sm"
                   >
                     {t("common.save")}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -224,9 +231,9 @@ export function AddressBar() {
         </div>
 
         {showDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg z-50 max-h-[240px] overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] z-50 max-h-[240px] overflow-y-auto">
             {addresses.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-center text-[var(--color-muted-foreground)]">
+              <div className="px-3 py-4 text-xs text-center text-[var(--text-muted)]">
                 {t("addressBar.noAddresses")}{t("addressBar.clickToSave")} <Bookmark size={12} className="inline" />
               </div>
             ) : (
@@ -234,59 +241,62 @@ export function AddressBar() {
                 <div
                   key={addr.id}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--color-accent)] transition-colors group",
-                    addr.address === tab.address && "bg-[var(--color-accent)]/50"
+                    "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface-1)] transition-colors group",
+                    addr.address === tab.address && "bg-[var(--surface-1)]/50"
                   )}
                   onClick={() => handleSelectAddress(addr)}
                 >
                   {editingId === addr.id ? (
                     <div className="flex-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <input
+                      <Input
                         autoFocus
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="flex-1 text-xs bg-[var(--color-secondary)] px-2 py-0.5 rounded border border-[var(--color-input)] text-[var(--color-foreground)] focus:outline-none"
+                        className="flex-1 text-xs bg-[var(--surface-1)] px-2 py-0.5 rounded border border-[var(--line-strong)] text-[var(--text-normal)] focus:outline-none h-7"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") confirmEdit(e as any, addr);
                           if (e.key === "Escape") cancelEdit(e as any);
                         }}
                       />
-                      <button onClick={(e) => confirmEdit(e, addr)} className="p-0.5 hover:text-green-500"><Check size={12} /></button>
-                      <button onClick={cancelEdit} className="p-0.5 hover:text-[var(--color-destructive)]"><X size={12} /></button>
+                      <IconButton onClick={(e) => confirmEdit(e, addr)} size="sm" tone="primary" className="h-6 w-6 border-transparent bg-transparent"><Check size={12} /></IconButton>
+                      <IconButton onClick={cancelEdit} size="sm" tone="danger" className="h-6 w-6 border-transparent bg-transparent"><X size={12} /></IconButton>
                     </div>
                   ) : (
                     <>
                       <div className="flex-1 min-w-0">
                         {addr.name && addr.name !== addr.address ? (
                           <>
-                            <div className="text-xs font-medium text-[var(--color-foreground)] truncate">
+                            <div className="text-xs font-medium text-[var(--text-normal)] truncate">
                               {addr.name}
                             </div>
-                            <div className="text-[10px] text-[var(--color-muted-foreground)] font-mono truncate">
+                            <div className="text-[10px] text-[var(--text-muted)] font-mono truncate">
                               {addr.address}
                             </div>
                           </>
                         ) : (
-                          <div className="text-xs font-mono text-[var(--color-foreground)] truncate">
+                          <div className="text-xs font-mono text-[var(--text-normal)] truncate">
                             {addr.address}
                           </div>
                         )}
                       </div>
                       <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-                        <button
+                        <IconButton
                           onClick={(e) => startEditing(e, addr)}
-                          className="p-1 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                          size="sm"
+                          className="h-6 w-6 border-transparent bg-transparent"
                           title={t("addressBar.rename")}
                         >
                           <Pencil size={12} />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
                           onClick={(e) => handleDeleteAddress(e, addr.id)}
-                          className="p-1 rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+                          size="sm"
+                          tone="danger"
+                          className="h-6 w-6 border-transparent bg-transparent"
                           title={t("addressBar.delete")}
                         >
                           <Trash2 size={12} />
-                        </button>
+                        </IconButton>
                       </div>
                     </>
                   )}
@@ -298,10 +308,10 @@ export function AddressBar() {
       </div>
 
       <div
-        className="flex items-center shrink-0 rounded-md focus-within:ring-1 focus-within:ring-[var(--color-ring)]"
+        className="flex items-center shrink-0 rounded-md focus-within:ring-1 focus-within:ring-[var(--focus-ring)]"
         title={t("addressBar.timeout")}
       >
-        <input
+        <Input
           type="text"
           inputMode="numeric"
           value={tab.timeoutSec}
@@ -315,9 +325,9 @@ export function AddressBar() {
               updateTab(tab.id, { timeoutSec: !v || v < 1 ? 30 : 3600 });
             }
           }}
-          className="w-10 bg-[var(--color-secondary)] text-xs text-center px-1 py-1.5 rounded-l-md border border-r-0 border-[var(--color-input)] focus:outline-none text-[var(--color-foreground)]"
+          className="w-10 bg-[var(--surface-1)] text-xs text-center px-1 py-1.5 rounded-l-md border border-r-0 border-[var(--line-strong)] focus:outline-none text-[var(--text-normal)]"
         />
-        <span className="text-xs text-[var(--color-muted-foreground)] bg-[var(--color-secondary)] border border-l-0 border-[var(--color-input)] px-1.5 py-[6px] rounded-r-md select-none">
+        <span className="text-xs text-[var(--text-muted)] bg-[var(--surface-1)] border border-l-0 border-[var(--line-strong)] px-1.5 py-[6px] rounded-r-md select-none">
           s
         </span>
       </div>
@@ -329,14 +339,14 @@ export function AddressBar() {
             "p-1.5 rounded-md transition-colors shrink-0",
             tab.useTls
               ? "text-[var(--color-method-unary)] bg-[var(--color-method-unary)]/10 hover:bg-[var(--color-method-unary)]/20"
-              : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-foreground)]"
+              : "text-[var(--text-muted)] hover:bg-[var(--surface-1)] hover:text-[var(--text-normal)]"
           )}
           title={tab.useTls ? t("tls.tlsEnabled") : t("tls.tlsDisabled")}
         >
           {tab.useTls ? <Shield size={14} /> : <ShieldOff size={14} />}
         </button>
         {showTls && (
-          <div className="absolute top-full right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg z-50 p-3 w-[280px]">
+          <div className="absolute top-full right-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-lg z-50 p-3 w-[280px]">
             <label className="flex items-center gap-2 text-xs cursor-pointer mb-2">
               <input
                 type="checkbox"
@@ -347,12 +357,12 @@ export function AddressBar() {
               {tab.useTls ? (
                 <Shield size={13} className="text-[var(--color-method-unary)]" />
               ) : (
-                <ShieldOff size={13} className="text-[var(--color-muted-foreground)]" />
+                <ShieldOff size={13} className="text-[var(--text-muted)]" />
               )}
               <span className="font-medium">{t("tls.enableTls")}</span>
             </label>
             {tab.useTls && (
-              <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--color-border)]">
+              <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--line-soft)]">
                 <CertFileRow label={t("tls.caFile")} value={tab.caPath} notSelected={t("tls.notSelected")} onSelect={async () => {
                   try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { caPath: p }); } catch {}
                 }} />
@@ -368,12 +378,12 @@ export function AddressBar() {
         )}
       </div>
 
-      <button
+      <Button
         className={cn(
-          "flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0",
+          "flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0 h-8",
           tab.isLoading
-            ? "bg-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/80 text-white"
-            : "bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/80 text-white",
+            ? "bg-[var(--state-error)] hover:bg-[var(--state-error)]/80 text-white"
+            : "bg-[var(--state-info)] hover:bg-[var(--state-info)]/80 text-white",
           !tab.method && "opacity-50 cursor-not-allowed"
         )}
         disabled={!tab.method || tab.isLoading}
@@ -390,7 +400,7 @@ export function AddressBar() {
             {t("addressBar.send")}
           </>
         )}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -398,19 +408,20 @@ export function AddressBar() {
 function CertFileRow({ label, value, notSelected, onSelect }: { label: string; value: string; notSelected: string; onSelect: () => void }) {
   return (
     <div className="flex items-center gap-1.5 mt-1">
-      <span className="text-[10px] text-[var(--color-muted-foreground)] w-[70px] shrink-0">{label}</span>
-      <div className="flex-1 flex items-center gap-1 bg-[var(--color-secondary)] rounded border border-[var(--color-input)] px-2 py-0.5 text-[10px] min-w-0">
-        <FileKey size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
-        <span className="truncate text-[var(--color-muted-foreground)]">
+      <span className="text-[10px] text-[var(--text-muted)] w-[70px] shrink-0">{label}</span>
+      <div className="flex-1 flex items-center gap-1 bg-[var(--surface-1)] rounded border border-[var(--line-strong)] px-2 py-0.5 text-[10px] min-w-0">
+        <FileKey size={10} className="shrink-0 text-[var(--text-muted)]" />
+        <span className="truncate text-[var(--text-muted)]">
           {value ? value.split("/").pop() : notSelected}
         </span>
       </div>
-      <button
+      <IconButton
         onClick={onSelect}
-        className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+        size="sm"
+        className="h-6 w-6 border-transparent bg-transparent"
       >
         <FolderOpen size={12} />
-      </button>
+      </IconButton>
     </div>
   );
 }

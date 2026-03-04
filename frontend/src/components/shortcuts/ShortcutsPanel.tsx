@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface Props {
   onClose: () => void;
@@ -47,26 +48,26 @@ export function ShortcutsPanel({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-[var(--color-card)] border rounded-lg shadow-xl w-[480px] max-h-[70vh] flex flex-col"
+        className="bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-lg shadow-[var(--elevation-2)] w-[480px] max-h-[70vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line-soft)]">
           <h3 className="text-sm font-medium">{t("shortcuts.title")}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
+          <IconButton size="sm" className="border-0 bg-transparent" onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
         <div className="overflow-auto p-4 flex flex-col gap-4">
           {shortcutGroups.map((group) => (
             <div key={group.titleKey}>
-              <h4 className="text-[10px] font-semibold text-[var(--color-muted-foreground)] uppercase tracking-wider mb-2">
+              <h4 className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">
                 {t(group.titleKey)}
               </h4>
               <div className="flex flex-col gap-1">
                 {group.items.map((item) => (
                   <div key={item.descKey} className="flex items-center justify-between py-1">
-                    <span className="text-xs text-[var(--color-foreground)]">{t(item.descKey)}</span>
-                    <kbd className="text-[10px] text-[var(--color-muted-foreground)] bg-[var(--color-secondary)] px-2 py-0.5 rounded font-mono">
+                    <span className="text-xs text-[var(--text-normal)]">{t(item.descKey)}</span>
+                    <kbd className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-2)] border border-[var(--line-soft)] px-2 py-0.5 rounded font-mono">
                       {item.keys}
                     </kbd>
                   </div>

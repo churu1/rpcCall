@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useEnvStore } from "@/store/env-store";
 import { Plus, Trash2, X, Save } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface Props {
   onClose: () => void;
@@ -56,12 +59,12 @@ export function EnvironmentEditor({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-[var(--color-card)] border rounded-lg shadow-xl w-[600px] max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-lg shadow-[var(--elevation-2)] w-[600px] max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line-soft)]">
           <h3 className="text-sm font-medium">{t("environment.manageTitle")}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
+          <IconButton size="sm" className="border-0 bg-transparent" onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="flex flex-1 min-h-0">
@@ -72,19 +75,20 @@ export function EnvironmentEditor({ onClose }: Props) {
                 <button
                   key={env.id}
                   onClick={() => setSelectedId(env.id)}
-                  className={`w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-secondary)] ${selectedId === env.id ? "bg-[var(--color-secondary)] text-[var(--color-primary)]" : ""}`}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-[var(--surface-2)] ${selectedId === env.id ? "bg-[var(--surface-2)] text-[var(--state-info)]" : ""}`}
                 >
                   {env.name}
                   {env.isActive && <span className="ml-1 text-[var(--color-method-unary)]">●</span>}
                 </button>
               ))}
             </div>
-            <button
+            <Button
               onClick={handleNew}
-              className="flex items-center gap-1 text-xs px-3 py-2 hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] border-t"
+              variant="ghost"
+              className="justify-start rounded-none border-t border-[var(--line-soft)]"
             >
               <Plus size={12} /> {t("environment.newEnv")}
-            </button>
+            </Button>
           </div>
 
           {/* Right: editor */}
@@ -92,55 +96,55 @@ export function EnvironmentEditor({ onClose }: Props) {
             {selectedId ? (
               <>
                 <div className="mb-3">
-                  <label className="text-[10px] text-[var(--color-muted-foreground)] mb-1 block">{t("environment.name")}</label>
-                  <input
+                  <label className="text-[10px] text-[var(--text-muted)] mb-1 block">{t("environment.name")}</label>
+                  <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-[var(--color-secondary)] text-xs px-2 py-1.5 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+                    className="w-full"
                   />
                 </div>
-                <label className="text-[10px] text-[var(--color-muted-foreground)] mb-1 block">{t("environment.variables")}</label>
+                <label className="text-[10px] text-[var(--text-muted)] mb-1 block">{t("environment.variables")}</label>
                 <div className="flex flex-col gap-1.5">
                   {vars.map((v, i) => (
                     <div key={i} className="flex items-center gap-1">
-                      <input
+                      <Input
                         value={v.key}
                         onChange={(e) => updateVar(i, "key", e.target.value)}
                         placeholder="key"
-                        className="flex-1 bg-[var(--color-secondary)] text-xs px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] font-mono"
+                        className="flex-1 font-mono"
                       />
-                      <input
+                      <Input
                         value={v.value}
                         onChange={(e) => updateVar(i, "value", e.target.value)}
                         placeholder="value"
-                        className="flex-1 bg-[var(--color-secondary)] text-xs px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] font-mono"
+                        className="flex-1 font-mono"
                       />
-                      <button onClick={() => removeVar(i)} className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]">
+                      <Button variant="danger" size="sm" className="h-7 w-7 px-0" onClick={() => removeVar(i)}>
                         <Trash2 size={12} />
-                      </button>
+                      </Button>
                     </div>
                   ))}
-                  <button onClick={addVar} className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] py-1">
+                  <Button onClick={addVar} variant="ghost" size="sm" className="self-start">
                     <Plus size={11} /> {t("environment.addVariable")}
-                  </button>
+                  </Button>
                 </div>
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t">
-                  <button
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[var(--line-soft)]">
+                  <Button
                     onClick={handleSave}
-                    className="flex items-center gap-1 text-xs px-3 py-1.5 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary)]/80"
+                    variant="primary"
                   >
                     <Save size={12} /> {t("common.save")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={handleDelete}
-                    className="flex items-center gap-1 text-xs px-3 py-1.5 text-[var(--color-destructive)] hover:bg-[var(--color-secondary)] rounded"
+                    variant="danger"
                   >
                     <Trash2 size={12} /> {t("common.delete")}
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-full text-xs text-[var(--color-muted-foreground)]">
+              <div className="flex items-center justify-center h-full text-xs text-[var(--text-muted)]">
                 {t("environment.selectOrCreate")}
               </div>
             )}

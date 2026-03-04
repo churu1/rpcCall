@@ -4,6 +4,9 @@ import { useAppStore, type ChainStepConfig } from "@/store/app-store";
 import { Plus, Trash2, Play, Loader2, ChevronDown, Save, FolderOpen, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
 
 export function ChainEditor() {
   const { t } = useTranslation();
@@ -144,40 +147,44 @@ export function ChainEditor() {
   }, [steps, tab, activeTabId, updateTab]);
 
   return (
-    <div className="flex flex-col gap-3 p-3 text-xs">
+    <div className="flex flex-col gap-3 p-3 text-xs bg-[var(--surface-1)] h-full overflow-auto">
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium text-[var(--color-muted-foreground)]">
+        <div className="text-[11px] font-medium text-[var(--text-muted)]">
           {t("chain.description")}
         </div>
         <div className="flex items-center gap-1">
           {saveSuccess && (
             <span className="text-[10px] text-green-500">{t("chain.templateSaved")}</span>
           )}
-          <button
+          <Button
             onClick={() => { setShowSaveInput(!showSaveInput); setShowTemplates(false); }}
-            className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-1.5 text-[10px] whitespace-nowrap"
             title={t("chain.saveTemplate")}
           >
             <Save size={11} /> {t("chain.saveTemplate")}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => { setShowTemplates(!showTemplates); setShowSaveInput(false); if (!showTemplates) loadTemplates(); }}
-            className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded hover:bg-[var(--color-secondary)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-1.5 text-[10px] whitespace-nowrap"
             title={t("chain.loadTemplate")}
           >
             <FolderOpen size={11} /> {t("chain.loadTemplate")}
-          </button>
+          </Button>
         </div>
       </div>
 
       {showSaveInput && (
-        <div className="flex items-center gap-2 p-2 rounded border border-[var(--color-border)] bg-[var(--color-secondary)]">
-          <input
+        <Card className="flex items-center gap-2 p-2">
+          <Input
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSaveTemplate()}
             placeholder={t("chain.templateNamePlaceholder")}
-            className="flex-1 bg-[var(--color-background)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px]"
+            className="flex-1 text-[11px]"
             autoFocus
             autoComplete="off"
             autoCorrect="off"
@@ -186,24 +193,25 @@ export function ChainEditor() {
             data-form-type="other"
             data-lpignore="true"
           />
-          <button
+          <Button
             onClick={handleSaveTemplate}
             disabled={!saveName.trim()}
-            className="px-2 py-1 rounded bg-[var(--color-primary)] text-white text-[10px] hover:bg-[var(--color-primary)]/80 disabled:opacity-50"
+            variant="primary"
+            size="sm"
           >
             {t("common.save")}
-          </button>
-          <button onClick={() => setShowSaveInput(false)} className="p-0.5 hover:bg-[var(--color-muted)] rounded">
+          </Button>
+          <Button variant="secondary" size="sm" className="h-7 w-7 px-0" onClick={() => setShowSaveInput(false)}>
             <X size={12} />
-          </button>
-        </div>
+          </Button>
+        </Card>
       )}
 
       {showTemplates && (
-        <div className="flex flex-col gap-1 p-2 rounded border border-[var(--color-border)] bg-[var(--color-secondary)] max-h-[160px] overflow-y-auto">
-          <div className="text-[10px] font-medium text-[var(--color-muted-foreground)] mb-0.5">{t("chain.savedTemplates")}</div>
+        <Card className="flex flex-col gap-1 p-2 max-h-[160px] overflow-y-auto">
+          <div className="text-[10px] font-medium text-[var(--text-muted)] mb-0.5">{t("chain.savedTemplates")}</div>
           {templates.length === 0 ? (
-            <div className="text-[10px] text-[var(--color-muted-foreground)] text-center py-2">{t("chain.noTemplates")}</div>
+            <div className="text-[10px] text-[var(--text-muted)] text-center py-2">{t("chain.noTemplates")}</div>
           ) : (
             templates.map((tpl) => {
               let stepCount = 0;
@@ -211,18 +219,18 @@ export function ChainEditor() {
               return (
                 <div
                   key={tpl.id}
-                  className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-[var(--color-background)] cursor-pointer group"
+                  className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-[var(--surface-2)] cursor-pointer group"
                   onClick={() => handleLoadTemplate(tpl)}
                 >
                   <div className="flex flex-col min-w-0">
                     <span className="text-[11px] font-medium truncate">{tpl.name}</span>
-                    <span className="text-[10px] text-[var(--color-muted-foreground)]">
+                    <span className="text-[10px] text-[var(--text-muted)]">
                       {stepCount} {t("chain.stepN", { n: "" }).replace(/\s*$/, "")} · {new Date(tpl.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(tpl.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--color-muted)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--surface-1)] rounded text-[var(--text-muted)] hover:text-[var(--state-error)]"
                   >
                     <Trash2 size={10} />
                   </button>
@@ -230,23 +238,23 @@ export function ChainEditor() {
               );
             })
           )}
-        </div>
+        </Card>
       )}
 
       {error && (
-        <div className="px-2 py-1.5 rounded bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] text-[11px]">
+        <div className="px-2 py-1.5 rounded border border-[var(--state-error)]/25 bg-[var(--state-error)]/10 text-[var(--state-error)] text-[11px]">
           {error}
         </div>
       )}
 
       {steps.map((step, i) => (
-        <div key={i} className="border border-[var(--color-border)] rounded p-2 flex flex-col gap-1.5">
+        <Card key={i} className="p-2 flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-medium text-[var(--color-primary)]">{t("chain.stepN", { n: i + 1 })}</span>
+            <span className="text-[10px] font-medium text-[var(--state-info)]">{t("chain.stepN", { n: i + 1 })}</span>
             {steps.length > 1 && (
-              <button onClick={() => removeStep(i)} className="p-0.5 hover:text-[var(--color-destructive)]">
+              <Button variant="danger" size="sm" className="h-6 w-6 px-0" onClick={() => removeStep(i)}>
                 <Trash2 size={11} />
-              </button>
+              </Button>
             )}
           </div>
           <AddressInput
@@ -257,11 +265,11 @@ export function ChainEditor() {
           />
           {step.manualInput || allServices.length === 0 ? (
             <div className="flex gap-1">
-              <input
+              <Input
                 value={step.serviceName}
                 onChange={(e) => updateStep(i, { serviceName: e.target.value })}
                 placeholder={t("chain.servicePlaceholder")}
-                className="flex-1 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px] font-mono"
+                className="flex-1 text-[11px] font-mono"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -269,11 +277,11 @@ export function ChainEditor() {
                 data-form-type="other"
                 data-lpignore="true"
               />
-              <input
+              <Input
                 value={step.methodName}
                 onChange={(e) => updateStep(i, { methodName: e.target.value })}
                 placeholder={t("chain.methodPlaceholder")}
-                className="flex-1 bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px] font-mono"
+                className="flex-1 text-[11px] font-mono"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -282,12 +290,14 @@ export function ChainEditor() {
                 data-lpignore="true"
               />
               {allServices.length > 0 && (
-                <button
+                <Button
                   onClick={() => updateStep(i, { manualInput: false })}
-                  className="text-[10px] text-[var(--color-primary)] hover:underline shrink-0 px-1"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[10px] text-[var(--state-info)] shrink-0 px-1"
                 >
                   {t("chain.selectMode")}
-                </button>
+                </Button>
               )}
             </div>
           ) : (
@@ -319,35 +329,41 @@ export function ChainEditor() {
                 onChange={(val) => handleMethodChange(i, step.serviceName, val)}
                 className="flex-1"
               />
-              <button
+              <Button
                 onClick={() => updateStep(i, { manualInput: true })}
-                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:underline shrink-0 px-1"
+                variant="ghost"
+                size="sm"
+                className="text-[10px] text-[var(--text-muted)] shrink-0 px-1"
               >
                 {t("chain.manualInput")}
-              </button>
+              </Button>
             </div>
           )}
           <textarea
             value={step.body}
             onChange={(e) => updateStep(i, { body: e.target.value })}
             placeholder={'{\n  "field": "{{prev.id}}"\n}'}
-            className="w-full bg-[var(--color-secondary)] px-2 py-1 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px] font-mono resize-none h-16"
+            className="w-full bg-[var(--surface-2)] px-2 py-1 rounded border border-[var(--line-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring)] text-[11px] font-mono resize-none h-16"
             spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
           />
-        </div>
+        </Card>
       ))}
 
-      <button onClick={addStep} className="flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] py-1">
+      <Button onClick={addStep} variant="ghost" size="sm" className="self-start">
         <Plus size={12} /> {t("chain.addStep")}
-      </button>
+      </Button>
 
-      <button
+      <Button
         onClick={runChain}
         disabled={running || steps.length === 0}
-        className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-[var(--color-primary)] text-white text-xs font-medium hover:bg-[var(--color-primary)]/80 disabled:opacity-50"
+        variant="primary"
+        className="self-start px-4"
       >
         {running ? <><Loader2 size={14} className="animate-spin" /> {t("chain.running")}</> : <><Play size={14} /> {t("chain.runChain")}</>}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -378,11 +394,11 @@ function AddressInput({
   return (
     <div ref={ref} className="relative">
       <div className="flex">
-        <input
+        <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 bg-[var(--color-secondary)] px-2 py-1 rounded-l border border-r-0 border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] text-[11px] font-mono"
+          className="flex-1 text-[11px] font-mono rounded-r-none border-r-0"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -394,20 +410,20 @@ function AddressInput({
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="px-1.5 bg-[var(--color-secondary)] border border-[var(--color-input)] rounded-r hover:bg-[var(--color-accent)] transition-colors"
+            className="px-1.5 bg-[var(--surface-2)] border border-[var(--line-strong)] rounded-r hover:bg-[var(--surface-1)] transition-colors"
           >
-            <ChevronDown size={10} className={cn("text-[var(--color-muted-foreground)] transition-transform", open && "rotate-180")} />
+            <ChevronDown size={10} className={cn("text-[var(--text-muted)] transition-transform", open && "rotate-180")} />
           </button>
         )}
       </div>
       {open && savedAddresses.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--color-popover)] border border-[var(--color-border)] rounded-md shadow-lg max-h-[120px] overflow-y-auto">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] max-h-[120px] overflow-y-auto">
           {savedAddresses.map((addr) => (
             <div
               key={addr.address}
               className={cn(
-                "flex items-center justify-between px-2 py-1.5 text-[11px] cursor-pointer hover:bg-[var(--color-secondary)]",
-                addr.address === value && "bg-[var(--color-accent)]"
+                "flex items-center justify-between px-2 py-1.5 text-[11px] cursor-pointer hover:bg-[var(--surface-2)]",
+                addr.address === value && "bg-[var(--surface-1)]"
               )}
               onClick={() => {
                 onChange(addr.address);
@@ -416,7 +432,7 @@ function AddressInput({
             >
               <span className="font-mono truncate">{addr.address}</span>
               {addr.name && (
-                <span className="text-[10px] text-[var(--color-muted-foreground)] ml-2 shrink-0">{addr.name}</span>
+                <span className="text-[10px] text-[var(--text-muted)] ml-2 shrink-0">{addr.name}</span>
               )}
             </div>
           ))}

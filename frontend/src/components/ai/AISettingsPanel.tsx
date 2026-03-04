@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface Props {
   onClose: () => void;
@@ -42,57 +45,57 @@ export function AISettingsPanel({ onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={onClose} />
       <div
-        className="relative w-[440px] bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl shadow-2xl overflow-hidden"
+        className="relative w-[440px] bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-xl shadow-[var(--elevation-2)] overflow-hidden"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line-soft)]">
           <span className="text-sm font-medium">{t("ai.settingsTitle")}</span>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
+          <IconButton size="sm" className="border-0 bg-transparent" onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="p-4 flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-[var(--color-muted-foreground)]">{t("ai.endpoint")}</label>
-            <input
+            <label className="text-[11px] text-[var(--text-muted)]">{t("ai.endpoint")}</label>
+            <Input
               type="text"
               value={endpoint}
               onChange={(e) => setEndpoint(e.target.value)}
               placeholder="https://api.openai.com"
-              className="w-full bg-[var(--color-secondary)] text-xs px-3 py-2 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] font-mono"
+              className="w-full font-mono"
             />
-            <span className="text-[10px] text-[var(--color-muted-foreground)]">
+            <span className="text-[10px] text-[var(--text-muted)]">
               {t("ai.endpointHint")}
             </span>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-[var(--color-muted-foreground)]">{t("ai.apiKey")}</label>
-            <input
+            <label className="text-[11px] text-[var(--text-muted)]">{t("ai.apiKey")}</label>
+            <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."
-              className="w-full bg-[var(--color-secondary)] text-xs px-3 py-2 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] font-mono"
+              className="w-full font-mono"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-[var(--color-muted-foreground)]">{t("ai.model")}</label>
-            <input
+            <label className="text-[11px] text-[var(--text-muted)]">{t("ai.model")}</label>
+            <Input
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="gpt-3.5-turbo"
-              className="w-full bg-[var(--color-secondary)] text-xs px-3 py-2 rounded border border-[var(--color-input)] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)] font-mono"
+              className="w-full font-mono"
             />
-            <span className="text-[10px] text-[var(--color-muted-foreground)]">
+            <span className="text-[10px] text-[var(--text-muted)]">
               {t("ai.modelHint")}
             </span>
           </div>
 
           {error && (
-            <div className="text-[11px] text-[var(--color-destructive)] bg-[var(--color-destructive)]/10 px-2 py-1.5 rounded">
+            <div className="text-[11px] text-[var(--state-error)] bg-[var(--state-error)]/10 border border-[var(--state-error)]/25 px-2 py-1.5 rounded">
               {error}
             </div>
           )}
@@ -102,14 +105,15 @@ export function AISettingsPanel({ onClose }: Props) {
             </div>
           )}
 
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || !endpoint.trim() || !apiKey.trim()}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-[var(--color-primary)] text-white text-xs font-medium hover:bg-[var(--color-primary)]/80 disabled:opacity-50 transition-colors"
+            variant="primary"
+            className="w-full"
           >
             {saving && <Loader2 size={12} className="animate-spin" />}
             {t("common.save")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -2,6 +2,10 @@ import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/Card";
+import { IconButton } from "@/components/ui/IconButton";
+import { PanelTabs } from "@/components/ui/PanelTabs";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 interface HistoryDetail {
   id: number;
@@ -135,37 +139,23 @@ export function DiffViewer({ left, right, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-[var(--color-card)] border rounded-lg shadow-xl w-[90vw] max-w-[1000px] max-h-[80vh] flex flex-col"
+      <Card
+        className="w-[92vw] max-w-[1060px] max-h-[82vh] flex flex-col p-0 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <div className="flex items-center gap-4">
-            <h3 className="text-sm font-medium">{t("history.diff")}</h3>
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={cn(
-                    "px-2 py-1 text-xs rounded transition-colors",
-                    activeTab === tab.key
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-secondary)]"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--color-secondary)] rounded">
-            <X size={14} />
-          </button>
-        </div>
+        <SectionHeader
+          title={t("history.diff")}
+          className="h-11 px-3 text-xs"
+          right={(
+            <IconButton onClick={onClose} size="sm" title={t("common.close")} aria-label={t("common.close")}>
+              <X size={14} />
+            </IconButton>
+          )}
+        />
+        <PanelTabs tabs={tabs} active={activeTab} onChange={setActiveTab} className="border-b border-[var(--line-soft)] px-2" />
 
-        <div className="flex border-b text-[10px] text-[var(--color-muted-foreground)]">
-          <div className="flex-1 px-3 py-1.5 border-r truncate">
+        <div className="flex border-b border-[var(--line-soft)] text-[10px] text-[var(--text-muted)]">
+          <div className="flex-1 px-3 py-1.5 border-r border-[var(--line-soft)] truncate">
             #{left.id} — {left.serviceName}/{left.methodName} ({left.statusCode}, {left.elapsedMs}ms)
           </div>
           <div className="flex-1 px-3 py-1.5 truncate">
@@ -174,14 +164,14 @@ export function DiffViewer({ left, right, onClose }: Props) {
         </div>
 
         <div className="flex flex-1 min-h-0 overflow-auto">
-          <div className="flex-1 border-r overflow-auto">
-            <pre className="text-[11px] font-mono p-2 leading-5">
+          <div className="flex-1 border-r border-[var(--line-soft)] overflow-auto">
+            <pre className="text-[11px] text-[var(--text-normal)] font-mono p-2 leading-5">
               {diff.left.map((line, i) => (
                 <div
                   key={i}
                   className={cn(
                     "px-1 -mx-1",
-                    line.type === "removed" && "bg-red-500/15 text-red-400",
+                    line.type === "removed" && "bg-[var(--state-error)]/14 text-[var(--state-error)]",
                     line.content === "" && line.type === "same" && "h-5"
                   )}
                 >
@@ -191,13 +181,13 @@ export function DiffViewer({ left, right, onClose }: Props) {
             </pre>
           </div>
           <div className="flex-1 overflow-auto">
-            <pre className="text-[11px] font-mono p-2 leading-5">
+            <pre className="text-[11px] text-[var(--text-normal)] font-mono p-2 leading-5">
               {diff.right.map((line, i) => (
                 <div
                   key={i}
                   className={cn(
                     "px-1 -mx-1",
-                    line.type === "added" && "bg-green-500/15 text-green-400",
+                    line.type === "added" && "bg-[var(--state-success)]/14 text-[var(--state-success)]",
                     line.content === "" && line.type === "same" && "h-5"
                   )}
                 >
@@ -207,7 +197,7 @@ export function DiffViewer({ left, right, onClose }: Props) {
             </pre>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

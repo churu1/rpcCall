@@ -3,6 +3,9 @@ import { RefreshCw, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { scoreFuzzyText } from "@/lib/fuzzy-search";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface Props {
   onSelect: (detail: DecodeHistoryDetail) => void;
@@ -94,52 +97,55 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
   ).sort();
 
   return (
-    <div className={`h-full flex flex-col ${embedded ? "" : "border-l"}`}>
-      <div className="h-8 border-b px-2 flex items-center justify-between text-[11px]">
-        <span className="font-medium text-[var(--color-muted-foreground)] uppercase tracking-wider">
+    <div className={`h-full flex flex-col bg-[var(--surface-1)] ${embedded ? "" : "border-l border-[var(--line-soft)]"}`}>
+      <div className="h-8 border-b border-[var(--line-soft)] px-2 flex items-center justify-between text-[11px]">
+        <span className="font-medium text-[var(--text-muted)] uppercase tracking-wider">
           {t("decode.historyTitle")} ({entries.length})
         </span>
         <div className="flex items-center gap-1">
-          <button
+          <IconButton
+            size="sm"
+            className="h-6 w-6 border-0 bg-transparent"
             onClick={load}
-            className="p-1 hover:bg-[var(--color-secondary)] rounded"
             disabled={loading}
             title={t("services.reload")}
           >
             <RefreshCw size={11} className={cn(loading && "animate-spin")} />
-          </button>
+          </IconButton>
           {entries.length > 0 && (
-            <button
+            <IconButton
+              size="sm"
+              tone="danger"
+              className="h-6 w-6 border-0 bg-transparent"
               onClick={handleClear}
-              className="p-1 hover:bg-[var(--color-secondary)] rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
               title={t("history.clear")}
             >
               <Trash2 size={11} />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
-      <div className="border-b p-2 flex flex-col gap-1.5">
-        <input
+      <div className="border-b border-[var(--line-soft)] p-2 flex flex-col gap-1.5">
+        <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("decode.searchPlaceholder")}
-          className="w-full bg-[var(--color-secondary)] border rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-[var(--color-ring)]"
+          className="w-full text-[11px] h-7"
         />
         <div className="grid grid-cols-2 gap-1">
-          <select
+          <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | "ok" | "failed")}
-            className="bg-[var(--color-secondary)] border rounded px-2 py-1 text-[11px]"
+            className="text-[11px] h-7"
           >
             <option value="all">{t("decode.filterStatusAll")}</option>
             <option value="ok">{t("decode.okUpper")}</option>
             <option value="failed">{t("decode.failUpper")}</option>
-          </select>
-          <select
+          </Select>
+          <Select
             value={encodingFilter}
             onChange={(e) => setEncodingFilter(e.target.value)}
-            className="bg-[var(--color-secondary)] border rounded px-2 py-1 text-[11px]"
+            className="text-[11px] h-7"
           >
             <option value="all">{t("decode.filterEncodingAll")}</option>
             {encodingOptions.map((enc) => (
@@ -147,14 +153,14 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
                 {enc}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
       <div className="flex-1 overflow-auto">
         {filteredEntries.map((entry) => (
           <div
             key={entry.id}
-            className="px-2 py-1.5 border-b text-[11px] hover:bg-[var(--color-secondary)] group cursor-pointer"
+            className="px-2 py-1.5 border-b border-[var(--line-soft)] text-[11px] hover:bg-[var(--surface-2)] group cursor-pointer"
             onClick={() => handleOpen(entry.id)}
           >
             {/** message-first display for decode history */}
@@ -170,14 +176,14 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
                     {entry.success ? (
                       <CheckCircle2 size={11} className="text-green-500" />
                     ) : (
-                      <AlertCircle size={11} className="text-[var(--color-destructive)]" />
+                      <AlertCircle size={11} className="text-[var(--state-error)]" />
                     )}
                     <span className="font-medium truncate">{title}</span>
-                    <span className="ml-auto text-[10px] text-[var(--color-muted-foreground)]">
+                    <span className="ml-auto text-[10px] text-[var(--text-muted)]">
                       {entry.elapsedMs}ms
                     </span>
                   </div>
-                  <div className="mt-0.5 flex items-center text-[10px] text-[var(--color-muted-foreground)]">
+                  <div className="mt-0.5 flex items-center text-[10px] text-[var(--text-muted)]">
                     <span className="truncate max-w-[120px]">{entry.projectName || entry.projectId || "-"}</span>
                     <span className="mx-1">·</span>
                     <span className="truncate">{entry.detectedEncoding || entry.inputEncoding}</span>
@@ -188,7 +194,7 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
                         e.stopPropagation();
                         handleDelete(entry.id);
                       }}
-                      className="ml-auto opacity-0 group-hover:opacity-100 hover:text-[var(--color-destructive)]"
+                      className="ml-auto opacity-0 group-hover:opacity-100 hover:text-[var(--state-error)]"
                     >
                       <Trash2 size={10} />
                     </button>
@@ -199,7 +205,7 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
           </div>
         ))}
         {filteredEntries.length === 0 && (
-          <div className="h-full flex items-center justify-center text-xs text-[var(--color-muted-foreground)]">
+          <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)]">
             {entries.length === 0 ? t("decode.noHistory") : t("decode.noFilteredHistory")}
           </div>
         )}
