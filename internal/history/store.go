@@ -218,6 +218,24 @@ func createTables(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS decode_templates (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			project_id TEXT NOT NULL DEFAULT '',
+			project_name TEXT NOT NULL DEFAULT '',
+			name TEXT NOT NULL DEFAULT '',
+			message_type TEXT NOT NULL DEFAULT '',
+			encoding TEXT NOT NULL DEFAULT 'auto',
+			batch_mode INTEGER NOT NULL DEFAULT 0,
+			payload_text TEXT NOT NULL DEFAULT '',
+			nested_rules_json TEXT NOT NULL DEFAULT '[]'
+		)
+	`)
+	if err != nil {
+		return err
+	}
 
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_created_at ON decode_history(created_at DESC)`)
 	if err != nil {
@@ -228,6 +246,14 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_history_project_id ON decode_history(project_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_templates_project_id ON decode_templates(project_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_decode_templates_updated_at ON decode_templates(updated_at DESC)`)
 	if err != nil {
 		return err
 	}
@@ -1090,6 +1116,20 @@ type DecodeHistoryDetail struct {
 	Warnings    []string                  `json:"warnings"`
 }
 
+type DecodeTemplate struct {
+	ID          int64                     `json:"id"`
+	CreatedAt   string                    `json:"createdAt"`
+	UpdatedAt   string                    `json:"updatedAt"`
+	ProjectID   string                    `json:"projectId"`
+	ProjectName string                    `json:"projectName"`
+	Name        string                    `json:"name"`
+	MessageType string                    `json:"messageType"`
+	Encoding    string                    `json:"encoding"`
+	BatchMode   bool                      `json:"batchMode"`
+	PayloadText string                    `json:"payloadText"`
+	NestedRules []models.NestedDecodeRule `json:"nestedRules"`
+}
+
 func (s *Store) SaveDecodeHistory(req models.DecodeRequest, resp *models.DecodeResponse) error {
 	if resp == nil {
 		return fmt.Errorf("decode response cannot be nil")
@@ -1205,5 +1245,119 @@ func (s *Store) DeleteDecodeHistory(id int64) error {
 
 func (s *Store) ClearDecodeHistory() error {
 	_, err := s.db.Exec("DELETE FROM decode_history")
+	return err
+}
+
+func (s *Store) SaveDecodeTemplate(
+	projectID string,
+	name string,
+	messageType string,
+	encoding string,
+	batchMode bool,
+	payloadText string,
+	nestedRules []models.NestedDecodeRule,
+) (*DecodeTemplate, error) {
+	projectID = strings.TrimSpace(projectID)
+	messageType = strings.TrimSpace(messageType)
+	if projectID == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
+	if messageType == "" {
+		return nil, fmt.Errorf("messageType is required")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = messageType
+	}
+	projectName := ""
+	_ = s.db.QueryRow(`SELECT name FROM proto_projects WHERE id = ?`, projectID).Scan(&projectName)
+	if projectName == "" {
+		projectName = projectID
+	}
+	if strings.TrimSpace(encoding) == "" {
+		encoding = string(models.DecodeEncodingAuto)
+	}
+	rulesJSON, _ := json.Marshal(nestedRules)
+	now := time.Now().Format(time.RFC3339)
+	batchInt := 0
+	if batchMode {
+		batchInt = 1
+	}
+	result, err := s.db.Exec(`
+		INSERT INTO decode_templates (
+			created_at, updated_at, project_id, project_name, name, message_type, encoding, batch_mode, payload_text, nested_rules_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, now, now, projectID, projectName, name, messageType, encoding, batchInt, payloadText, string(rulesJSON))
+	if err != nil {
+		return nil, err
+	}
+	id, _ := result.LastInsertId()
+	return &DecodeTemplate{
+		ID:          id,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		ProjectID:   projectID,
+		ProjectName: projectName,
+		Name:        name,
+		MessageType: messageType,
+		Encoding:    encoding,
+		BatchMode:   batchMode,
+		PayloadText: payloadText,
+		NestedRules: nestedRules,
+	}, nil
+}
+
+func (s *Store) ListDecodeTemplates(projectID string, limit int) ([]DecodeTemplate, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	projectID = strings.TrimSpace(projectID)
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if projectID == "" {
+		rows, err = s.db.Query(`
+			SELECT id, created_at, updated_at, project_id, project_name, name, message_type, encoding, batch_mode, payload_text, nested_rules_json
+			FROM decode_templates
+			ORDER BY updated_at DESC, id DESC
+			LIMIT ?
+		`, limit)
+	} else {
+		rows, err = s.db.Query(`
+			SELECT id, created_at, updated_at, project_id, project_name, name, message_type, encoding, batch_mode, payload_text, nested_rules_json
+			FROM decode_templates
+			WHERE project_id = ?
+			ORDER BY updated_at DESC, id DESC
+			LIMIT ?
+		`, projectID, limit)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	templates := make([]DecodeTemplate, 0)
+	for rows.Next() {
+		var (
+			item     DecodeTemplate
+			batchInt int
+			rulesRaw string
+		)
+		if err := rows.Scan(
+			&item.ID, &item.CreatedAt, &item.UpdatedAt, &item.ProjectID, &item.ProjectName, &item.Name,
+			&item.MessageType, &item.Encoding, &batchInt, &item.PayloadText, &rulesRaw,
+		); err != nil {
+			continue
+		}
+		item.BatchMode = batchInt == 1
+		_ = json.Unmarshal([]byte(rulesRaw), &item.NestedRules)
+		templates = append(templates, item)
+	}
+	return templates, nil
+}
+
+func (s *Store) DeleteDecodeTemplate(id int64) error {
+	_, err := s.db.Exec("DELETE FROM decode_templates WHERE id = ?", id)
 	return err
 }

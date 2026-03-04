@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppStore } from "@/store/app-store";
-import { Plus, Trash2, Play, FolderOpen } from "lucide-react";
+import { Plus, Trash2, Play, FolderOpen, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
@@ -21,8 +21,9 @@ const ENCODINGS: DecodeEncoding[] = ["auto", "hex", "base64", "escape", "raw"];
 
 export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatchTick }: Props) {
   const { t } = useTranslation();
-  const { activeTabId, tabs, protoFiles } = useAppStore();
+  const { activeTabId, tabs, protoFiles, activeProjectId, updateTab } = useAppStore();
   const tab = tabs.find((tt) => tt.id === activeTabId);
+  const currentProjectId = tab?.projectId || activeProjectId || "";
 
   const [explicitMessageType, setExplicitMessageType] = useState("");
   const [encoding, setEncoding] = useState<DecodeEncoding>("auto");
@@ -34,16 +35,51 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
   const [allMessageTypes, setAllMessageTypes] = useState<string[]>([]);
   const [messageFields, setMessageFields] = useState<FieldInfo[]>([]);
   const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [templates, setTemplates] = useState<DecodeTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateName, setTemplateName] = useState("");
 
   useEffect(() => {
-    if (!tab?.projectId) {
+    if (!currentProjectId) {
       setAllMessageTypes([]);
       return;
     }
-    window.go.main.App.GetAllMessageTypes(tab.projectId)
+    window.go.main.App.GetAllMessageTypes(currentProjectId)
       .then((types) => setAllMessageTypes((types ?? []).filter(Boolean)))
       .catch(() => setAllMessageTypes([]));
-  }, [protoFiles, tab?.projectId]);
+  }, [protoFiles, currentProjectId]);
+
+  useEffect(() => {
+    if (!tab?.id || tab.projectId || !activeProjectId) return;
+    updateTab(tab.id, { projectId: activeProjectId });
+  }, [tab?.id, tab?.projectId, activeProjectId, updateTab]);
+
+  const loadTemplates = useCallback(async () => {
+    if (!currentProjectId) {
+      setTemplates([]);
+      setSelectedTemplateId("");
+      return;
+    }
+    try {
+      const items = await window.go.main.App.ListDecodeTemplates(currentProjectId, 200);
+      setTemplates(items || []);
+    } catch {
+      setTemplates([]);
+    }
+  }, [currentProjectId]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  useEffect(() => {
+    setSelectedTemplateId("");
+  }, [currentProjectId]);
+
+  const hasSelectedTemplate = useMemo(
+    () => templates.some((tpl) => String(tpl.id) === selectedTemplateId),
+    [templates, selectedTemplateId]
+  );
 
   const messageOptions = useMemo<MessageOption[]>(
     () =>
@@ -75,16 +111,16 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
       return;
     }
     setFieldsLoading(true);
-    if (!tab?.projectId) {
+    if (!currentProjectId) {
       setMessageFields([]);
       setFieldsLoading(false);
       return;
     }
-    window.go.main.App.GetMessageTypeFields(tab.projectId, explicitMessageType.trim())
+    window.go.main.App.GetMessageTypeFields(currentProjectId, explicitMessageType.trim())
       .then((fields) => setMessageFields(fields ?? []))
       .catch(() => setMessageFields([]))
       .finally(() => setFieldsLoading(false));
-  }, [explicitMessageType, tab?.projectId]);
+  }, [explicitMessageType, currentProjectId]);
 
   useEffect(() => {
     const applyHistory = (e: Event) => {
@@ -110,10 +146,10 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
     }
   }, [tab?.method?.inputTypeName, explicitMessageType]);
 
-  const canDecode = !!explicitMessageType.trim() && !!tab?.projectId;
+  const canDecode = !!explicitMessageType.trim() && !!currentProjectId;
 
   const buildCommon = (): DecodeRequest => ({
-    projectId: tab?.projectId || "",
+    projectId: currentProjectId,
     serviceName: "",
     methodName: "",
     target: "message",
@@ -173,6 +209,67 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
     }
   };
 
+  const applyTemplate = useCallback((tpl: DecodeTemplate) => {
+    setExplicitMessageType(tpl.messageType || "");
+    setEncoding((tpl.encoding as DecodeEncoding) || "auto");
+    setRules(tpl.nestedRules || []);
+    setBatchMode(!!tpl.batchMode);
+    setTemplateName(tpl.name || "");
+    const payload = tpl.payloadText || "";
+    setSinglePayload(payload);
+    setBatchPayload(payload);
+  }, []);
+
+  const handleSaveTemplate = useCallback(async () => {
+    if (!currentProjectId || !explicitMessageType.trim()) return;
+    const name = templateName.trim() || `${explicitMessageType}${batchMode ? " (batch)" : ""}`;
+    try {
+      if (!window.go?.main?.App?.SaveDecodeTemplate) {
+        window.alert("SaveDecodeTemplate API not available, please restart dev/build.");
+        return;
+      }
+      const payload = batchMode ? batchPayload : singlePayload;
+      const created = await window.go.main.App.SaveDecodeTemplate(
+        currentProjectId,
+        name,
+        explicitMessageType,
+        encoding,
+        batchMode,
+        payload,
+        rules
+      );
+      await loadTemplates();
+      if (created?.id) {
+        setSelectedTemplateId(String(created.id));
+      }
+    } catch (e: any) {
+      const msg = typeof e === "string" ? e : (e?.message || String(e));
+      window.alert(`保存模板失败: ${msg}`);
+    }
+  }, [
+    currentProjectId,
+    templateName,
+    explicitMessageType,
+    batchMode,
+    batchPayload,
+    singlePayload,
+    encoding,
+    rules,
+    loadTemplates,
+  ]);
+
+  const handleDeleteTemplate = useCallback(async () => {
+    const id = Number(selectedTemplateId);
+    if (!id) return;
+    try {
+      await window.go.main.App.DeleteDecodeTemplate(id);
+      setSelectedTemplateId("");
+      await loadTemplates();
+    } catch {
+      // ignore
+    }
+  }, [selectedTemplateId, loadTemplates]);
+
   return (
     <div className="h-full flex flex-col min-w-0 p-2 gap-2 bg-[var(--color-background)]" data-decode-panel="true">
       <div className="rounded-lg border bg-[var(--color-card)] p-2 flex flex-col gap-2">
@@ -183,6 +280,53 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
           onChange={(val) => setExplicitMessageType(val)}
           className="w-[430px] max-w-full"
         />
+        <div className="grid grid-cols-[1.2fr_1fr_auto_auto] gap-2 items-center">
+          <select
+            value={selectedTemplateId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedTemplateId(id);
+              const hit = templates.find((tpl) => String(tpl.id) === id);
+              if (hit) applyTemplate(hit);
+            }}
+            className="bg-[var(--color-secondary)] border rounded px-2 py-1.5 text-xs"
+            disabled={!currentProjectId}
+          >
+            <option value="">{t("decode.selectTemplate")}</option>
+            {templates.map((tpl) => (
+              <option key={tpl.id} value={String(tpl.id)}>
+                {tpl.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder={t("decode.templateNamePlaceholder")}
+            className="bg-[var(--color-secondary)] border rounded px-2 py-1.5 text-xs min-w-0"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+          <button
+            onClick={handleSaveTemplate}
+            disabled={!currentProjectId || !explicitMessageType.trim()}
+            className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border hover:bg-[var(--color-secondary)] disabled:opacity-50"
+            title={t("decode.saveTemplate")}
+          >
+            <Save size={12} />
+            {t("decode.saveTemplate")}
+          </button>
+          <button
+            onClick={handleDeleteTemplate}
+            disabled={!hasSelectedTemplate}
+            className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border hover:bg-[var(--color-secondary)] disabled:opacity-50 text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)]"
+            title={t("decode.deleteTemplate")}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
 
         <div className="grid grid-cols-[auto_auto_auto] gap-2 items-center">
           <select

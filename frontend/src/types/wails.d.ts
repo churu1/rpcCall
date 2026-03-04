@@ -266,6 +266,20 @@ declare interface DecodeHistoryDetail extends DecodeHistoryEntry {
   warnings: string[];
 }
 
+declare interface DecodeTemplate {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+  projectId: string;
+  projectName: string;
+  name: string;
+  messageType: string;
+  encoding: DecodeEncoding;
+  batchMode: boolean;
+  payloadText: string;
+  nestedRules: NestedDecodeRule[];
+}
+
 interface Window {
   go: {
     main: {
@@ -341,6 +355,17 @@ interface Window {
         GetDecodeHistoryDetail: (id: number) => Promise<DecodeHistoryDetail | null>;
         DeleteDecodeHistory: (id: number) => Promise<void>;
         ClearDecodeHistory: () => Promise<void>;
+        SaveDecodeTemplate: (
+          projectId: string,
+          name: string,
+          messageType: string,
+          encoding: DecodeEncoding,
+          batchMode: boolean,
+          payloadText: string,
+          nestedRules: NestedDecodeRule[]
+        ) => Promise<DecodeTemplate | null>;
+        ListDecodeTemplates: (projectId: string, limit: number) => Promise<DecodeTemplate[] | null>;
+        DeleteDecodeTemplate: (id: number) => Promise<void>;
       };
     };
   };

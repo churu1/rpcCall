@@ -1059,6 +1059,63 @@ func (a *App) ClearDecodeHistory() error {
 	return a.history.ClearDecodeHistory()
 }
 
+func (a *App) SaveDecodeTemplate(
+	projectID string,
+	name string,
+	messageType string,
+	encoding models.DecodeEncoding,
+	batchMode bool,
+	payloadText string,
+	nestedRules []models.NestedDecodeRule,
+) (*history.DecodeTemplate, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("projectId is required")
+	}
+	item, err := a.history.SaveDecodeTemplate(
+		projectID,
+		name,
+		messageType,
+		string(encoding),
+		batchMode,
+		payloadText,
+		nestedRules,
+	)
+	if err != nil {
+		logger.Error("save decode template failed: %v", err)
+		return nil, err
+	}
+	logger.Info("decode template saved: project=%s name=%s message=%s", projectID, item.Name, item.MessageType)
+	return item, nil
+}
+
+func (a *App) ListDecodeTemplates(projectID string, limit int) ([]history.DecodeTemplate, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	projectID = strings.TrimSpace(projectID)
+	items, err := a.history.ListDecodeTemplates(projectID, limit)
+	if err != nil {
+		logger.Error("list decode templates failed: %v", err)
+		return nil, err
+	}
+	return items, nil
+}
+
+func (a *App) DeleteDecodeTemplate(id int64) error {
+	if a.history == nil {
+		return nil
+	}
+	if err := a.history.DeleteDecodeTemplate(id); err != nil {
+		logger.Error("delete decode template failed: id=%d err=%v", id, err)
+		return err
+	}
+	return nil
+}
+
 func (a *App) ExportWorkspace() (string, error) {
 	if a.history == nil {
 		return "", fmt.Errorf("history store not available")
