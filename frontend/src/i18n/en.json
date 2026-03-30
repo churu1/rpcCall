@@ -12,7 +12,12 @@
   "http": {
     "urlPlaceholder": "https://api.example.com",
     "newRequest": "New HTTP Request",
-    "addHeader": "Add header"
+    "addHeader": "Add header",
+    "importCurl": "Import cURL",
+    "importCurlHint": "Paste a curl command to fill method, URL, headers and body.",
+    "import": "Import",
+    "curlEmpty": "Paste a curl command first",
+    "curlParseError": "Failed to parse curl command"
   },
   "addressBar": {
     "send": "Send",

@@ -12,7 +12,12 @@
   "http": {
     "urlPlaceholder": "https://api.example.com",
     "newRequest": "新建 HTTP 请求",
-    "addHeader": "添加请求头"
+    "addHeader": "添加请求头",
+    "importCurl": "导入 cURL",
+    "importCurlHint": "粘贴 curl 命令，将自动填充方法、URL、请求头和请求体。",
+    "import": "导入",
+    "curlEmpty": "请先粘贴 curl 命令",
+    "curlParseError": "无法解析 curl 命令"
   },
   "addressBar": {
     "send": "发送",

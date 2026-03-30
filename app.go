@@ -16,6 +16,7 @@ import (
 	"rpccall/internal/ai"
 	grpclib "rpccall/internal/grpc"
 	"rpccall/internal/history"
+	"rpccall/internal/curl"
 	"rpccall/internal/httpclient"
 	"rpccall/internal/logger"
 	"rpccall/internal/models"
@@ -302,7 +303,11 @@ func (a *App) resolveEnvVariablesForHttp(req *models.HttpRequest) {
 func (a *App) InvokeHttp(req models.HttpRequest) (*models.HttpResponse, error) {
 	a.resolveEnvVariablesForHttp(&req)
 	logger.Info("InvokeHttp: %s %s", req.Method, req.URL)
-	return httpclient.Do(req)
+	resp, err := httpclient.Do(req)
+	if err == nil && resp != nil && a.history != nil {
+		a.history.SaveHttp(req, *resp)
+	}
+	return resp, err
 }
 
 func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error) {
@@ -412,6 +417,40 @@ func (a *App) ClearHistory() error {
 		return nil
 	}
 	return a.history.ClearAll()
+}
+
+func (a *App) GetHttpHistory(limit int) ([]history.HttpHistoryEntry, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.ListHttp(limit)
+}
+
+func (a *App) GetHttpHistoryDetail(id int64) (*history.HttpHistoryDetail, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.GetHttpDetail(id)
+}
+
+func (a *App) DeleteHttpHistory(id int64) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.DeleteHttp(id)
+}
+
+func (a *App) ClearHttpHistory() error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.ClearHttpAll()
+}
+
+// ParseCurlToHttpRequest parses a curl command string and returns an HttpRequest.
+// Example: curl -X POST 'https://api.example.com' -H 'Content-Type: application/json' -d '{"key":"value"}'
+func (a *App) ParseCurlToHttpRequest(curlCommand string) (*models.HttpRequest, error) {
+	return curl.ParseCurl(curlCommand)
 }
 
 // --- Saved Addresses ---

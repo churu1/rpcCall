@@ -17,6 +17,7 @@ import { SaveRequestDialog } from "@/components/collection/SaveRequestDialog";
 import { ShortcutsPanel } from "@/components/shortcuts/ShortcutsPanel";
 import { AISettingsPanel } from "@/components/ai/AISettingsPanel";
 import { HelpPanel } from "@/components/help/HelpPanel";
+import { ImportCurlDialog } from "@/components/http/ImportCurlDialog";
 
 export function AppLayout() {
   const { sidebarWidth, setSidebarWidth } = useAppStore();
@@ -49,6 +50,8 @@ export function AppLayout() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showImportCurl, setShowImportCurl] = useState(false);
+  const [importCurlTabId, setImportCurlTabId] = useState<string | null>(null);
 
   const toggleLang = useCallback(() => {
     const next = i18n.language === "zh" ? "en" : "zh";
@@ -61,15 +64,22 @@ export function AppLayout() {
     const onSaveRequest = () => setShowSaveRequest(true);
     const onShowShortcuts = () => setShowShortcuts(true);
     const onAISettings = () => setShowAISettings(true);
+    const onImportCurl = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tabId?: string } | undefined>;
+      setImportCurlTabId(customEvent.detail?.tabId ?? null);
+      setShowImportCurl(true);
+    };
     document.addEventListener("rpccall:manage-envs", onManageEnvs);
     document.addEventListener("rpccall:save-request", onSaveRequest);
     document.addEventListener("rpccall:show-shortcuts", onShowShortcuts);
     document.addEventListener("rpccall:ai-settings", onAISettings);
+    document.addEventListener("rpccall:import-curl", onImportCurl);
     return () => {
       document.removeEventListener("rpccall:manage-envs", onManageEnvs);
       document.removeEventListener("rpccall:save-request", onSaveRequest);
       document.removeEventListener("rpccall:show-shortcuts", onShowShortcuts);
       document.removeEventListener("rpccall:ai-settings", onAISettings);
+      document.removeEventListener("rpccall:import-curl", onImportCurl);
     };
   }, []);
 
@@ -81,6 +91,12 @@ export function AppLayout() {
       {showShortcuts && <ShortcutsPanel onClose={() => setShowShortcuts(false)} />}
       {showAISettings && <AISettingsPanel onClose={() => setShowAISettings(false)} />}
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {showImportCurl && (
+        <ImportCurlDialog
+          tabId={importCurlTabId}
+          onClose={() => { setShowImportCurl(false); setImportCurlTabId(null); }}
+        />
+      )}
       {/* Drag region for macOS title bar */}
       <div
         className="h-8 bg-[var(--color-card)] flex items-center justify-center text-xs text-[var(--color-muted-foreground)] select-none relative"

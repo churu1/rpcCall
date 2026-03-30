@@ -146,6 +146,26 @@ func createTables(db *sql.DB) error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS http_history (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp TEXT NOT NULL,
+			method TEXT NOT NULL,
+			url TEXT NOT NULL,
+			request_headers TEXT NOT NULL DEFAULT '[]',
+			request_body TEXT NOT NULL DEFAULT '',
+			response_status_code INTEGER NOT NULL DEFAULT 0,
+			response_status TEXT NOT NULL DEFAULT '',
+			response_headers TEXT NOT NULL DEFAULT '[]',
+			response_body TEXT NOT NULL DEFAULT '',
+			elapsed_ms INTEGER NOT NULL DEFAULT 0,
+			error_msg TEXT NOT NULL DEFAULT ''
+		)
+	`)
 	return err
 }
 
@@ -265,6 +285,109 @@ func (s *Store) Delete(id int64) error {
 
 func (s *Store) ClearAll() error {
 	_, err := s.db.Exec("DELETE FROM history")
+	return err
+}
+
+// --- HTTP History ---
+
+func (s *Store) SaveHttp(req models.HttpRequest, resp models.HttpResponse) error {
+	reqHeadersJSON, err := json.Marshal(req.Headers)
+	if err != nil {
+		reqHeadersJSON = []byte("[]")
+	}
+	respHeadersJSON, err := json.Marshal(resp.Headers)
+	if err != nil {
+		respHeadersJSON = []byte("[]")
+	}
+	_, err = s.db.Exec(`
+		INSERT INTO http_history (timestamp, method, url, request_headers, request_body,
+			response_status_code, response_status, response_headers, response_body, elapsed_ms, error_msg)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		time.Now().Format(time.RFC3339),
+		req.Method,
+		req.URL,
+		string(reqHeadersJSON),
+		req.Body,
+		resp.StatusCode,
+		resp.Status,
+		string(respHeadersJSON),
+		resp.Body,
+		resp.ElapsedMs,
+		resp.Error,
+	)
+	return err
+}
+
+type HttpHistoryEntry struct {
+	ID         int64  `json:"id"`
+	Timestamp  string `json:"timestamp"`
+	Method     string `json:"method"`
+	URL        string `json:"url"`
+	StatusCode int    `json:"statusCode"`
+	ElapsedMs  int64  `json:"elapsedMs"`
+	Error      string `json:"error,omitempty"`
+}
+
+type HttpHistoryDetail struct {
+	HttpHistoryEntry
+	RequestHeaders  []models.MetadataEntry `json:"requestHeaders"`
+	RequestBody     string                `json:"requestBody"`
+	ResponseStatus  string               `json:"responseStatus"`
+	ResponseHeaders []models.MetadataEntry `json:"responseHeaders"`
+	ResponseBody    string                `json:"responseBody"`
+}
+
+func (s *Store) ListHttp(limit int) ([]HttpHistoryEntry, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.Query(`
+		SELECT id, timestamp, method, url, response_status_code, elapsed_ms, error_msg
+		FROM http_history
+		ORDER BY id DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var entries []HttpHistoryEntry
+	for rows.Next() {
+		var e HttpHistoryEntry
+		if err := rows.Scan(&e.ID, &e.Timestamp, &e.Method, &e.URL, &e.StatusCode, &e.ElapsedMs, &e.Error); err != nil {
+			continue
+		}
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+func (s *Store) GetHttpDetail(id int64) (*HttpHistoryDetail, error) {
+	row := s.db.QueryRow(`
+		SELECT id, timestamp, method, url, request_headers, request_body,
+			response_status_code, response_status, response_headers, response_body, elapsed_ms, error_msg
+		FROM http_history WHERE id = ?
+	`, id)
+	var d HttpHistoryDetail
+	var reqHeaders, respHeaders string
+	err := row.Scan(&d.ID, &d.Timestamp, &d.Method, &d.URL, &reqHeaders, &d.RequestBody,
+		&d.StatusCode, &d.ResponseStatus, &respHeaders, &d.ResponseBody, &d.ElapsedMs, &d.Error)
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal([]byte(reqHeaders), &d.RequestHeaders)
+	json.Unmarshal([]byte(respHeaders), &d.ResponseHeaders)
+	return &d, nil
+}
+
+func (s *Store) DeleteHttp(id int64) error {
+	_, err := s.db.Exec("DELETE FROM http_history WHERE id = ?", id)
+	return err
+}
+
+func (s *Store) ClearHttpAll() error {
+	_, err := s.db.Exec("DELETE FROM http_history")
 	return err
 }
 

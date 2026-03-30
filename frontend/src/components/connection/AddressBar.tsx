@@ -4,7 +4,7 @@ import { useAppStore, type MethodType, HTTP_METHODS } from "@/store/app-store";
 import { useGrpc } from "@/hooks/useGrpc";
 import { useHttp } from "@/hooks/useHttp";
 import { cn } from "@/lib/utils";
-import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save } from "lucide-react";
+import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save, Terminal } from "lucide-react";
 
 interface SavedAddress {
   id: number;
@@ -192,6 +192,15 @@ export function AddressBar() {
               title={t("addressBar.selectAddress")}
             >
               <ChevronDown size={14} className={cn("text-[var(--color-muted-foreground)] transition-transform", showDropdown && "rotate-180")} />
+            </button>
+          )}
+          {isHttp && (
+            <button
+              onClick={() => document.dispatchEvent(new CustomEvent("rpccall:import-curl", { detail: { tabId: tab.id } }))}
+              className="ml-1 p-1.5 rounded-md hover:bg-[var(--color-accent)] transition-colors text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              title={t("http.importCurl")}
+            >
+              <Terminal size={14} />
             </button>
           )}
           <button

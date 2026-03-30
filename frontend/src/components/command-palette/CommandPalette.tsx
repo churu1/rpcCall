@@ -104,6 +104,16 @@ export function CommandPalette() {
         action: () => { addTab(undefined, "http"); close(); },
       },
       {
+        id: "import-curl",
+        label: t("http.importCurl"),
+        category: "HTTP",
+        icon: <Globe size={14} />,
+        action: () => {
+          document.dispatchEvent(new CustomEvent("rpccall:import-curl"));
+          close();
+        },
+      },
+      {
         id: "invoke",
         label: t("command.invoke"),
         category: "GRPC",

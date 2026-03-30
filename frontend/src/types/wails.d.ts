@@ -58,6 +58,31 @@ declare interface HttpResponse {
   error?: string;
 }
 
+declare interface HttpHistoryEntry {
+  id: number;
+  timestamp: string;
+  method: string;
+  url: string;
+  statusCode: number;
+  elapsedMs: number;
+  error?: string;
+}
+
+declare interface HttpHistoryDetail {
+  id: number;
+  timestamp: string;
+  method: string;
+  url: string;
+  statusCode: number;
+  elapsedMs: number;
+  error?: string;
+  requestHeaders: { key: string; value: string }[];
+  requestBody: string;
+  responseStatus: string;
+  responseHeaders: { key: string; value: string }[];
+  responseBody: string;
+}
+
 declare interface BenchmarkVariable {
   name: string;
   type: 'sequence' | 'random_int' | 'random_string' | 'list';
@@ -189,6 +214,11 @@ interface Window {
         InvokeServerStream: (req: GrpcRequest) => Promise<void>;
         InvokeBidiStream: (req: GrpcRequest) => Promise<void>;
         InvokeHttp: (req: HttpRequest) => Promise<HttpResponse>;
+        GetHttpHistory: (limit: number) => Promise<HttpHistoryEntry[] | null>;
+        GetHttpHistoryDetail: (id: number) => Promise<HttpHistoryDetail | null>;
+        DeleteHttpHistory: (id: number) => Promise<void>;
+        ClearHttpHistory: () => Promise<void>;
+        ParseCurlToHttpRequest: (curlCommand: string) => Promise<HttpRequest>;
         SelectCertFile: () => Promise<string>;
         GetHistory: (limit: number) => Promise<any[]>;
         GetHistoryDetail: (id: number) => Promise<any>;
