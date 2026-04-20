@@ -17,6 +17,7 @@ export function DecodeResultPanel() {
   const [jsonViewMode, setJsonViewMode] = useState<"tree" | "raw">("tree");
   const [rawTagsExpanded, setRawTagsExpanded] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [activeBatchIndex, setActiveBatchIndex] = useState<number | null>(null);
   const [diff, setDiff] = useState<{ leftTitle: string; rightTitle: string; leftText: string; rightText: string } | null>(null);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function DecodeResultPanel() {
       setResult(custom.detail?.result ?? null);
       setBatchResult(custom.detail?.batchResult ?? null);
       setSelectedItems(new Set());
+      setActiveBatchIndex(custom.detail?.batchResult?.results?.[0]?.index ?? null);
       setRightView("result");
     };
     window.addEventListener("rpccall:decode-output", onOutput as EventListener);
@@ -60,6 +62,8 @@ export function DecodeResultPanel() {
       rightText: right.json || right.error || "",
     });
   };
+
+  const activeBatchItem = batchResult?.results.find((item) => item.index === activeBatchIndex) ?? batchResult?.results?.[0] ?? null;
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -105,11 +109,14 @@ export function DecodeResultPanel() {
         ) : (
           <>
             {batchResult ? (
-              <div className="h-full flex flex-col">
-                <div className="px-2 py-1 border-b text-[11px] flex items-center gap-2">
+              <div className="h-full flex flex-col min-h-0">
+                <div className="px-2 py-1 border-b text-[11px] flex items-center gap-2 shrink-0">
                   <span>{t("decode.total")} {batchResult.total}</span>
                   <span className="text-[var(--state-success)]">{t("decode.ok")} {batchResult.success}</span>
                   <span className="text-[var(--state-error)]">{t("decode.failed")} {batchResult.failed}</span>
+                  {selectedItems.size !== 2 && (
+                    <span className="text-[10px] text-[var(--text-muted)]">{t("decode.compare")}：2</span>
+                  )}
                   <Button
                     onClick={compareSelected}
                     disabled={selectedItems.size !== 2}
@@ -120,41 +127,100 @@ export function DecodeResultPanel() {
                     <GitCompareArrows size={11} /> {t("decode.compare")}
                   </Button>
                 </div>
-                <div className="flex-1 overflow-auto">
-                  {batchResult.results.map((item) => {
-                    const selected = selectedItems.has(item.index);
-                    return (
-                      <div
-                        key={item.index}
-                        className={`p-2 border-b border-[var(--line-soft)] cursor-pointer ${selected ? "bg-[var(--state-info)]/10" : "hover:bg-[var(--surface-1)]"}`}
-                        onClick={() => {
-                          setSelectedItems((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(item.index)) next.delete(item.index);
-                            else if (next.size < 2) next.add(item.index);
-                            else {
-                              const [first] = Array.from(next);
-                              next.delete(first);
-                              next.add(item.index);
-                            }
-                            return next;
-                          });
-                        }}
-                      >
-                        <div className="text-[11px] flex items-center gap-2">
-                          <span>#{item.index + 1}</span>
-                          <span className={item.ok ? "text-[var(--state-success)]" : "text-[var(--state-error)]"}>
-                            {item.ok ? t("decode.okUpper") : t("decode.failUpper")}
-                          </span>
-                          <span className="text-[var(--text-muted)]">{item.detectedEncoding}</span>
-                          <span className="ml-auto text-[var(--text-muted)]">{item.elapsedMs}ms</span>
+                <div className="flex-1 min-h-0 grid grid-cols-[minmax(220px,40%)_1fr]">
+                  <div className="border-r border-[var(--line-soft)] overflow-auto">
+                    {batchResult.results.map((item) => {
+                      const selected = selectedItems.has(item.index);
+                      const active = activeBatchItem?.index === item.index;
+                      return (
+                        <div
+                          key={item.index}
+                          className={`p-2 border-b border-[var(--line-soft)] cursor-pointer ${active ? "bg-[var(--state-info)]/12" : "hover:bg-[var(--surface-1)]"}`}
+                          onClick={() => setActiveBatchIndex(item.index)}
+                        >
+                          <div className="text-[11px] flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedItems((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(item.index)) next.delete(item.index);
+                                  else if (next.size < 2) next.add(item.index);
+                                  else {
+                                    const [first] = Array.from(next);
+                                    next.delete(first);
+                                    next.add(item.index);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="shrink-0"
+                            />
+                            <span>#{item.index + 1}</span>
+                            <span className={item.ok ? "text-[var(--state-success)]" : "text-[var(--state-error)]"}>
+                              {item.ok ? t("decode.okUpper") : t("decode.failUpper")}
+                            </span>
+                            <span className="text-[var(--text-muted)]">{item.detectedEncoding}</span>
+                            <span className="ml-auto text-[var(--text-muted)]">{item.elapsedMs}ms</span>
+                          </div>
+                          <pre className="mt-1 text-[11px] whitespace-pre-wrap text-[var(--text-muted)] max-h-[62px] overflow-auto">
+                            {item.ok ? item.json : `[${item.errorCode}] ${item.error}`}
+                          </pre>
                         </div>
-                        <pre className="mt-1 text-[11px] whitespace-pre-wrap text-[var(--text-muted)] max-h-[90px] overflow-auto">
-                          {item.ok ? item.json : `[${item.errorCode}] ${item.error}`}
-                        </pre>
+                      );
+                    })}
+                  </div>
+                  <div className="min-h-0 flex flex-col">
+                    {activeBatchItem ? (
+                      <>
+                        <div className="px-2 py-1 border-b border-[var(--line-soft)] flex items-center gap-2 text-[11px] shrink-0">
+                          <span>#{activeBatchItem.index + 1}</span>
+                          <span className={activeBatchItem.ok ? "text-[var(--state-success)]" : "text-[var(--state-error)]"}>
+                            {activeBatchItem.ok ? t("decode.okUpper") : t("decode.failUpper")}
+                          </span>
+                          <Badge>{activeBatchItem.detectedEncoding}</Badge>
+                          <PanelTabs
+                            tabs={[
+                              { key: "tree", label: t("response.tree") },
+                              { key: "raw", label: t("response.raw") },
+                            ]}
+                            active={jsonViewMode}
+                            onChange={setJsonViewMode}
+                            className="px-0 py-0"
+                          />
+                          <Button
+                            className="ml-auto"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigator.clipboard.writeText(activeBatchItem.ok ? activeBatchItem.json || "" : `[${activeBatchItem.errorCode}] ${activeBatchItem.error || ""}`)}
+                          >
+                            <Copy size={10} /> {t("decode.copy")}
+                          </Button>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-auto">
+                          {activeBatchItem.ok ? (
+                            jsonViewMode === "tree" ? (
+                              <JsonTreeViewer json={activeBatchItem.json || ""} />
+                            ) : (
+                              <pre className="text-xs font-mono p-2 whitespace-pre-wrap text-[var(--text-normal)]">
+                                <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(activeBatchItem.json || "") }} />
+                              </pre>
+                            )
+                          ) : (
+                            <div className="p-2 text-xs text-[var(--state-error)]">
+                              [{activeBatchItem.errorCode || t("decode.error")}] {activeBatchItem.error || t("decode.decodeFailed")}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)]">
+                        {t("decode.resultPlaceholder")}
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
                 </div>
               </div>
             ) : result ? (

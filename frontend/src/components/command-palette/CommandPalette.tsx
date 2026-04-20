@@ -379,9 +379,21 @@ export function CommandPalette() {
     setSelectedIndex(0);
   }, [query, searchAllProjects, scopedProjectId]);
 
-  const openMethod = useCallback((item: MethodItem) => {
+  const openMethod = useCallback(async (item: MethodItem) => {
     const tabId = addTab(item.method);
     updateTab(tabId, { projectId: item.projectId });
+    try {
+      const template = await window.go.main.App.GetMethodTemplate(
+        item.projectId,
+        item.method.serviceName,
+        item.method.methodName
+      );
+      if (template) {
+        updateTab(tabId, { requestBody: template });
+      }
+    } catch {
+      // keep default body if template generation fails
+    }
     close();
   }, [addTab, updateTab, close]);
 
