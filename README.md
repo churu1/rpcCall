@@ -16,11 +16,25 @@
 
 ## 界面截图
 
-> 当前进程无 macOS「屏幕录制」权限，未能自动生成截图。把对应图片放到 `docs/images/` 下并取消下方注释即可展示（建议宽度 1280）。
+<div align="center">
 
-<!-- ![主界面 - gRPC 调用](docs/images/main.png) -->
-<!-- ![压测面板](docs/images/benchmark.png) -->
-<!-- ![Payload 解码](docs/images/decode.png) -->
+![主界面 - gRPC 一元调用](docs/images/overview.png)
+
+</div>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/benchmark.png" alt="压力测试" /><p align="center"><b>压力测试</b></p></td>
+<td width="50%"><img src="docs/images/decode.png" alt="Payload 解码" /><p align="center"><b>Payload 解码</b></p></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/images/chain.png" alt="链式调用" /><p align="center"><b>链式调用</b></p></td>
+<td width="50%"><img src="docs/images/mock.png" alt="Mock 服务器" /><p align="center"><b>Mock 服务器</b></p></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/images/command-palette.png" alt="命令面板" /><p align="center"><b>命令面板（⌘K）</b></p></td>
+</tr>
+</table>
 
 ---
 
