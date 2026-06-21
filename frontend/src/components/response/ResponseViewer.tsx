@@ -321,7 +321,7 @@ export function ResponseViewer() {
             viewMode === "tree" ? (
               <JsonTreeViewer json={tab.responseBody} />
             ) : (
-              <pre ref={preRef} className="text-sm p-3 font-[var(--font-mono)] leading-relaxed whitespace-pre-wrap">
+              <pre ref={preRef} className="text-[var(--rpccall-json-font-size)] p-3 font-[var(--font-mono)] leading-relaxed whitespace-pre-wrap">
                 {showSearch && searchMatches.length > 0 ? (
                   <HighlightedText
                     text={tab.responseBody}
@@ -395,7 +395,7 @@ function ChainResultsView({ results }: { results: ChainStepResult[] }) {
             </span>
           </div>
           {expanded.has(r.index) && (
-            <pre className="px-3 py-2 text-xs font-[var(--font-mono)] bg-[var(--surface-1)] border-t border-[var(--line-soft)] whitespace-pre-wrap overflow-auto max-h-[300px] leading-relaxed">
+            <pre className="px-3 py-2 text-[var(--rpccall-json-font-size)] font-[var(--font-mono)] bg-[var(--surface-1)] border-t border-[var(--line-soft)] whitespace-pre-wrap overflow-auto max-h-[300px] leading-relaxed">
               {r.error ? (
                 <span className="text-[var(--state-error)]">{r.error}</span>
               ) : r.body ? (

@@ -38,7 +38,7 @@ export function JsonEditor({ value, onChange, placeholder, readOnly }: JsonEdito
       preClassName="json-editor-pre"
       style={{
         fontFamily: 'var(--font-mono)',
-        fontSize: 13,
+        fontSize: 'var(--rpccall-json-font-size)',
         lineHeight: '1.6',
         minHeight: '100%',
       }}

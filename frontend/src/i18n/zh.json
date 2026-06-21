@@ -45,6 +45,7 @@
   "editor": {
     "format": "格式化",
     "minify": "压缩",
+    "jsonParseError": "JSON 解析失败：{{detail}}",
     "placeholder": "{\n  \"field\": \"value\"\n}"
   },
   "response": {

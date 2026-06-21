@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
 import { mergeMetadata } from "@/lib/metadata-profile";
 
+function getJsonParseErrorMessage(error: unknown, t: (key: string, options?: Record<string, unknown>) => string) {
+  const detail = error instanceof Error ? error.message : String(error);
+  return t("editor.jsonParseError", { detail });
+}
+
 export function useGrpc() {
+  const { t } = useTranslation();
   const { activeTabId, tabs, updateTab } = useAppStore();
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -17,6 +24,25 @@ export function useGrpc() {
   const send = useCallback(async () => {
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab || !tab.method || !tab.projectId) return;
+
+    try {
+      JSON.parse(tab.requestBody);
+    } catch (error) {
+      const message = getJsonParseErrorMessage(error, t);
+      window.dispatchEvent(new CustomEvent("rpccall:request-json-error", {
+        detail: { tabId: tab.id, message },
+      }));
+      updateTab(tab.id, {
+        isLoading: false,
+        responseBody: `Error: ${message}`,
+        responseMetadata: [],
+        responseTrailers: [],
+        statusCode: "ERROR",
+        elapsedMs: null,
+        timing: null,
+      });
+      return;
+    }
 
     updateTab(tab.id, {
       isLoading: true,
@@ -112,13 +138,14 @@ export function useGrpc() {
         }
       }
     } catch (e: any) {
+      const message = e instanceof Error ? e.message : String(e);
       updateTab(tab.id, {
         isLoading: false,
-        responseBody: `Error: ${e?.message || "Unknown error"}`,
+        responseBody: `Error: ${message}`,
         statusCode: "ERROR",
       });
     }
-  }, [activeTabId, tabs, updateTab]);
+  }, [activeTabId, tabs, updateTab, t]);
 
   return { send };
 }

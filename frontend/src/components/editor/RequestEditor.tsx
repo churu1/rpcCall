@@ -29,6 +29,11 @@ function parseJsonToEntries(json: string): MetadataEntry[] | null {
   }
 }
 
+function getJsonParseErrorMessage(error: unknown, t: (key: string, options?: Record<string, unknown>) => string) {
+  const detail = error instanceof Error ? error.message : String(error);
+  return t("editor.jsonParseError", { detail });
+}
+
 function entriesToJson(entries: MetadataEntry[]): string {
   const obj: Record<string, string> = {};
   for (const e of entries) {
@@ -69,13 +74,18 @@ function MetadataTable({
   };
 
   const applyJson = () => {
-    const parsed = parseJsonToEntries(jsonText);
-    if (parsed) {
+    try {
+      JSON.parse(jsonText);
+      const parsed = parseJsonToEntries(jsonText);
+      if (!parsed) {
+        setJsonError(t("metadata.invalidJson"));
+        return;
+      }
       onChange(parsed);
       setJsonError(null);
       setJsonMode(false);
-    } else {
-      setJsonError(t("metadata.invalidJson"));
+    } catch (error) {
+      setJsonError(getJsonParseErrorMessage(error, t));
     }
   };
 
@@ -84,7 +94,9 @@ function MetadataTable({
       const formatted = JSON.stringify(JSON.parse(jsonText), null, 2);
       setJsonText(formatted);
       setJsonError(null);
-    } catch { /* ignore */ }
+    } catch (error) {
+      setJsonError(getJsonParseErrorMessage(error, t));
+    }
   };
 
   const handleJsonMinify = () => {
@@ -92,7 +104,9 @@ function MetadataTable({
       const minified = JSON.stringify(JSON.parse(jsonText));
       setJsonText(minified);
       setJsonError(null);
-    } catch { /* ignore */ }
+    } catch (error) {
+      setJsonError(getJsonParseErrorMessage(error, t));
+    }
   };
 
   if (jsonMode) {
@@ -235,6 +249,7 @@ export function RequestEditor() {
   const [acFilter, setAcFilter] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [bodyJsonError, setBodyJsonError] = useState<string | null>(null);
 
   const handleHighlight = useCallback((_matches: SearchMatch[], _currentIndex: number) => {
     // For textarea, highlighting is done via setSelectionRange in onScrollTo
@@ -265,6 +280,7 @@ export function RequestEditor() {
         const newBody =
           tab.requestBody.slice(0, start) + insert + tab.requestBody.slice(end);
         updateTab(tab.id, { requestBody: newBody });
+        setBodyJsonError(null);
         requestAnimationFrame(() => {
           el.focus();
           const newPos = start + insert.length;
@@ -340,6 +356,19 @@ export function RequestEditor() {
     }));
   }, [activePanel]);
 
+  useEffect(() => {
+    const handleRequestJsonError = (event: Event) => {
+      const custom = event as CustomEvent<{ tabId?: string; message?: string }>;
+      if (!custom.detail?.message || custom.detail.tabId !== activeTabId) return;
+      setActivePanel("body");
+      setBodyJsonError(custom.detail.message);
+    };
+    window.addEventListener("rpccall:request-json-error", handleRequestJsonError as EventListener);
+    return () => {
+      window.removeEventListener("rpccall:request-json-error", handleRequestJsonError as EventListener);
+    };
+  }, [activeTabId]);
+
   if (!tab) return null;
 
   const panels = [
@@ -355,14 +384,20 @@ export function RequestEditor() {
     try {
       const formatted = JSON.stringify(JSON.parse(tab.requestBody), null, 2);
       updateTab(tab.id, { requestBody: formatted });
-    } catch { /* ignore invalid JSON */ }
+      setBodyJsonError(null);
+    } catch (error) {
+      setBodyJsonError(getJsonParseErrorMessage(error, t));
+    }
   };
 
   const handleMinify = () => {
     try {
       const minified = JSON.stringify(JSON.parse(tab.requestBody));
       updateTab(tab.id, { requestBody: minified });
-    } catch { /* ignore invalid JSON */ }
+      setBodyJsonError(null);
+    } catch (error) {
+      setBodyJsonError(getJsonParseErrorMessage(error, t));
+    }
   };
 
   const handleMetadataFormat = () => {
@@ -452,6 +487,11 @@ export function RequestEditor() {
           AI: {aiError}
         </div>
       )}
+      {activePanel === "body" && bodyJsonError && (
+        <div className="px-3 py-1.5 text-[11px] text-[var(--state-error)] bg-[var(--state-error)]/10 border-b border-[var(--line-soft)]">
+          {bodyJsonError}
+        </div>
+      )}
       {activePanel === "body" && (
         <SearchBar
           visible={showSearch}
@@ -465,7 +505,10 @@ export function RequestEditor() {
         {activePanel === "body" ? (
           <JsonEditor
             value={tab.requestBody}
-            onChange={(val) => updateTab(tab.id, { requestBody: val })}
+            onChange={(nextValue) => {
+              updateTab(tab.id, { requestBody: nextValue });
+              setBodyJsonError(null);
+            }}
             placeholder='{\n  "field": "value"\n}'
           />
         ) : activePanel === "metadata" ? (

@@ -57,6 +57,13 @@
 
   --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
   --app-font-scale: 1;
+  --rpccall-text-8: 8px;
+  --rpccall-text-10: 10px;
+  --rpccall-text-11: 11px;
+  --rpccall-text-12: 12px;
+  --rpccall-text-13: 13px;
+  --rpccall-text-14: 14px;
+  --rpccall-json-font-size: calc(var(--rpccall-text-13) * var(--app-font-scale));
 }
 
 * {
@@ -93,6 +100,16 @@ body {
   overflow: hidden;
   height: 100vh;
 }
+
+.text-\[8px\] { font-size: calc(var(--rpccall-text-8) * var(--app-font-scale)); }
+.text-\[9px\] { font-size: calc(9px * var(--app-font-scale)); }
+.text-\[10px\] { font-size: calc(var(--rpccall-text-10) * var(--app-font-scale)); }
+.text-\[11px\] { font-size: calc(var(--rpccall-text-11) * var(--app-font-scale)); }
+.text-\[12px\] { font-size: calc(var(--rpccall-text-12) * var(--app-font-scale)); }
+.text-\[13px\] { font-size: calc(var(--rpccall-text-13) * var(--app-font-scale)); }
+.text-\[14px\] { font-size: calc(var(--rpccall-text-14) * var(--app-font-scale)); }
+
+.min-h-\[33px\] { min-height: calc(33px * var(--app-font-scale)); }
 
 #root {
   height: 100vh;
@@ -175,13 +192,13 @@ button:focus-visible {
 }
 
 .ui-input {
-  height: 30px;
+  height: calc(30px * var(--app-font-scale));
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 0 10px;
   color: var(--text-normal);
-  font-size: 12px;
+  font-size: calc(12px * var(--app-font-scale));
 }
 
 .ui-input::placeholder {
@@ -189,13 +206,13 @@ button:focus-visible {
 }
 
 .ui-btn {
-  height: 30px;
+  min-height: calc(30px * var(--app-font-scale));
   border-radius: 8px;
   border: 1px solid var(--line-strong);
   background: var(--surface-2);
   color: var(--text-normal);
   padding: 0 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--app-font-scale));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -221,7 +238,7 @@ button:focus-visible {
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-2) 82%, black 18%);
   padding: 1px 8px;
-  font-size: 10px;
+  font-size: calc(10px * var(--app-font-scale));
   line-height: 1.5;
   color: var(--text-muted);
 }

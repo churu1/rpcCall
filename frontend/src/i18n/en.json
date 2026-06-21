@@ -45,6 +45,7 @@
   "editor": {
     "format": "Format",
     "minify": "Minify",
+    "jsonParseError": "JSON parse failed: {{detail}}",
     "placeholder": "{\n  \"field\": \"value\"\n}"
   },
   "response": {
