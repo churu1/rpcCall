@@ -140,6 +140,9 @@
     "editing": "Editing",
     "search": "Find Text",
     "runDecode": "Run Decode (in Decode panel)",
+    "increaseFont": "Increase UI font size",
+    "decreaseFont": "Decrease UI font size",
+    "resetFont": "Reset UI font size",
     "indent": "Insert Indent (2 spaces)",
     "closeSearch": "Close Search / Dialog",
     "navigation": "Navigation",
@@ -338,7 +341,7 @@
     "diff": "Request Diff",
     "diffDesc": "⌘+Click two history records (marked A/B), then click Compare to view line-by-line diffs of request body, response body, and metadata.",
     "theme": "Theme & Language",
-    "themeDesc": "Toggle dark/light theme and switch between Chinese/English from the title bar icons."
+    "themeDesc": "Toggle dark/light theme and switch languages from the title bar. Use ⌘++ / ⌘+- to adjust UI font size and ⌘+0 to reset."
   },
   "chain": {
     "title": "Chain Request",

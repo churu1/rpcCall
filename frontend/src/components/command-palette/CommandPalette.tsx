@@ -24,6 +24,7 @@ import {
   Binary,
 } from "lucide-react";
 import { useThemeStore } from "@/store/theme-store";
+import { useFontScaleStore } from "@/store/font-scale-store";
 import { scoreFuzzyText } from "@/lib/fuzzy-search";
 
 interface CommandItem {
@@ -69,6 +70,7 @@ export function CommandPalette() {
   const keyboardNavRef = useRef(false);
   const { protoFiles, protoProjects, tabs, addTab, removeTab, activeTabId, activeProjectId, updateTab } = useAppStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { increaseFontScale, decreaseFontScale, resetFontScale } = useFontScaleStore();
   const { t } = useTranslation();
   const projectNameById = useMemo(() => {
     const names: Record<string, string> = {};
@@ -462,11 +464,29 @@ export function CommandPalette() {
         document.dispatchEvent(new CustomEvent("rpccall:show-shortcuts"));
         return;
       }
+
+      if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        increaseFontScale();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+        e.preventDefault();
+        decreaseFontScale();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        resetFontScale();
+        return;
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addTab, removeTab, activeTabId]);
+  }, [addTab, removeTab, activeTabId, increaseFontScale, decreaseFontScale, resetFontScale]);
 
   useEffect(() => {
     if (open) {
