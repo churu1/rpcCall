@@ -7,6 +7,7 @@ import { BenchmarkPanel } from "@/components/benchmark/BenchmarkPanel";
 import { ChainEditor } from "@/components/chain/ChainEditor";
 import { MockPanel } from "@/components/mock/MockPanel";
 import { DecodePanel } from "@/components/decode/DecodePanel";
+import { MetadataProfileBar } from "@/components/metadata/MetadataProfileBar";
 import { PanelTabs } from "@/components/ui/PanelTabs";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -468,10 +469,13 @@ export function RequestEditor() {
             placeholder='{\n  "field": "value"\n}'
           />
         ) : activePanel === "metadata" ? (
-          <MetadataTable
-            entries={tab.metadata}
-            onChange={(metadata) => updateTab(tab.id, { metadata })}
-          />
+          <>
+            <MetadataProfileBar address={tab.address} />
+            <MetadataTable
+              entries={tab.metadata}
+              onChange={(metadata) => updateTab(tab.id, { metadata })}
+            />
+          </>
         ) : activePanel === "chain" ? (
           <ChainEditor />
         ) : activePanel === "mock" ? (

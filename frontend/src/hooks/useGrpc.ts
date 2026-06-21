@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAppStore } from "@/store/app-store";
+import { mergeMetadata } from "@/lib/metadata-profile";
 
 export function useGrpc() {
   const { activeTabId, tabs, updateTab } = useAppStore();
@@ -27,13 +28,21 @@ export function useGrpc() {
       timing: null,
     });
 
+    let metadata = tab.metadata;
+    try {
+      const profile = await window.go.main.App.GetMetadataProfile(tab.address);
+      if (profile?.enabled) {
+        metadata = mergeMetadata(tab.metadata, profile.metadata.map((m) => ({ ...m, enabled: true })));
+      }
+    } catch { /* ignore profile load errors and send manual metadata */ }
+
     const request = {
       projectId: tab.projectId,
       address: tab.address,
       serviceName: tab.method.serviceName,
       methodName: tab.method.methodName,
       body: tab.requestBody,
-      metadata: tab.metadata.filter((m) => m.enabled && m.key),
+      metadata: metadata.filter((m) => m.enabled && m.key),
       useTls: tab.useTls,
       certPath: tab.certPath,
       keyPath: tab.keyPath,

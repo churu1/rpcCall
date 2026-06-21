@@ -59,6 +59,24 @@
     "apply": "Apply",
     "addMetadata": "Add metadata"
   },
+  "metadataProfile": {
+    "title": "Save as Address Default Metadata",
+    "saveDefault": "Save Default Metadata",
+    "invalidJson": "The current response is not valid JSON, so metadata cannot be extracted from the body.",
+    "responseFields": "Response Fields",
+    "mappings": "Field Mappings",
+    "preview": "Preview",
+    "noSelection": "Select at least one extractable field",
+    "save": "Save Default Metadata",
+    "active": "This address will auto-attach {{count}} default metadata entries",
+    "hoverTitle": "Auto-attached Metadata",
+    "enable": "Enable",
+    "disable": "Disable",
+    "refresh": "Refresh",
+    "refreshed": "Default metadata refreshed",
+    "clear": "Clear",
+    "clearConfirm": "Clear default metadata for this address?"
+  },
   "services": {
     "title": "PROJECTS",
     "importFile": "Import Proto File",
@@ -258,6 +276,7 @@
   },
   "common": {
     "save": "Save",
+    "add": "Add",
     "cancel": "Cancel",
     "delete": "Delete",
     "close": "Close"
@@ -314,7 +333,7 @@
     "protoImportDesc": "Import .proto files, directories, or use Server Reflection to auto-discover services. The service tree appears in the sidebar after import.",
     "protoImportTip": "⌘+R to reload",
     "metadata": "Metadata",
-    "metadataDesc": "Add request headers in the Metadata tab. Supports key-value editing and JSON bulk import. Use {{varName}} to reference environment variables.",
+    "metadataDesc": "Add request headers in the Metadata tab. Supports key-value editing and JSON bulk import. From a JSON response, save fields as address default Metadata; later requests to the same address auto-attach them. Hover the status bar to view full key/value pairs, and Refresh replays the source RPC to update defaults. Manual keys still win conflicts.",
     "environment": "Environments",
     "environmentDesc": "Switch environments from the title bar. Manage variables per environment. Use {{varName}} in request body and metadata — values are auto-replaced on send.",
     "collections": "Collections",

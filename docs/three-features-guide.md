@@ -136,6 +136,54 @@ Response Viewer 中的 JSON 响应也使用 Prism 高亮渲染。当使用 Cmd+F
 
 ---
 
+## 功能五：地址级默认 Metadata
+
+### 概述
+
+适用于“先调用一个 RPC 获取认证/初始化信息，再把返回字段填到后续请求 Metadata”的场景。RpcCall 可以从成功响应的 JSON Body 中提取字段，经过用户确认后保存为当前服务地址的默认 Metadata。
+
+保存范围按 `address` 隔离，例如 `grpc.example.com:443` 保存的默认 Metadata 只会自动附加到同地址请求，不会影响其他服务地址。
+
+### 使用方法
+
+#### 保存默认 Metadata
+
+1. 调用用于获取 token/session/metadata 的 RPC，确保响应状态为 OK，且 Response Body 是 JSON。
+2. 在 Response 区右上角点击 **保存默认 Metadata**。
+3. 在弹窗中选择响应字段，并配置映射：
+   - `字段路径`：例如 `data.token`
+   - `metadata key`：例如 `authorization`
+   - `value 模板`：例如 `Bearer {{value}}`
+4. 在预览区域确认最终 key/value。
+5. 点击 **保存默认 Metadata**。
+
+#### 自动附加规则
+
+- 后续发送到同一 `address` 的请求会自动附加已启用的默认 Metadata。
+- 如果当前请求的 Metadata 面板中手动填写了同名 key，**手动值优先**，不会被默认 Metadata 覆盖。
+- 自动附加只发生在发送请求时，不会把默认值写回当前 Tab 的手动 Metadata 列表。
+
+#### 管理当前地址 Metadata
+
+打开 Request 的 **元数据** 面板，如果当前地址已有默认 Metadata，会在顶部看到状态条：
+
+- **悬浮查看**：鼠标停留在状态条上，会展示自动附加的完整 Metadata key/value。
+- **刷新**：重新调用保存时记录的来源 RPC，并按原映射规则更新默认 Metadata。
+- **停用 / 启用**：临时关闭或恢复当前地址的自动附加。
+- **清除**：删除当前地址保存的默认 Metadata。
+
+刷新按钮调用的是“保存默认 Metadata 时的来源请求”，不是当前正在编辑的请求。例如先通过 `AccountCheckService/FindDebugMetaDataV2` 保存默认 Metadata，之后即使当前 Tab 正在调 `AnchorTaskService/GetMoreAnchorFunctionEntrance`，点击刷新也会后台重新调用 `FindDebugMetaDataV2` 并更新默认 Metadata。
+
+刷新后的默认 Metadata 仍按同地址自动附加，且同名 key 依然遵循 **手动值优先** 规则。
+
+### 使用场景
+
+- **认证 token 注入**：登录 RPC 返回 `token`，保存为 `authorization: Bearer {{value}}`
+- **会话信息复用**：初始化 RPC 返回 `sessionId`，保存为 `x-session-id`
+- **链路调试**：获取 `traceId` / `tenantId` 后自动带入同地址后续请求
+
+---
+
 ## 快捷键汇总
 
 | 快捷键 | 功能 |

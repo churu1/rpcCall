@@ -8,6 +8,8 @@ import { TimingBar } from "./TimingBar";
 import { highlightJsonHtml } from "@/components/editor/JsonEditor";
 import { JsonTreeViewer } from "./JsonTreeViewer";
 import { DecodeResultPanel } from "@/components/decode/DecodeResultPanel";
+import { MetadataProfileDialog } from "@/components/metadata/MetadataProfileDialog";
+import { parseJsonBody } from "@/lib/metadata-profile";
 import { PanelTabs } from "@/components/ui/PanelTabs";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -39,6 +41,7 @@ export function ResponseViewer() {
   const [decodeActive, setDecodeActive] = useState(false);
   const [viewMode, setViewMode] = useState<"raw" | "tree">("raw");
   const [showSearch, setShowSearch] = useState(false);
+  const [showMetadataProfileDialog, setShowMetadataProfileDialog] = useState(false);
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
   const [searchCurrentIndex, setSearchCurrentIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -186,6 +189,7 @@ export function ResponseViewer() {
       ? "text-[var(--state-success)]"
       : "text-[var(--state-error)]"
     : "";
+  const canSaveDefaultMetadata = tab.statusCode === "OK" && !!tab.responseBody && !!parseJsonBody(tab.responseBody);
 
   return (
     <div className="flex flex-col h-full bg-[var(--surface-1)]" ref={containerRef} tabIndex={-1}>
@@ -235,6 +239,17 @@ export function ResponseViewer() {
             >
               <Binary size={12} />
             </IconButton>
+          )}
+          {canSaveDefaultMetadata && (
+            <Button
+              onClick={() => setShowMetadataProfileDialog(true)}
+              size="sm"
+              variant="ghost"
+              className="h-7"
+              title={t("metadataProfile.saveDefault")}
+            >
+              {t("metadataProfile.saveDefault")}
+            </Button>
           )}
           {tab.statusCode && (
             <span className={cn("flex items-center gap-1 font-medium", statusColor)}>
@@ -329,6 +344,12 @@ export function ResponseViewer() {
           <ReadonlyMetadataTable entries={tab.responseTrailers} emptyText={t("response.noEntries")} />
         ) : null}
       </div>
+      {showMetadataProfileDialog && (
+        <MetadataProfileDialog
+          tab={tab}
+          onClose={() => setShowMetadataProfileDialog(false)}
+        />
+      )}
     </div>
   );
 }

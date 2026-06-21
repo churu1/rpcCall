@@ -59,6 +59,24 @@
     "apply": "应用",
     "addMetadata": "添加元数据"
   },
+  "metadataProfile": {
+    "title": "保存为地址默认 Metadata",
+    "saveDefault": "保存默认 Metadata",
+    "invalidJson": "当前响应不是有效 JSON，无法从响应体提取 Metadata。",
+    "responseFields": "响应字段",
+    "mappings": "字段映射",
+    "preview": "预览",
+    "noSelection": "请选择至少一个可提取的字段",
+    "save": "保存默认 Metadata",
+    "active": "当前地址将自动附加 {{count}} 个默认 Metadata",
+    "hoverTitle": "自动附加的 Metadata",
+    "enable": "启用",
+    "disable": "停用",
+    "refresh": "刷新",
+    "refreshed": "已刷新默认 Metadata",
+    "clear": "清除",
+    "clearConfirm": "确认清除当前地址的默认 Metadata？"
+  },
   "services": {
     "title": "项目",
     "importFile": "导入 Proto 文件",
@@ -258,6 +276,7 @@
   },
   "common": {
     "save": "保存",
+    "add": "添加",
     "cancel": "取消",
     "delete": "删除",
     "close": "关闭"
@@ -314,7 +333,7 @@
     "protoImportDesc": "支持导入 .proto 文件、目录，或通过服务端反射自动发现服务。导入后左侧会展示服务树，点击方法即可开始调用。",
     "protoImportTip": "⌘+R 重新加载",
     "metadata": "元数据 (Metadata)",
-    "metadataDesc": "在「元数据」标签页中添加请求头，支持键值对编辑和 JSON 批量导入。可通过环境变量引用 {{varName}}。",
+    "metadataDesc": "在「元数据」标签页中添加请求头，支持键值对编辑和 JSON 批量导入。响应区可将 JSON 字段保存为当前地址的默认 Metadata，后续同地址请求会自动附加；悬浮状态条可查看完整 key/value，刷新会重新调用来源 RPC 更新默认值。手动填写的同名 key 优先。",
     "environment": "环境变量",
     "environmentDesc": "在标题栏切换环境，管理不同环境的变量。请求体和元数据中使用 {{varName}} 引用变量，发送时自动替换。",
     "collections": "收藏集合",

@@ -38,13 +38,14 @@ type App struct {
 }
 
 type WorkspaceExport struct {
-	Version       string                     `json:"version"`
-	ExportedAt    string                     `json:"exportedAt"`
-	Addresses     []history.SavedAddress     `json:"addresses"`
-	Environments  []history.Environment      `json:"environments"`
-	Collections   []CollectionExport         `json:"collections"`
-	ProtoProjects []history.ProtoProject     `json:"protoProjects"`
-	ProtoSources  []history.SavedProtoSource `json:"protoSources"`
+	Version          string                     `json:"version"`
+	ExportedAt       string                     `json:"exportedAt"`
+	Addresses        []history.SavedAddress     `json:"addresses"`
+	Environments     []history.Environment      `json:"environments"`
+	Collections      []CollectionExport         `json:"collections"`
+	MetadataProfiles []history.MetadataProfile  `json:"metadataProfiles"`
+	ProtoProjects    []history.ProtoProject     `json:"protoProjects"`
+	ProtoSources     []history.SavedProtoSource `json:"protoSources"`
 }
 
 type CollectionExport struct {
@@ -58,6 +59,8 @@ func NewApp() *App {
 	caller := grpclib.NewCaller()
 	caller.SetParser(parser)
 	caller.SetReflection(reflection)
+	mockServer := grpclib.NewMockServer()
+	mockServer.SetParser(parser)
 
 	historyStore, err := history.NewStore()
 	if err != nil {
@@ -75,7 +78,7 @@ func NewApp() *App {
 		decoder:    grpclib.NewDecoder(parser, reflection),
 		parser:     parser,
 		reflection: reflection,
-		mockServer: grpclib.NewMockServer(),
+		mockServer: mockServer,
 		history:    historyStore,
 		aiClient:   aiClient,
 	}
@@ -649,6 +652,158 @@ func (a *App) DeleteSavedRequest(id int64) error {
 	return a.history.DeleteRequest(id)
 }
 
+// --- Address Metadata Profiles ---
+
+func (a *App) SaveMetadataProfile(profile history.MetadataProfile) (*history.MetadataProfile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.SaveMetadataProfile(profile)
+}
+
+func (a *App) GetMetadataProfile(address string) (*history.MetadataProfile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.GetMetadataProfile(address)
+}
+
+func (a *App) ListMetadataProfiles() ([]history.MetadataProfile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.ListMetadataProfiles()
+}
+
+func (a *App) SetMetadataProfileEnabled(address string, enabled bool) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.SetMetadataProfileEnabled(address, enabled)
+}
+
+func (a *App) DeleteMetadataProfile(address string) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.DeleteMetadataProfile(address)
+}
+
+func (a *App) RefreshMetadataProfile(address string) (*history.MetadataProfile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	profile, err := a.history.GetMetadataProfile(address)
+	if err != nil || profile == nil {
+		return profile, err
+	}
+	source := profile.SourceRequest
+	req := models.GrpcRequest{
+		ProjectID:   source.ProjectID,
+		Address:     source.Address,
+		ServiceName: source.ServiceName,
+		MethodName:  source.MethodName,
+		Body:        source.Body,
+		Metadata:    source.Metadata,
+		UseTLS:      source.UseTLS,
+		CertPath:    source.CertPath,
+		KeyPath:     source.KeyPath,
+		CaPath:      source.CaPath,
+		TimeoutSec:  source.TimeoutSec,
+	}
+	a.resolveEnvVariables(&req)
+
+	var resp *models.GrpcResponse
+	switch source.MethodType {
+	case models.MethodTypeClientStreaming:
+		resp, err = a.caller.InvokeClientStream(req)
+	case models.MethodTypeServerStreaming, models.MethodTypeBidiStreaming:
+		return nil, fmt.Errorf("refresh supports unary and client streaming metadata sources only")
+	default:
+		resp, err = a.caller.InvokeUnary(req)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || resp.StatusCode != "OK" {
+		if resp != nil && resp.Error != "" {
+			return nil, fmt.Errorf("metadata source returned %s: %s", resp.StatusCode, resp.Error)
+		}
+		return nil, fmt.Errorf("metadata source returned %s", resp.StatusCode)
+	}
+
+	metadata, err := applyMetadataMappingsFromBody(resp.Body, profile.Mappings)
+	if err != nil {
+		return nil, err
+	}
+	profile.Metadata = metadata
+	profile.Enabled = true
+	return a.history.SaveMetadataProfile(*profile)
+}
+
+func applyMetadataMappingsFromBody(body string, mappings []models.MetadataMapping) ([]models.MetadataEntry, error) {
+	var payload interface{}
+	if err := json.Unmarshal([]byte(body), &payload); err != nil {
+		return nil, fmt.Errorf("response body is not valid JSON: %w", err)
+	}
+	var metadata []models.MetadataEntry
+	for _, mapping := range mappings {
+		if !mapping.Enabled || strings.TrimSpace(mapping.Key) == "" || strings.TrimSpace(mapping.Path) == "" {
+			continue
+		}
+		value, ok := jsonPathString(payload, mapping.Path)
+		if !ok || value == "" {
+			continue
+		}
+		template := mapping.Template
+		if template == "" {
+			template = "{{value}}"
+		}
+		metadata = append(metadata, models.MetadataEntry{
+			Key:   strings.TrimSpace(mapping.Key),
+			Value: strings.ReplaceAll(template, "{{value}}", value),
+		})
+	}
+	if len(metadata) == 0 {
+		return nil, fmt.Errorf("no metadata values extracted from response")
+	}
+	return metadata, nil
+}
+
+func jsonPathString(payload interface{}, path string) (string, bool) {
+	current := payload
+	for _, part := range strings.Split(path, ".") {
+		switch value := current.(type) {
+		case map[string]interface{}:
+			next, ok := value[part]
+			if !ok {
+				return "", false
+			}
+			current = next
+		case []interface{}:
+			var index int
+			if _, err := fmt.Sscanf(part, "%d", &index); err != nil || index < 0 || index >= len(value) {
+				return "", false
+			}
+			current = value[index]
+		default:
+			return "", false
+		}
+	}
+	switch value := current.(type) {
+	case string:
+		return value, true
+	case nil:
+		return "", false
+	default:
+		b, err := json.Marshal(value)
+		if err != nil {
+			return "", false
+		}
+		return string(b), true
+	}
+}
+
 // --- Benchmark ---
 
 func (a *App) StartBenchmark(req models.GrpcRequest, cfg models.BenchmarkConfig) error {
@@ -1167,15 +1322,20 @@ func (a *App) ExportWorkspace() (string, error) {
 			Requests: reqs,
 		})
 	}
+	metadataProfiles, err := a.history.ListMetadataProfiles()
+	if err != nil {
+		return "", fmt.Errorf("list metadata profiles: %w", err)
+	}
 
 	exp := WorkspaceExport{
-		Version:       "1",
-		ExportedAt:    time.Now().Format(time.RFC3339),
-		Addresses:     addresses,
-		Environments:  environments,
-		Collections:   collectionExports,
-		ProtoProjects: protoProjects,
-		ProtoSources:  protoSources,
+		Version:          "1",
+		ExportedAt:       time.Now().Format(time.RFC3339),
+		Addresses:        addresses,
+		Environments:     environments,
+		Collections:      collectionExports,
+		MetadataProfiles: metadataProfiles,
+		ProtoProjects:    protoProjects,
+		ProtoSources:     protoSources,
 	}
 	data, err := json.MarshalIndent(exp, "", "  ")
 	if err != nil {
@@ -1240,6 +1400,11 @@ func (a *App) ImportWorkspace() error {
 			if _, err := a.history.SaveRequest(req); err != nil {
 				logger.Error("import request %s: %v", req.Name, err)
 			}
+		}
+	}
+	for _, profile := range exp.MetadataProfiles {
+		if _, err := a.history.SaveMetadataProfile(profile); err != nil {
+			logger.Error("import metadata profile %s: %v", profile.Address, err)
 		}
 	}
 	projectIDMap := make(map[string]string, len(exp.ProtoProjects))

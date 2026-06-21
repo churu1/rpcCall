@@ -192,6 +192,22 @@ func createTables(db *sql.DB) error {
 	}
 
 	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS metadata_profiles (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			address TEXT NOT NULL UNIQUE,
+			metadata_json TEXT NOT NULL DEFAULT '[]',
+			mappings_json TEXT NOT NULL DEFAULT '[]',
+			source_request_json TEXT NOT NULL DEFAULT '{}',
+			enabled INTEGER NOT NULL DEFAULT 1,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS decode_history (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -758,6 +774,138 @@ func (s *Store) ListAllProtoSources() ([]SavedProtoSource, error) {
 		sources = append(sources, src)
 	}
 	return sources, nil
+}
+
+// --- Address Metadata Profiles ---
+
+type MetadataProfile struct {
+	ID            int64                        `json:"id"`
+	Address       string                       `json:"address"`
+	Metadata      []models.MetadataEntry       `json:"metadata"`
+	Mappings      []models.MetadataMapping     `json:"mappings"`
+	SourceRequest models.MetadataSourceRequest `json:"sourceRequest"`
+	Enabled       bool                         `json:"enabled"`
+	CreatedAt     string                       `json:"createdAt"`
+	UpdatedAt     string                       `json:"updatedAt"`
+}
+
+func (s *Store) SaveMetadataProfile(profile MetadataProfile) (*MetadataProfile, error) {
+	profile.Address = strings.TrimSpace(profile.Address)
+	if profile.Address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+	if len(profile.Metadata) == 0 {
+		return nil, fmt.Errorf("metadata cannot be empty")
+	}
+	metadataJSON, err := json.Marshal(profile.Metadata)
+	if err != nil {
+		return nil, err
+	}
+	mappingsJSON, err := json.Marshal(profile.Mappings)
+	if err != nil {
+		return nil, err
+	}
+	sourceJSON, err := json.Marshal(profile.SourceRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	enabled := 0
+	if profile.Enabled {
+		enabled = 1
+	}
+	result, err := s.db.Exec(`
+		INSERT INTO metadata_profiles (address, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(address) DO UPDATE SET
+			metadata_json = excluded.metadata_json,
+			mappings_json = excluded.mappings_json,
+			source_request_json = excluded.source_request_json,
+			enabled = excluded.enabled,
+			updated_at = excluded.updated_at
+	`, profile.Address, string(metadataJSON), string(mappingsJSON), string(sourceJSON), enabled, now, now)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := result.LastInsertId()
+	if id == 0 {
+		_ = s.db.QueryRow("SELECT id, created_at FROM metadata_profiles WHERE address = ?", profile.Address).Scan(&id, &profile.CreatedAt)
+	} else {
+		profile.CreatedAt = now
+	}
+	profile.ID = id
+	profile.UpdatedAt = now
+	return &profile, nil
+}
+
+func (s *Store) GetMetadataProfile(address string) (*MetadataProfile, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRow(`
+		SELECT id, address, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		FROM metadata_profiles
+		WHERE address = ?
+	`, address)
+
+	var profile MetadataProfile
+	var metadataJSON, mappingsJSON, sourceJSON string
+	var enabled int
+	if err := row.Scan(&profile.ID, &profile.Address, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(metadataJSON), &profile.Metadata)
+	_ = json.Unmarshal([]byte(mappingsJSON), &profile.Mappings)
+	_ = json.Unmarshal([]byte(sourceJSON), &profile.SourceRequest)
+	profile.Enabled = enabled == 1
+	return &profile, nil
+}
+
+func (s *Store) ListMetadataProfiles() ([]MetadataProfile, error) {
+	rows, err := s.db.Query(`
+		SELECT id, address, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		FROM metadata_profiles
+		ORDER BY updated_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var profiles []MetadataProfile
+	for rows.Next() {
+		var profile MetadataProfile
+		var metadataJSON, mappingsJSON, sourceJSON string
+		var enabled int
+		if err := rows.Scan(&profile.ID, &profile.Address, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
+			continue
+		}
+		_ = json.Unmarshal([]byte(metadataJSON), &profile.Metadata)
+		_ = json.Unmarshal([]byte(mappingsJSON), &profile.Mappings)
+		_ = json.Unmarshal([]byte(sourceJSON), &profile.SourceRequest)
+		profile.Enabled = enabled == 1
+		profiles = append(profiles, profile)
+	}
+	return profiles, nil
+}
+
+func (s *Store) SetMetadataProfileEnabled(address string, enabled bool) error {
+	value := 0
+	if enabled {
+		value = 1
+	}
+	_, err := s.db.Exec(`UPDATE metadata_profiles SET enabled = ?, updated_at = ? WHERE address = ?`, value, time.Now().Format(time.RFC3339), strings.TrimSpace(address))
+	return err
+}
+
+func (s *Store) DeleteMetadataProfile(address string) error {
+	_, err := s.db.Exec(`DELETE FROM metadata_profiles WHERE address = ?`, strings.TrimSpace(address))
+	return err
 }
 
 // --- Environments ---
