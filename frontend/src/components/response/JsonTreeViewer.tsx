@@ -117,11 +117,11 @@ export function JsonTreeViewer({ json }: JsonTreeViewerProps) {
   }, [json]);
 
   if (parsed === null) {
-    return <pre className="text-xs text-[var(--text-normal)] p-3 font-mono leading-relaxed whitespace-pre-wrap">{json}</pre>;
+    return <pre className="text-[var(--rpccall-json-font-size)] text-[var(--text-normal)] p-3 font-mono leading-relaxed whitespace-pre-wrap">{json}</pre>;
   }
 
   return (
-    <div className="text-[11px] text-[var(--text-normal)] font-mono p-2 select-text">
+    <div className="text-[var(--rpccall-json-font-size)] text-[var(--text-normal)] font-mono p-2 select-text">
       <JsonNode data={parsed} depth={0} defaultExpanded={true} />
     </div>
   );

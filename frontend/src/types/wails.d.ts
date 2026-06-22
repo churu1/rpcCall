@@ -170,6 +170,39 @@ declare interface SavedRequest {
   createdAt: string;
 }
 
+declare interface MetadataMapping {
+  path: string;
+  key: string;
+  template: string;
+  enabled: boolean;
+}
+
+declare interface MetadataSourceRequest {
+  projectId: string;
+  address: string;
+  serviceName: string;
+  methodName: string;
+  methodType: string;
+  body: string;
+  metadata: { key: string; value: string }[];
+  useTls: boolean;
+  certPath: string;
+  keyPath: string;
+  caPath: string;
+  timeoutSec: number;
+}
+
+declare interface MetadataProfile {
+  id: number;
+  address: string;
+  metadata: { key: string; value: string }[];
+  mappings: MetadataMapping[];
+  sourceRequest: MetadataSourceRequest;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 declare type DecodeEncoding = "auto" | "hex" | "base64" | "escape" | "raw";
 declare type DecodeTarget = "input" | "output" | "message";
 
@@ -330,6 +363,12 @@ interface Window {
         SaveRequestToCollection: (req: SavedRequest) => Promise<SavedRequest | null>;
         ListCollectionRequests: (collectionId: number) => Promise<SavedRequest[] | null>;
         DeleteSavedRequest: (id: number) => Promise<void>;
+        SaveMetadataProfile: (profile: MetadataProfile) => Promise<MetadataProfile | null>;
+        GetMetadataProfile: (address: string) => Promise<MetadataProfile | null>;
+        ListMetadataProfiles: () => Promise<MetadataProfile[] | null>;
+        SetMetadataProfileEnabled: (address: string, enabled: boolean) => Promise<void>;
+        DeleteMetadataProfile: (address: string) => Promise<void>;
+        RefreshMetadataProfile: (address: string) => Promise<MetadataProfile | null>;
         GetMessageFields: (projectId: string, serviceName: string, methodName: string) => Promise<FieldInfo[] | null>;
         GetMessageTypeFields: (projectId: string, messageType: string) => Promise<FieldInfo[] | null>;
         GetAllMessageTypes: (projectId: string) => Promise<string[] | null>;

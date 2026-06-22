@@ -462,8 +462,8 @@ export function ServiceTree() {
   return (
     <div className="flex flex-col h-full bg-[var(--surface-1)]">
       <div className="px-3 py-2 border-b border-[var(--line-soft)] space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 min-w-0 flex-1 pr-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1 min-w-0 flex-1 basis-[150px] pr-2">
             <div className="relative flex-1 min-w-[96px]">
               <select
                 value={activeProjectId ?? protoProjects[0]?.id ?? ""}
@@ -497,7 +497,7 @@ export function ServiceTree() {
               <Plus size={12} />
             </IconButton>
           </div>
-          <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-[var(--line-soft)]">
+          <div className="flex flex-wrap items-center justify-end gap-1 shrink-0 pl-2 border-l border-[var(--line-soft)]">
             <div className="h-4 w-4 flex items-center justify-center">
               {loading && <Loader2 size={14} className="animate-spin text-[var(--state-info)]" />}
             </div>

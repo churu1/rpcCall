@@ -42,6 +42,28 @@ type MetadataEntry struct {
 	Value string `json:"value"`
 }
 
+type MetadataMapping struct {
+	Path     string `json:"path"`
+	Key      string `json:"key"`
+	Template string `json:"template"`
+	Enabled  bool   `json:"enabled"`
+}
+
+type MetadataSourceRequest struct {
+	ProjectID   string          `json:"projectId"`
+	Address     string          `json:"address"`
+	ServiceName string          `json:"serviceName"`
+	MethodName  string          `json:"methodName"`
+	MethodType  MethodType      `json:"methodType"`
+	Body        string          `json:"body"`
+	Metadata    []MetadataEntry `json:"metadata"`
+	UseTLS      bool            `json:"useTls"`
+	CertPath    string          `json:"certPath"`
+	KeyPath     string          `json:"keyPath"`
+	CaPath      string          `json:"caPath"`
+	TimeoutSec  int             `json:"timeoutSec"`
+}
+
 type GrpcRequest struct {
 	ProjectID   string          `json:"projectId"`
 	Address     string          `json:"address"`
