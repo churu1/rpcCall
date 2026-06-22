@@ -45,6 +45,7 @@
   "editor": {
     "format": "Format",
     "minify": "Minify",
+    "jsonParseError": "JSON parse failed: {{detail}}",
     "placeholder": "{\n  \"field\": \"value\"\n}"
   },
   "response": {
@@ -58,6 +59,24 @@
     "invalidJson": "Invalid JSON, expected {\"key\": \"value\"} format",
     "apply": "Apply",
     "addMetadata": "Add metadata"
+  },
+  "metadataProfile": {
+    "title": "Save as Address Default Metadata",
+    "saveDefault": "Save Default Metadata",
+    "invalidJson": "The current response is not valid JSON, so metadata cannot be extracted from the body.",
+    "responseFields": "Response Fields",
+    "mappings": "Field Mappings",
+    "preview": "Preview",
+    "noSelection": "Select at least one extractable field",
+    "save": "Save Default Metadata",
+    "active": "This address will auto-attach {{count}} default metadata entries",
+    "hoverTitle": "Auto-attached Metadata",
+    "enable": "Enable",
+    "disable": "Disable",
+    "refresh": "Refresh",
+    "refreshed": "Default metadata refreshed",
+    "clear": "Clear",
+    "clearConfirm": "Clear default metadata for this address?"
   },
   "services": {
     "title": "PROJECTS",
@@ -140,6 +159,9 @@
     "editing": "Editing",
     "search": "Find Text",
     "runDecode": "Run Decode (in Decode panel)",
+    "increaseFont": "Increase UI font size",
+    "decreaseFont": "Decrease UI font size",
+    "resetFont": "Reset UI font size",
     "indent": "Insert Indent (2 spaces)",
     "closeSearch": "Close Search / Dialog",
     "navigation": "Navigation",
@@ -255,6 +277,7 @@
   },
   "common": {
     "save": "Save",
+    "add": "Add",
     "cancel": "Cancel",
     "delete": "Delete",
     "close": "Close"
@@ -311,7 +334,7 @@
     "protoImportDesc": "Import .proto files, directories, or use Server Reflection to auto-discover services. The service tree appears in the sidebar after import.",
     "protoImportTip": "⌘+R to reload",
     "metadata": "Metadata",
-    "metadataDesc": "Add request headers in the Metadata tab. Supports key-value editing and JSON bulk import. Use {{varName}} to reference environment variables.",
+    "metadataDesc": "Add request headers in the Metadata tab. Supports key-value editing and JSON bulk import. From a JSON response, save fields as address default Metadata; later requests to the same address auto-attach them. Hover the status bar to view full key/value pairs, and Refresh replays the source RPC to update defaults. Manual keys still win conflicts.",
     "environment": "Environments",
     "environmentDesc": "Switch environments from the title bar. Manage variables per environment. Use {{varName}} in request body and metadata — values are auto-replaced on send.",
     "collections": "Collections",
@@ -338,7 +361,7 @@
     "diff": "Request Diff",
     "diffDesc": "⌘+Click two history records (marked A/B), then click Compare to view line-by-line diffs of request body, response body, and metadata.",
     "theme": "Theme & Language",
-    "themeDesc": "Toggle dark/light theme and switch between Chinese/English from the title bar icons."
+    "themeDesc": "Toggle dark/light theme and switch languages from the title bar. Use ⌘++ / ⌘+- to adjust UI font size and ⌘+0 to reset."
   },
   "chain": {
     "title": "Chain Request",

@@ -16,6 +16,9 @@ const shortcutGroups = [
       { keys: "⌘ Enter", descKey: "shortcuts.sendRequest" },
       { keys: "⌘ ⇧ D", descKey: "shortcuts.openDecode" },
       { keys: "⌘ ⇧ B", descKey: "shortcuts.openDecodeBatch" },
+      { keys: "⌘ +", descKey: "shortcuts.increaseFont" },
+      { keys: "⌘ -", descKey: "shortcuts.decreaseFont" },
+      { keys: "⌘ 0", descKey: "shortcuts.resetFont" },
     ],
   },
   {
