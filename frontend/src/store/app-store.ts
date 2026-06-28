@@ -156,6 +156,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const active = state.tabs.find((t) => t.id === state.activeTabId);
     tab.projectId = active?.projectId ?? state.activeProjectId ?? null;
+    if (active) {
+      tab.address = active.address;
+      tab.useTls = active.useTls;
+      tab.certPath = active.certPath;
+      tab.keyPath = active.keyPath;
+      tab.caPath = active.caPath;
+    }
     set((state) => ({
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,

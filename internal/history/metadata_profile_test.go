@@ -12,6 +12,7 @@ func TestMetadataProfileCRUD(t *testing.T) {
 
 	created, err := s.SaveMetadataProfile(MetadataProfile{
 		Address: "example.com:443",
+		Name:    "uid-1",
 		Metadata: []models.MetadataEntry{
 			{Key: "authorization", Value: "Bearer abc"},
 		},
@@ -31,7 +32,7 @@ func TestMetadataProfileCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("save metadata profile: %v", err)
 	}
-	if created.ID == 0 || !created.Enabled {
+	if created.ID == 0 || !created.Enabled || created.Name != "uid-1" {
 		t.Fatalf("unexpected created profile: %+v", created)
 	}
 
@@ -50,7 +51,7 @@ func TestMetadataProfileCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get disabled profile: %v", err)
 	}
-	if disabled == nil || disabled.Enabled {
+	if disabled != nil {
 		t.Fatalf("expected disabled profile: %+v", disabled)
 	}
 
@@ -63,5 +64,52 @@ func TestMetadataProfileCRUD(t *testing.T) {
 	}
 	if deleted != nil {
 		t.Fatalf("expected deleted profile, got %+v", deleted)
+	}
+}
+
+func TestMetadataProfileLimitAndSingleActive(t *testing.T) {
+	s := newTestStore(t)
+	defer s.Close()
+
+	for i := 0; i < 10; i++ {
+		_, err := s.SaveMetadataProfile(MetadataProfile{
+			Address: "example.com:443",
+			Name:    string(rune('a' + i)),
+			Metadata: []models.MetadataEntry{
+				{Key: "uid", Value: string(rune('0' + i))},
+			},
+			Enabled: i == 0,
+		})
+		if err != nil {
+			t.Fatalf("save profile %d: %v", i, err)
+		}
+	}
+	if _, err := s.SaveMetadataProfile(MetadataProfile{
+		Address:  "example.com:443",
+		Name:     "overflow",
+		Metadata: []models.MetadataEntry{{Key: "uid", Value: "overflow"}},
+	}); err == nil {
+		t.Fatal("expected profile limit error")
+	}
+
+	profiles, err := s.ListMetadataProfilesByAddress("example.com:443")
+	if err != nil {
+		t.Fatalf("list profiles: %v", err)
+	}
+	if len(profiles) != 10 {
+		t.Fatalf("expected 10 profiles, got %d", len(profiles))
+	}
+	if err := s.SetMetadataProfileEnabledByID(profiles[3].ID, true); err != nil {
+		t.Fatalf("enable profile: %v", err)
+	}
+	profiles, _ = s.ListMetadataProfilesByAddress("example.com:443")
+	active := 0
+	for _, profile := range profiles {
+		if profile.Enabled {
+			active++
+		}
+	}
+	if active != 1 {
+		t.Fatalf("expected exactly one active profile, got %d", active)
 	}
 }

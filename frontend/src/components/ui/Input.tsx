@@ -3,16 +3,30 @@ import { cn } from "@/lib/utils";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   dense?: boolean;
+  "data-form-type"?: string;
+  "data-lpignore"?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, dense, autoComplete, autoCorrect, autoCapitalize, spellCheck, ...props }, ref) => (
+  ({
+    className,
+    dense,
+    autoComplete,
+    autoCorrect,
+    autoCapitalize,
+    spellCheck,
+    "data-form-type": dataFormType,
+    "data-lpignore": dataLpIgnore,
+    ...props
+  }, ref) => (
     <input
       ref={ref}
       autoComplete={autoComplete ?? "off"}
       autoCorrect={autoCorrect ?? "off"}
       autoCapitalize={autoCapitalize ?? "off"}
       spellCheck={spellCheck ?? false}
+      data-form-type={dataFormType ?? "other"}
+      data-lpignore={dataLpIgnore ?? "true"}
       className={cn("ui-input w-full min-w-0", dense && "h-7 text-[11px]", className)}
       {...props}
     />

@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { Clock, AlertCircle, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronRight, Stethoscope, X, Binary } from "lucide-react";
-import { SearchBar, HighlightedText, type SearchMatch } from "@/components/search/SearchBar";
+import { SearchBar, type SearchMatch } from "@/components/search/SearchBar";
 import { TimingBar } from "./TimingBar";
 import { highlightJsonHtml } from "@/components/editor/JsonEditor";
-import { JsonTreeViewer } from "./JsonTreeViewer";
+import { buildJsonTreeSearchText, JsonTreeViewer } from "./JsonTreeViewer";
 import { DecodeResultPanel } from "@/components/decode/DecodeResultPanel";
 import { MetadataProfileDialog } from "@/components/metadata/MetadataProfileDialog";
 import { parseJsonBody } from "@/lib/metadata-profile";
@@ -33,6 +33,84 @@ function ReadonlyMetadataTable({ entries, emptyText }: { entries: MetadataEntry[
   );
 }
 
+const searchMarkClass =
+  "bg-[var(--state-warn)]/22 text-[var(--text-normal)] rounded-sm px-[1px]";
+const currentSearchMarkClass =
+  "bg-[var(--state-warn)]/40 text-[var(--text-strong)] rounded-sm px-[1px]";
+
+function renderJsonHtmlWithSearch(text: string, matches: SearchMatch[], currentIndex: number) {
+  if (matches.length === 0) return highlightJsonHtml(text);
+
+  const highlighted = highlightJsonHtml(text);
+  let plainPos = 0;
+  let matchIdx = 0;
+  let openMatchIdx = -1;
+  let out = "";
+
+  const matchAt = (pos: number) => {
+    while (matchIdx < matches.length && pos >= matches[matchIdx].end) {
+      matchIdx++;
+    }
+    const match = matches[matchIdx];
+    return match && pos >= match.start && pos < match.end ? matchIdx : -1;
+  };
+
+  const openMark = (idx: number) =>
+    `<mark class="${idx === currentIndex ? currentSearchMarkClass : searchMarkClass}"${idx === currentIndex ? ' data-current-match="true"' : ""}>`;
+
+  const closeOpenMark = () => {
+    if (openMatchIdx !== -1) {
+      out += "</mark>";
+      openMatchIdx = -1;
+    }
+  };
+
+  const syncMark = () => {
+    const nextMatchIdx = matchAt(plainPos);
+    if (nextMatchIdx === openMatchIdx) return;
+    closeOpenMark();
+    if (nextMatchIdx !== -1) {
+      out += openMark(nextMatchIdx);
+      openMatchIdx = nextMatchIdx;
+    }
+  };
+
+  for (let i = 0; i < highlighted.length; i++) {
+    const ch = highlighted[i];
+    if (ch === "<") {
+      closeOpenMark();
+      const end = highlighted.indexOf(">", i);
+      if (end === -1) {
+        syncMark();
+        out += ch;
+        plainPos++;
+        continue;
+      }
+      out += highlighted.slice(i, end + 1);
+      i = end;
+      syncMark();
+      continue;
+    }
+    if (ch === "&") {
+      syncMark();
+      const end = highlighted.indexOf(";", i);
+      if (end !== -1) {
+        out += highlighted.slice(i, end + 1);
+        i = end;
+      } else {
+        out += ch;
+      }
+      plainPos++;
+      continue;
+    }
+    syncMark();
+    out += ch;
+    plainPos++;
+  }
+  closeOpenMark();
+  return out;
+}
+
 export function ResponseViewer() {
   const { t } = useTranslation();
   const { activeTabId, tabs } = useAppStore();
@@ -41,6 +119,7 @@ export function ResponseViewer() {
   const [decodeActive, setDecodeActive] = useState(false);
   const [viewMode, setViewMode] = useState<"raw" | "tree">("raw");
   const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showMetadataProfileDialog, setShowMetadataProfileDialog] = useState(false);
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
   const [searchCurrentIndex, setSearchCurrentIndex] = useState(-1);
@@ -190,6 +269,7 @@ export function ResponseViewer() {
       : "text-[var(--state-error)]"
     : "";
   const canSaveDefaultMetadata = tab.statusCode === "OK" && !!tab.responseBody && !!parseJsonBody(tab.responseBody);
+  const responseSearchText = showSearch && viewMode === "tree" ? buildJsonTreeSearchText(tab.responseBody) : tab.responseBody;
 
   return (
     <div className="flex flex-col h-full bg-[var(--surface-1)]" ref={containerRef} tabIndex={-1}>
@@ -272,8 +352,9 @@ export function ResponseViewer() {
         <SearchBar
           visible={showSearch}
           onClose={() => setShowSearch(false)}
-          text={tab.responseBody}
+          text={responseSearchText}
           onHighlight={handleHighlight}
+          onQueryChange={setSearchQuery}
         />
       )}
       {activePanel === "body" && tab.responseBody && (
@@ -319,18 +400,18 @@ export function ResponseViewer() {
         ) : activePanel === "body" ? (
           tab.responseBody ? (
             viewMode === "tree" ? (
-              <JsonTreeViewer json={tab.responseBody} />
+              <JsonTreeViewer
+                json={tab.responseBody}
+                searchQuery={showSearch ? searchQuery : ""}
+                currentMatchIndex={searchCurrentIndex}
+              />
             ) : (
               <pre ref={preRef} className="text-[var(--rpccall-json-font-size)] p-3 font-[var(--font-mono)] leading-relaxed whitespace-pre-wrap">
-                {showSearch && searchMatches.length > 0 ? (
-                  <HighlightedText
-                    text={tab.responseBody}
-                    matches={searchMatches}
-                    currentIndex={searchCurrentIndex}
-                  />
-                ) : (
-                  <code dangerouslySetInnerHTML={{ __html: highlightJsonHtml(tab.responseBody) }} />
-                )}
+                <code dangerouslySetInnerHTML={{
+                  __html: showSearch && searchMatches.length > 0
+                    ? renderJsonHtmlWithSearch(tab.responseBody, searchMatches, searchCurrentIndex)
+                    : highlightJsonHtml(tab.responseBody)
+                }} />
               </pre>
             )
           ) : (

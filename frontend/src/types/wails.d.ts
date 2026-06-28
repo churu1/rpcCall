@@ -195,6 +195,7 @@ declare interface MetadataSourceRequest {
 declare interface MetadataProfile {
   id: number;
   address: string;
+  name: string;
   metadata: { key: string; value: string }[];
   mappings: MetadataMapping[];
   sourceRequest: MetadataSourceRequest;
@@ -366,9 +367,13 @@ interface Window {
         SaveMetadataProfile: (profile: MetadataProfile) => Promise<MetadataProfile | null>;
         GetMetadataProfile: (address: string) => Promise<MetadataProfile | null>;
         ListMetadataProfiles: () => Promise<MetadataProfile[] | null>;
+        ListMetadataProfilesByAddress: (address: string) => Promise<MetadataProfile[] | null>;
         SetMetadataProfileEnabled: (address: string, enabled: boolean) => Promise<void>;
+        SetMetadataProfileEnabledByID: (id: number, enabled: boolean) => Promise<void>;
         DeleteMetadataProfile: (address: string) => Promise<void>;
+        DeleteMetadataProfileByID: (id: number) => Promise<void>;
         RefreshMetadataProfile: (address: string) => Promise<MetadataProfile | null>;
+        RefreshMetadataProfileByID: (id: number) => Promise<MetadataProfile | null>;
         GetMessageFields: (projectId: string, serviceName: string, methodName: string) => Promise<FieldInfo[] | null>;
         GetMessageTypeFields: (projectId: string, messageType: string) => Promise<FieldInfo[] | null>;
         GetAllMessageTypes: (projectId: string) => Promise<string[] | null>;

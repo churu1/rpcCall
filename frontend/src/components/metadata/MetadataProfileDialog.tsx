@@ -30,6 +30,7 @@ export function MetadataProfileDialog({ tab, onClose, onSaved }: Props) {
       enabled: false,
     }))
   );
+  const [profileName, setProfileName] = useState("");
   const [error, setError] = useState("");
 
   const metadata = useMemo<MetadataEntry[]>(
@@ -54,37 +55,65 @@ export function MetadataProfileDialog({ tab, onClose, onSaved }: Props) {
     ]);
   };
 
+  const addAllMappings = () => {
+    setMappings((items) => {
+      const byPath = new Map(items.map((item) => [item.path, item]));
+      const fieldPaths = new Set(fields.map((field) => field.path));
+      const next = fields.map((field) => {
+        const existing = byPath.get(field.path);
+        return {
+          path: field.path,
+          key: existing?.key || defaultMetadataKey(field.path),
+          template: existing?.template || "{{value}}",
+          enabled: true,
+        };
+      });
+      const custom = items.filter((item) => item.path && !fieldPaths.has(item.path));
+      return [...next, ...custom];
+    });
+  };
+
   const save = async () => {
+    const name = profileName.trim();
+    if (!name) {
+      setError(t("metadataProfile.nameRequired"));
+      return;
+    }
     if (!payload || metadata.length === 0) {
       setError(t("metadataProfile.noSelection"));
       return;
     }
-    await window.go.main.App.SaveMetadataProfile({
-      id: 0,
-      address: tab.address,
-      metadata: metadata.map(({ key, value }) => ({ key, value })),
-      mappings,
-      sourceRequest: {
-        projectId: tab.projectId ?? "",
+    try {
+      await window.go.main.App.SaveMetadataProfile({
+        id: 0,
         address: tab.address,
-        serviceName: tab.method?.serviceName ?? "",
-        methodName: tab.method?.methodName ?? "",
-        methodType: tab.method?.methodType ?? "unary",
-        body: tab.requestBody,
-        metadata: tab.metadata.filter((entry) => entry.enabled && entry.key).map(({ key, value }) => ({ key, value })),
-        useTls: tab.useTls,
-        certPath: tab.certPath,
-        keyPath: tab.keyPath,
-        caPath: tab.caPath,
-        timeoutSec: tab.timeoutSec,
-      },
-      enabled: true,
-      createdAt: "",
-      updatedAt: "",
-    });
-    window.dispatchEvent(new CustomEvent("rpccall:metadata-profile-changed", { detail: { address: tab.address } }));
-    onSaved?.();
-    onClose();
+        name,
+        metadata: metadata.map(({ key, value }) => ({ key, value })),
+        mappings,
+        sourceRequest: {
+          projectId: tab.projectId ?? "",
+          address: tab.address,
+          serviceName: tab.method?.serviceName ?? "",
+          methodName: tab.method?.methodName ?? "",
+          methodType: tab.method?.methodType ?? "unary",
+          body: tab.requestBody,
+          metadata: tab.metadata.filter((entry) => entry.enabled && entry.key).map(({ key, value }) => ({ key, value })),
+          useTls: tab.useTls,
+          certPath: tab.certPath,
+          keyPath: tab.keyPath,
+          caPath: tab.caPath,
+          timeoutSec: tab.timeoutSec,
+        },
+        enabled: true,
+        createdAt: "",
+        updatedAt: "",
+      });
+      window.dispatchEvent(new CustomEvent("rpccall:metadata-profile-changed", { detail: { address: tab.address } }));
+      onSaved?.();
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   };
 
   if (!payload) {
@@ -112,10 +141,30 @@ export function MetadataProfileDialog({ tab, onClose, onSaved }: Props) {
           <IconButton onClick={onClose} size="sm"><X size={14} /></IconButton>
         </div>
 
+        <div className="border-b border-[var(--line-soft)] px-4 py-3">
+          <label className="mb-1 block text-[11px] font-medium text-[var(--text-muted)]">
+            {t("metadataProfile.profileName")}
+          </label>
+          <Input
+            value={profileName}
+            onChange={(e) => { setProfileName(e.target.value); setError(""); }}
+            placeholder={t("metadataProfile.profileNamePlaceholder")}
+            autoFocus
+          />
+          <div className="mt-1 text-[10px] text-[var(--text-muted)]">
+            {t("metadataProfile.profileLimitHint")}
+          </div>
+        </div>
+
         <div className="grid min-h-0 flex-1 grid-cols-[1fr_1.4fr] gap-3 overflow-hidden p-3">
           <div className="overflow-auto rounded-lg border border-[var(--line-soft)] bg-[var(--surface-1)]">
-            <div className="sticky top-0 bg-[var(--surface-1)] px-3 py-2 text-[11px] font-medium text-[var(--text-muted)]">
-              {t("metadataProfile.responseFields")}
+            <div className="sticky top-0 flex items-center justify-between gap-2 bg-[var(--surface-1)] px-3 py-2">
+              <span className="text-[11px] font-medium text-[var(--text-muted)]">
+                {t("metadataProfile.responseFields")}
+              </span>
+              <Button onClick={addAllMappings} size="sm" variant="ghost" className="h-6" disabled={fields.length === 0}>
+                <Plus size={12} /> {t("metadataProfile.addAll")}
+              </Button>
             </div>
             {fields.map((field) => (
               <button
