@@ -18,9 +18,10 @@ const sizeClass: Record<NonNullable<IconButtonProps["size"]>, string> = {
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ className, tone = "neutral", size = "md", ...props }, ref) => (
+  ({ className, tone = "neutral", size = "md", type = "button", ...props }, ref) => (
     <button
       ref={ref}
+      type={type}
       className={cn(
         "inline-flex items-center justify-center rounded-md border border-[var(--line-soft)] bg-[var(--surface-1)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
         toneClass[tone],

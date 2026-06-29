@@ -1,20 +1,153 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 interface JsonTreeViewerProps {
   json: string;
+  searchQuery?: string;
+  currentMatchIndex?: number;
 }
 
-function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?: string; depth: number; defaultExpanded: boolean }) {
+interface SearchRenderContext {
+  query: string;
+  currentMatchIndex: number;
+  nextIndex: number;
+}
+
+function appendTreeSearchText(parts: string[], data: unknown, name?: string) {
+  if (name !== undefined) {
+    parts.push(name);
+  }
+  if (data === null) {
+    parts.push("null");
+    return;
+  }
+  if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
+    parts.push(String(data));
+    return;
+  }
+  if (Array.isArray(data)) {
+    data.forEach((item, i) => appendTreeSearchText(parts, item, String(i)));
+    return;
+  }
+  if (typeof data === "object" && data !== null) {
+    Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
+      appendTreeSearchText(parts, value, key);
+    });
+    return;
+  }
+  parts.push(String(data));
+}
+
+export function buildJsonTreeSearchText(json: string) {
+  try {
+    const parsed = JSON.parse(json);
+    const parts: string[] = [];
+    appendTreeSearchText(parts, parsed);
+    return parts.join("\u0000");
+  } catch {
+    return json;
+  }
+}
+
+function containsSearch(data: unknown, name: string | undefined, query: string): boolean {
+  if (!query) return false;
+  const q = query.toLowerCase();
+  if (name !== undefined && name.toLowerCase().includes(q)) return true;
+  if (data === null) return "null".includes(q);
+  if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
+    return String(data).toLowerCase().includes(q);
+  }
+  if (Array.isArray(data)) {
+    return data.some((item, i) => containsSearch(item, String(i), query));
+  }
+  if (typeof data === "object" && data !== null) {
+    return Object.entries(data as Record<string, unknown>).some(([key, value]) => containsSearch(value, key, query));
+  }
+  return String(data).toLowerCase().includes(q);
+}
+
+function HighlightSearchText({
+  text,
+  ctx,
+  className,
+}: {
+  text: string;
+  ctx?: SearchRenderContext;
+  className?: string;
+}) {
+  if (!ctx?.query) {
+    return <span className={className}>{text}</span>;
+  }
+
+  const lowerText = text.toLowerCase();
+  const lowerQuery = ctx.query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let pos = 0;
+  let key = 0;
+
+  while (pos < text.length) {
+    const idx = lowerText.indexOf(lowerQuery, pos);
+    if (idx === -1) break;
+    if (idx > pos) {
+      parts.push(<span key={key++}>{text.slice(pos, idx)}</span>);
+    }
+
+    const matchIndex = ctx.nextIndex++;
+    const isCurrent = matchIndex === ctx.currentMatchIndex;
+    parts.push(
+      <mark
+        key={key++}
+        className={
+          isCurrent
+            ? "bg-[var(--state-warn)]/40 text-[var(--text-strong)] rounded-sm px-[1px]"
+            : "bg-[var(--state-warn)]/22 text-[var(--text-normal)] rounded-sm px-[1px]"
+        }
+        {...(isCurrent ? { "data-current-tree-match": "true" } : {})}
+      >
+        {text.slice(idx, idx + ctx.query.length)}
+      </mark>
+    );
+    pos = idx + ctx.query.length;
+  }
+
+  if (pos < text.length) {
+    parts.push(<span key={key++}>{text.slice(pos)}</span>);
+  }
+
+  return <span className={className}>{parts}</span>;
+}
+
+function JsonNode({
+  data,
+  name,
+  depth,
+  defaultExpanded,
+  searchQuery,
+  searchCtx,
+}: {
+  data: unknown;
+  name?: string;
+  depth: number;
+  defaultExpanded: boolean;
+  searchQuery: string;
+  searchCtx?: SearchRenderContext;
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const toggle = useCallback(() => setExpanded((p) => !p), []);
+  const hasSearchMatch = useMemo(() => containsSearch(data, name, searchQuery), [data, name, searchQuery]);
+  const isExpanded = searchQuery && hasSearchMatch ? true : expanded;
+  const nameEl = name !== undefined ? (
+    <span className="text-[var(--text-muted)]">
+      <HighlightSearchText text={name} ctx={searchCtx} />:
+    </span>
+  ) : null;
 
   if (data === null) {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-        <span className="text-[var(--state-warn)] italic">null</span>
+        {nameEl}
+        <HighlightSearchText text="null" ctx={searchCtx} className="text-[var(--state-warn)] italic" />
       </div>
     );
   }
@@ -22,8 +155,10 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (typeof data === "string") {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-        <span className="text-[var(--color-syntax-string)]">"{data}"</span>
+        {nameEl}
+        <span className="text-[var(--color-syntax-string)]">
+          "<HighlightSearchText text={data} ctx={searchCtx} />"
+        </span>
       </div>
     );
   }
@@ -31,8 +166,8 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (typeof data === "number") {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-        <span className="text-[var(--color-syntax-number)]">{String(data)}</span>
+        {nameEl}
+        <HighlightSearchText text={String(data)} ctx={searchCtx} className="text-[var(--color-syntax-number)]" />
       </div>
     );
   }
@@ -40,8 +175,8 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
   if (typeof data === "boolean") {
     return (
       <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-        <span className="text-[var(--color-syntax-boolean)]">{String(data)}</span>
+        {nameEl}
+        <HighlightSearchText text={String(data)} ctx={searchCtx} className="text-[var(--color-syntax-boolean)]" />
       </div>
     );
   }
@@ -55,15 +190,23 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
           style={{ paddingLeft: depth * 16 }}
           onClick={toggle}
         >
-          {expanded ? <ChevronDown size={12} className="shrink-0 text-[var(--text-muted)]" /> : <ChevronRight size={12} className="shrink-0 text-[var(--text-muted)]" />}
-          {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-          {!expanded && <span className="text-[var(--text-muted)]">[{preview}]</span>}
-          {expanded && <span className="text-[var(--text-muted)]">[</span>}
+          {isExpanded ? <ChevronDown size={12} className="shrink-0 text-[var(--text-muted)]" /> : <ChevronRight size={12} className="shrink-0 text-[var(--text-muted)]" />}
+          {nameEl}
+          {!isExpanded && <span className="text-[var(--text-muted)]">[{preview}]</span>}
+          {isExpanded && <span className="text-[var(--text-muted)]">[</span>}
         </div>
-        {expanded && (
+        {isExpanded && (
           <>
             {data.map((item, i) => (
-              <JsonNode key={i} data={item} name={String(i)} depth={depth + 1} defaultExpanded={depth + 1 < 2} />
+              <JsonNode
+                key={i}
+                data={item}
+                name={String(i)}
+                depth={depth + 1}
+                defaultExpanded={depth + 1 < 2}
+                searchQuery={searchQuery}
+                searchCtx={searchCtx}
+              />
             ))}
             <div style={{ paddingLeft: depth * 16 }} className="text-[var(--text-muted)]">]</div>
           </>
@@ -82,15 +225,23 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
           style={{ paddingLeft: depth * 16 }}
           onClick={toggle}
         >
-          {expanded ? <ChevronDown size={12} className="shrink-0 text-[var(--text-muted)]" /> : <ChevronRight size={12} className="shrink-0 text-[var(--text-muted)]" />}
-          {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-          {!expanded && <span className="text-[var(--text-muted)]">{`{${preview}}`}</span>}
-          {expanded && <span className="text-[var(--text-muted)]">{"{"}</span>}
+          {isExpanded ? <ChevronDown size={12} className="shrink-0 text-[var(--text-muted)]" /> : <ChevronRight size={12} className="shrink-0 text-[var(--text-muted)]" />}
+          {nameEl}
+          {!isExpanded && <span className="text-[var(--text-muted)]">{`{${preview}}`}</span>}
+          {isExpanded && <span className="text-[var(--text-muted)]">{"{"}</span>}
         </div>
-        {expanded && (
+        {isExpanded && (
           <>
             {keys.map((key) => (
-              <JsonNode key={key} data={(data as Record<string, unknown>)[key]} name={key} depth={depth + 1} defaultExpanded={depth + 1 < 2} />
+              <JsonNode
+                key={key}
+                data={(data as Record<string, unknown>)[key]}
+                name={key}
+                depth={depth + 1}
+                defaultExpanded={depth + 1 < 2}
+                searchQuery={searchQuery}
+                searchCtx={searchCtx}
+              />
             ))}
             <div style={{ paddingLeft: depth * 16 }} className="text-[var(--text-muted)]">{"}"}</div>
           </>
@@ -101,13 +252,14 @@ function JsonNode({ data, name, depth, defaultExpanded }: { data: unknown; name?
 
   return (
     <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-      {name !== undefined && <span className="text-[var(--text-muted)]">{name}:</span>}
-      <span>{String(data)}</span>
+      {nameEl}
+      <HighlightSearchText text={String(data)} ctx={searchCtx} />
     </div>
   );
 }
 
-export function JsonTreeViewer({ json }: JsonTreeViewerProps) {
+export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 }: JsonTreeViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const parsed = useMemo(() => {
     try {
       return JSON.parse(json);
@@ -115,14 +267,32 @@ export function JsonTreeViewer({ json }: JsonTreeViewerProps) {
       return null;
     }
   }, [json]);
+  const normalizedSearchQuery = searchQuery.trim();
+  const searchCtx: SearchRenderContext | undefined = normalizedSearchQuery
+    ? { query: normalizedSearchQuery, currentMatchIndex, nextIndex: 0 }
+    : undefined;
+
+  useEffect(() => {
+    if (!normalizedSearchQuery || currentMatchIndex < 0) return;
+    requestAnimationFrame(() => {
+      const el = containerRef.current?.querySelector("[data-current-tree-match]");
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [currentMatchIndex, normalizedSearchQuery]);
 
   if (parsed === null) {
     return <pre className="text-[var(--rpccall-json-font-size)] text-[var(--text-normal)] p-3 font-mono leading-relaxed whitespace-pre-wrap">{json}</pre>;
   }
 
   return (
-    <div className="text-[var(--rpccall-json-font-size)] text-[var(--text-normal)] font-mono p-2 select-text">
-      <JsonNode data={parsed} depth={0} defaultExpanded={true} />
+    <div ref={containerRef} className="text-[var(--rpccall-json-font-size)] text-[var(--text-normal)] font-mono p-2 select-text">
+      <JsonNode
+        data={parsed}
+        depth={0}
+        defaultExpanded={true}
+        searchQuery={normalizedSearchQuery}
+        searchCtx={searchCtx}
+      />
     </div>
   );
 }

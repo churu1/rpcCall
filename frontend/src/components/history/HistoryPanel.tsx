@@ -32,6 +32,10 @@ interface HistoryDetail {
   responseBody: string;
   responseHeaders: { key: string; value: string }[];
   responseTrailers: { key: string; value: string }[];
+  useTls: boolean;
+  certPath: string;
+  keyPath: string;
+  caPath: string;
 }
 
 export function HistoryPanel() {
@@ -82,6 +86,10 @@ export function HistoryPanel() {
         responseTrailers: detail.responseTrailers?.map((m) => ({ ...m, enabled: true })) ?? [],
         statusCode: detail.statusCode || null,
         elapsedMs: detail.elapsedMs || null,
+        useTls: detail.useTls ?? false,
+        certPath: detail.certPath ?? "",
+        keyPath: detail.keyPath ?? "",
+        caPath: detail.caPath ?? "",
       });
     } catch {
       // ignore

@@ -72,7 +72,11 @@ func createTables(db *sql.DB) error {
 			response_trailers TEXT NOT NULL DEFAULT '[]',
 			status_code TEXT NOT NULL DEFAULT '',
 			elapsed_ms INTEGER NOT NULL DEFAULT 0,
-			error_msg TEXT NOT NULL DEFAULT ''
+			error_msg TEXT NOT NULL DEFAULT '',
+			use_tls INTEGER NOT NULL DEFAULT 0,
+			cert_path TEXT NOT NULL DEFAULT '',
+			key_path TEXT NOT NULL DEFAULT '',
+			ca_path TEXT NOT NULL DEFAULT ''
 		)
 	`)
 	if err != nil {
@@ -194,13 +198,15 @@ func createTables(db *sql.DB) error {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS metadata_profiles (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			address TEXT NOT NULL UNIQUE,
+			address TEXT NOT NULL,
+			name TEXT NOT NULL DEFAULT 'Default',
 			metadata_json TEXT NOT NULL DEFAULT '[]',
 			mappings_json TEXT NOT NULL DEFAULT '[]',
 			source_request_json TEXT NOT NULL DEFAULT '{}',
 			enabled INTEGER NOT NULL DEFAULT 1,
 			created_at TEXT NOT NULL,
-			updated_at TEXT NOT NULL
+			updated_at TEXT NOT NULL,
+			UNIQUE(address, name)
 		)
 	`)
 	if err != nil {
@@ -276,7 +282,89 @@ func createTables(db *sql.DB) error {
 	if err := migrateProtoProjectScope(db); err != nil {
 		return err
 	}
+	if err := migrateHistoryTLSColumns(db); err != nil {
+		return err
+	}
+	if err := migrateMetadataProfilesMulti(db); err != nil {
+		return err
+	}
 	return migrateDecodeHistoryProjectScope(db)
+}
+
+func migrateHistoryTLSColumns(db *sql.DB) error {
+	columns := []struct {
+		name string
+		sql  string
+	}{
+		{"use_tls", `ALTER TABLE history ADD COLUMN use_tls INTEGER NOT NULL DEFAULT 0`},
+		{"cert_path", `ALTER TABLE history ADD COLUMN cert_path TEXT NOT NULL DEFAULT ''`},
+		{"key_path", `ALTER TABLE history ADD COLUMN key_path TEXT NOT NULL DEFAULT ''`},
+		{"ca_path", `ALTER TABLE history ADD COLUMN ca_path TEXT NOT NULL DEFAULT ''`},
+	}
+	for _, col := range columns {
+		if _, err := db.Exec(col.sql); err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func migrateMetadataProfilesMulti(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(metadata_profiles)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasName := false
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == "name" {
+			hasName = true
+		}
+	}
+	if hasName {
+		return nil
+	}
+
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS metadata_profiles_new (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			address TEXT NOT NULL,
+			name TEXT NOT NULL DEFAULT 'Default',
+			metadata_json TEXT NOT NULL DEFAULT '[]',
+			mappings_json TEXT NOT NULL DEFAULT '[]',
+			source_request_json TEXT NOT NULL DEFAULT '{}',
+			enabled INTEGER NOT NULL DEFAULT 1,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			UNIQUE(address, name)
+		)
+	`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO metadata_profiles_new
+			(id, address, name, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at)
+		SELECT id, address, 'Default', metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		FROM metadata_profiles
+	`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`DROP TABLE metadata_profiles`); err != nil {
+		return err
+	}
+	_, err = db.Exec(`ALTER TABLE metadata_profiles_new RENAME TO metadata_profiles`)
+	return err
 }
 
 func migrateProtoProjectScope(db *sql.DB) error {
@@ -365,12 +453,17 @@ func (s *Store) Save(req models.GrpcRequest, resp models.GrpcResponse) error {
 	if err != nil {
 		trailersJSON = []byte("[]")
 	}
+	useTLS := 0
+	if req.UseTLS {
+		useTLS = 1
+	}
 
 	_, err = s.db.Exec(`
 		INSERT INTO history (timestamp, address, service_name, method_name,
 			request_body, request_metadata, response_body, response_headers,
-			response_trailers, status_code, elapsed_ms, error_msg)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			response_trailers, status_code, elapsed_ms, error_msg,
+			use_tls, cert_path, key_path, ca_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		time.Now().Format(time.RFC3339),
 		req.Address,
@@ -384,6 +477,10 @@ func (s *Store) Save(req models.GrpcRequest, resp models.GrpcResponse) error {
 		resp.StatusCode,
 		resp.ElapsedMs,
 		resp.Error,
+		useTLS,
+		req.CertPath,
+		req.KeyPath,
+		req.CaPath,
 	)
 	return err
 }
@@ -406,6 +503,10 @@ type HistoryDetail struct {
 	ResponseBody     string                 `json:"responseBody"`
 	ResponseHeaders  []models.MetadataEntry `json:"responseHeaders"`
 	ResponseTrailers []models.MetadataEntry `json:"responseTrailers"`
+	UseTLS           bool                   `json:"useTls"`
+	CertPath         string                 `json:"certPath"`
+	KeyPath          string                 `json:"keyPath"`
+	CaPath           string                 `json:"caPath"`
 }
 
 func (s *Store) List(limit int) ([]HistoryEntry, error) {
@@ -441,18 +542,22 @@ func (s *Store) GetDetail(id int64) (*HistoryDetail, error) {
 	row := s.db.QueryRow(`
 		SELECT id, timestamp, address, service_name, method_name,
 			request_body, request_metadata, response_body, response_headers,
-			response_trailers, status_code, elapsed_ms, error_msg
+			response_trailers, status_code, elapsed_ms, error_msg,
+			use_tls, cert_path, key_path, ca_path
 		FROM history WHERE id = ?
 	`, id)
 
 	var d HistoryDetail
 	var reqMeta, respHeaders, respTrailers string
+	var useTLS int
 	err := row.Scan(&d.ID, &d.Timestamp, &d.Address, &d.ServiceName,
 		&d.MethodName, &d.RequestBody, &reqMeta, &d.ResponseBody,
-		&respHeaders, &respTrailers, &d.StatusCode, &d.ElapsedMs, &d.Error)
+		&respHeaders, &respTrailers, &d.StatusCode, &d.ElapsedMs, &d.Error,
+		&useTLS, &d.CertPath, &d.KeyPath, &d.CaPath)
 	if err != nil {
 		return nil, err
 	}
+	d.UseTLS = useTLS == 1
 
 	json.Unmarshal([]byte(reqMeta), &d.RequestMetadata)
 	json.Unmarshal([]byte(respHeaders), &d.ResponseHeaders)
@@ -781,6 +886,7 @@ func (s *Store) ListAllProtoSources() ([]SavedProtoSource, error) {
 type MetadataProfile struct {
 	ID            int64                        `json:"id"`
 	Address       string                       `json:"address"`
+	Name          string                       `json:"name"`
 	Metadata      []models.MetadataEntry       `json:"metadata"`
 	Mappings      []models.MetadataMapping     `json:"mappings"`
 	SourceRequest models.MetadataSourceRequest `json:"sourceRequest"`
@@ -791,8 +897,12 @@ type MetadataProfile struct {
 
 func (s *Store) SaveMetadataProfile(profile MetadataProfile) (*MetadataProfile, error) {
 	profile.Address = strings.TrimSpace(profile.Address)
+	profile.Name = strings.TrimSpace(profile.Name)
 	if profile.Address == "" {
 		return nil, fmt.Errorf("address cannot be empty")
+	}
+	if profile.Name == "" {
+		profile.Name = "Default"
 	}
 	if len(profile.Metadata) == 0 {
 		return nil, fmt.Errorf("metadata cannot be empty")
@@ -815,26 +925,58 @@ func (s *Store) SaveMetadataProfile(profile MetadataProfile) (*MetadataProfile, 
 	if profile.Enabled {
 		enabled = 1
 	}
-	result, err := s.db.Exec(`
-		INSERT INTO metadata_profiles (address, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(address) DO UPDATE SET
-			metadata_json = excluded.metadata_json,
-			mappings_json = excluded.mappings_json,
-			source_request_json = excluded.source_request_json,
-			enabled = excluded.enabled,
-			updated_at = excluded.updated_at
-	`, profile.Address, string(metadataJSON), string(mappingsJSON), string(sourceJSON), enabled, now, now)
+
+	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
-	id, _ := result.LastInsertId()
-	if id == 0 {
-		_ = s.db.QueryRow("SELECT id, created_at FROM metadata_profiles WHERE address = ?", profile.Address).Scan(&id, &profile.CreatedAt)
+	defer tx.Rollback()
+
+	var existingID int64
+	if profile.ID > 0 {
+		_ = tx.QueryRow(`SELECT id, created_at FROM metadata_profiles WHERE id = ?`, profile.ID).Scan(&existingID, &profile.CreatedAt)
 	} else {
+		_ = tx.QueryRow(`SELECT id, created_at FROM metadata_profiles WHERE address = ? AND name = ?`, profile.Address, profile.Name).Scan(&existingID, &profile.CreatedAt)
+	}
+	if existingID == 0 {
+		var count int
+		if err := tx.QueryRow(`SELECT COUNT(1) FROM metadata_profiles WHERE address = ?`, profile.Address).Scan(&count); err != nil {
+			return nil, err
+		}
+		if count >= 10 {
+			return nil, fmt.Errorf("metadata profile limit reached for this address")
+		}
+	}
+	if profile.Enabled {
+		if _, err := tx.Exec(`UPDATE metadata_profiles SET enabled = 0 WHERE address = ?`, profile.Address); err != nil {
+			return nil, err
+		}
+	}
+
+	if existingID > 0 {
+		_, err = tx.Exec(`
+			UPDATE metadata_profiles
+			SET address = ?, name = ?, metadata_json = ?, mappings_json = ?, source_request_json = ?, enabled = ?, updated_at = ?
+			WHERE id = ?
+		`, profile.Address, profile.Name, string(metadataJSON), string(mappingsJSON), string(sourceJSON), enabled, now, existingID)
+		profile.ID = existingID
+	} else {
+		result, err := tx.Exec(`
+			INSERT INTO metadata_profiles (address, name, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, profile.Address, profile.Name, string(metadataJSON), string(mappingsJSON), string(sourceJSON), enabled, now, now)
+		if err != nil {
+			return nil, err
+		}
+		profile.ID, _ = result.LastInsertId()
 		profile.CreatedAt = now
 	}
-	profile.ID = id
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	profile.UpdatedAt = now
 	return &profile, nil
 }
@@ -845,15 +987,39 @@ func (s *Store) GetMetadataProfile(address string) (*MetadataProfile, error) {
 		return nil, nil
 	}
 	row := s.db.QueryRow(`
-		SELECT id, address, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		SELECT id, address, name, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
 		FROM metadata_profiles
-		WHERE address = ?
+		WHERE address = ? AND enabled = 1
+		ORDER BY updated_at DESC
+		LIMIT 1
 	`, address)
 
 	var profile MetadataProfile
 	var metadataJSON, mappingsJSON, sourceJSON string
 	var enabled int
-	if err := row.Scan(&profile.ID, &profile.Address, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
+	if err := row.Scan(&profile.ID, &profile.Address, &profile.Name, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(metadataJSON), &profile.Metadata)
+	_ = json.Unmarshal([]byte(mappingsJSON), &profile.Mappings)
+	_ = json.Unmarshal([]byte(sourceJSON), &profile.SourceRequest)
+	profile.Enabled = enabled == 1
+	return &profile, nil
+}
+
+func (s *Store) GetMetadataProfileByID(id int64) (*MetadataProfile, error) {
+	row := s.db.QueryRow(`
+		SELECT id, address, name, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		FROM metadata_profiles
+		WHERE id = ?
+	`, id)
+	var profile MetadataProfile
+	var metadataJSON, mappingsJSON, sourceJSON string
+	var enabled int
+	if err := row.Scan(&profile.ID, &profile.Address, &profile.Name, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -868,7 +1034,7 @@ func (s *Store) GetMetadataProfile(address string) (*MetadataProfile, error) {
 
 func (s *Store) ListMetadataProfiles() ([]MetadataProfile, error) {
 	rows, err := s.db.Query(`
-		SELECT id, address, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		SELECT id, address, name, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
 		FROM metadata_profiles
 		ORDER BY updated_at DESC
 	`)
@@ -882,7 +1048,40 @@ func (s *Store) ListMetadataProfiles() ([]MetadataProfile, error) {
 		var profile MetadataProfile
 		var metadataJSON, mappingsJSON, sourceJSON string
 		var enabled int
-		if err := rows.Scan(&profile.ID, &profile.Address, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
+		if err := rows.Scan(&profile.ID, &profile.Address, &profile.Name, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
+			continue
+		}
+		_ = json.Unmarshal([]byte(metadataJSON), &profile.Metadata)
+		_ = json.Unmarshal([]byte(mappingsJSON), &profile.Mappings)
+		_ = json.Unmarshal([]byte(sourceJSON), &profile.SourceRequest)
+		profile.Enabled = enabled == 1
+		profiles = append(profiles, profile)
+	}
+	return profiles, nil
+}
+
+func (s *Store) ListMetadataProfilesByAddress(address string) ([]MetadataProfile, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, nil
+	}
+	rows, err := s.db.Query(`
+		SELECT id, address, name, metadata_json, mappings_json, source_request_json, enabled, created_at, updated_at
+		FROM metadata_profiles
+		WHERE address = ?
+		ORDER BY enabled DESC, updated_at DESC
+	`, address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var profiles []MetadataProfile
+	for rows.Next() {
+		var profile MetadataProfile
+		var metadataJSON, mappingsJSON, sourceJSON string
+		var enabled int
+		if err := rows.Scan(&profile.ID, &profile.Address, &profile.Name, &metadataJSON, &mappingsJSON, &sourceJSON, &enabled, &profile.CreatedAt, &profile.UpdatedAt); err != nil {
 			continue
 		}
 		_ = json.Unmarshal([]byte(metadataJSON), &profile.Metadata)
@@ -895,16 +1094,54 @@ func (s *Store) ListMetadataProfiles() ([]MetadataProfile, error) {
 }
 
 func (s *Store) SetMetadataProfileEnabled(address string, enabled bool) error {
+	address = strings.TrimSpace(address)
+	if enabled {
+		var id int64
+		err := s.db.QueryRow(`SELECT id FROM metadata_profiles WHERE address = ? ORDER BY updated_at DESC LIMIT 1`, address).Scan(&id)
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return s.SetMetadataProfileEnabledByID(id, true)
+	}
+	_, err := s.db.Exec(`UPDATE metadata_profiles SET enabled = 0, updated_at = ? WHERE address = ?`, time.Now().Format(time.RFC3339), address)
+	return err
+}
+
+func (s *Store) SetMetadataProfileEnabledByID(id int64, enabled bool) error {
+	profile, err := s.GetMetadataProfileByID(id)
+	if err != nil || profile == nil {
+		return err
+	}
 	value := 0
 	if enabled {
 		value = 1
 	}
-	_, err := s.db.Exec(`UPDATE metadata_profiles SET enabled = ?, updated_at = ? WHERE address = ?`, value, time.Now().Format(time.RFC3339), strings.TrimSpace(address))
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if enabled {
+		if _, err := tx.Exec(`UPDATE metadata_profiles SET enabled = 0 WHERE address = ?`, profile.Address); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE metadata_profiles SET enabled = ?, updated_at = ? WHERE id = ?`, value, time.Now().Format(time.RFC3339), id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) DeleteMetadataProfile(address string) error {
 	_, err := s.db.Exec(`DELETE FROM metadata_profiles WHERE address = ?`, strings.TrimSpace(address))
+	return err
+}
+
+func (s *Store) DeleteMetadataProfileByID(id int64) error {
+	_, err := s.db.Exec(`DELETE FROM metadata_profiles WHERE id = ?`, id)
 	return err
 }
 

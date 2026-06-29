@@ -8,6 +8,7 @@ interface SearchBarProps {
   onClose: () => void;
   text: string;
   onHighlight: (matches: SearchMatch[], currentIndex: number) => void;
+  onQueryChange?: (query: string) => void;
   /** For textarea: scroll to match by setting selection */
   onScrollTo?: (match: SearchMatch) => void;
 }
@@ -17,7 +18,7 @@ export interface SearchMatch {
   end: number;
 }
 
-export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: SearchBarProps) {
+export function SearchBar({ visible, onClose, text, onHighlight, onQueryChange, onScrollTo }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [matches, setMatches] = useState<SearchMatch[]>([]);
@@ -28,9 +29,11 @@ export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: S
       if (!q.trim()) {
         setMatches([]);
         setCurrentIndex(0);
+        onQueryChange?.("");
         onHighlight([], -1);
         return;
       }
+      onQueryChange?.(q);
       const lowerText = text.toLowerCase();
       const lowerQuery = q.toLowerCase();
       const found: SearchMatch[] = [];
@@ -49,7 +52,7 @@ export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: S
         onScrollTo(found[0]);
       }
     },
-    [text, onHighlight, onScrollTo]
+    [text, onHighlight, onQueryChange, onScrollTo]
   );
 
   useEffect(() => {
@@ -61,9 +64,10 @@ export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: S
       setMatches([]);
       setCurrentIndex(0);
       navigatedRef.current = false;
+      onQueryChange?.("");
       onHighlight([], -1);
     }
-  }, [visible]);
+  }, [visible, onHighlight, onQueryChange]);
 
   useEffect(() => {
     search(query);
@@ -116,7 +120,11 @@ export function SearchBar({ visible, onClose, text, onHighlight, onScrollTo }: S
         ref={inputRef}
         type="text"
         autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
         spellCheck={false}
+        data-form-type="other"
+        data-lpignore="true"
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);

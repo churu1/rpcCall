@@ -675,6 +675,13 @@ func (a *App) ListMetadataProfiles() ([]history.MetadataProfile, error) {
 	return a.history.ListMetadataProfiles()
 }
 
+func (a *App) ListMetadataProfilesByAddress(address string) ([]history.MetadataProfile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.ListMetadataProfilesByAddress(address)
+}
+
 func (a *App) SetMetadataProfileEnabled(address string, enabled bool) error {
 	if a.history == nil {
 		return nil
@@ -682,11 +689,25 @@ func (a *App) SetMetadataProfileEnabled(address string, enabled bool) error {
 	return a.history.SetMetadataProfileEnabled(address, enabled)
 }
 
+func (a *App) SetMetadataProfileEnabledByID(id int64, enabled bool) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.SetMetadataProfileEnabledByID(id, enabled)
+}
+
 func (a *App) DeleteMetadataProfile(address string) error {
 	if a.history == nil {
 		return nil
 	}
 	return a.history.DeleteMetadataProfile(address)
+}
+
+func (a *App) DeleteMetadataProfileByID(id int64) error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.DeleteMetadataProfileByID(id)
 }
 
 func (a *App) RefreshMetadataProfile(address string) (*history.MetadataProfile, error) {
@@ -738,6 +759,57 @@ func (a *App) RefreshMetadataProfile(address string) (*history.MetadataProfile, 
 	}
 	profile.Metadata = metadata
 	profile.Enabled = true
+	return a.history.SaveMetadataProfile(*profile)
+}
+
+func (a *App) RefreshMetadataProfileByID(id int64) (*history.MetadataProfile, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	profile, err := a.history.GetMetadataProfileByID(id)
+	if err != nil || profile == nil {
+		return profile, err
+	}
+	source := profile.SourceRequest
+	req := models.GrpcRequest{
+		ProjectID:   source.ProjectID,
+		Address:     source.Address,
+		ServiceName: source.ServiceName,
+		MethodName:  source.MethodName,
+		Body:        source.Body,
+		Metadata:    source.Metadata,
+		UseTLS:      source.UseTLS,
+		CertPath:    source.CertPath,
+		KeyPath:     source.KeyPath,
+		CaPath:      source.CaPath,
+		TimeoutSec:  source.TimeoutSec,
+	}
+	a.resolveEnvVariables(&req)
+
+	var resp *models.GrpcResponse
+	switch source.MethodType {
+	case models.MethodTypeClientStreaming:
+		resp, err = a.caller.InvokeClientStream(req)
+	case models.MethodTypeServerStreaming, models.MethodTypeBidiStreaming:
+		return nil, fmt.Errorf("refresh supports unary and client streaming metadata sources only")
+	default:
+		resp, err = a.caller.InvokeUnary(req)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || resp.StatusCode != "OK" {
+		if resp != nil && resp.Error != "" {
+			return nil, fmt.Errorf("metadata source returned %s: %s", resp.StatusCode, resp.Error)
+		}
+		return nil, fmt.Errorf("metadata source returned %s", resp.StatusCode)
+	}
+
+	metadata, err := applyMetadataMappingsFromBody(resp.Body, profile.Mappings)
+	if err != nil {
+		return nil, err
+	}
+	profile.Metadata = metadata
 	return a.history.SaveMetadataProfile(*profile)
 }
 
