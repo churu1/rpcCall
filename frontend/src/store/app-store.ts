@@ -76,7 +76,6 @@ interface AppState {
   protoProjects: ProtoProject[];
   protoSourcesByProject: Record<string, ProtoImportSource[]>;
   protoSourcesStatus: Record<string, ProtoSourcesLoadStatus>;
-  protoFilesLoadStatus: Record<string, ProtoSourcesLoadStatus>;
   activeProjectId: string | null;
   tabs: Tab[];
   activeTabId: string | null;
