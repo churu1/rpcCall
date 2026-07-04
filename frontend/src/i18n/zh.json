@@ -221,6 +221,8 @@
     "decodeThisPayload": "解码这段内容",
     "selectMethod": "选择服务/方法",
     "selectMessage": "选择消息结构",
+    "selectProtoFile": "选择 proto 文件",
+    "pickMessageInProto": "请先选择 proto 文件，再选择该文件内的消息结构",
     "selectTemplate": "选择解码模板",
     "saveTemplate": "保存模板",
     "deleteTemplate": "删除模板",

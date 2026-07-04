@@ -6,6 +6,7 @@ import { scoreFuzzyText } from "@/lib/fuzzy-search";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { IconButton } from "@/components/ui/IconButton";
+import { HISTORY_LIST_LIMIT } from "@/lib/history-limits";
 
 interface Props {
   onSelect: (detail: DecodeHistoryDetail) => void;
@@ -23,7 +24,7 @@ export function DecodeHistoryPanel({ onSelect, embedded = false }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await window.go.main.App.GetDecodeHistory(200);
+      const data = await window.go.main.App.GetDecodeHistory(HISTORY_LIST_LIMIT);
       setEntries(data || []);
     } catch {
       setEntries([]);

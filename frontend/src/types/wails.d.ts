@@ -215,6 +215,13 @@ declare interface MetadataProfile {
 declare type DecodeEncoding = "auto" | "hex" | "base64" | "escape" | "raw";
 declare type DecodeTarget = "input" | "output" | "message";
 
+declare interface MessageTypeOption {
+  messageType: string;
+  protoPath: string;
+  fieldCount: number;
+  maxFieldNumber?: number;
+}
+
 declare interface NestedDecodeRule {
   fieldPath: string;
   messageType: string;
@@ -228,6 +235,7 @@ declare interface DecodeRequest {
   methodName: string;
   target: DecodeTarget;
   explicitMessageType: string;
+  explicitMessageProtoPath?: string;
   payload: string;
   encoding: DecodeEncoding;
   nestedRules: NestedDecodeRule[];
@@ -285,6 +293,7 @@ declare interface DecodeHistoryEntry {
   methodName: string;
   target: string;
   messageType: string;
+  protoPath?: string;
   inputEncoding: string;
   detectedEncoding: string;
   success: boolean;
@@ -316,6 +325,7 @@ declare interface DecodeTemplate {
   projectName: string;
   name: string;
   messageType: string;
+  protoPath?: string;
   encoding: DecodeEncoding;
   batchMode: boolean;
   payloadText: string;
@@ -385,7 +395,9 @@ interface Window {
         RefreshMetadataProfile: (address: string) => Promise<MetadataProfile | null>;
         RefreshMetadataProfileByID: (id: number) => Promise<MetadataProfile | null>;
         GetMessageFields: (projectId: string, serviceName: string, methodName: string) => Promise<FieldInfo[] | null>;
-        GetMessageTypeFields: (projectId: string, messageType: string) => Promise<FieldInfo[] | null>;
+        GetMessageTypeFields: (projectId: string, messageType: string, protoPath: string) => Promise<FieldInfo[] | null>;
+        ListMessageTypeOptions: (projectId: string) => Promise<MessageTypeOption[] | null>;
+        ResolveMethodInputMessage: (projectId: string, serviceName: string, methodName: string) => Promise<MessageTypeOption | null>;
         GetAllMessageTypes: (projectId: string) => Promise<string[] | null>;
         ExportWorkspace: () => Promise<string>;
         ImportWorkspace: () => Promise<void>;
@@ -413,6 +425,7 @@ interface Window {
           projectId: string,
           name: string,
           messageType: string,
+          protoPath: string,
           encoding: DecodeEncoding,
           batchMode: boolean,
           payloadText: string,

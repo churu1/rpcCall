@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
+import {
+  buildProtoFileGroups,
+  filterMessagesForProto,
+  formatProtoFileLabel,
+  messageExistsInProto,
+  messageShortName,
+  resolveSelection,
+} from "@/lib/decode-message-type";
 
 interface Props {
   seedPayload?: string;
@@ -14,12 +22,6 @@ interface Props {
   seedTick?: number;
   forceBatchTick?: number;
 }
-
-type MessageOption = {
-  value: string;
-  label: string;
-  searchExtra: string;
-};
 
 const ENCODINGS: DecodeEncoding[] = ["auto", "hex", "base64", "escape", "raw"];
 
@@ -29,14 +31,15 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
   const tab = tabs.find((tt) => tt.id === activeTabId);
   const currentProjectId = tab?.projectId || activeProjectId || "";
 
-  const [explicitMessageType, setExplicitMessageType] = useState("");
+  const [selectedProtoPath, setSelectedProtoPath] = useState("");
+  const [selectedMessageType, setSelectedMessageType] = useState("");
   const [encoding, setEncoding] = useState<DecodeEncoding>("auto");
   const [singlePayload, setSinglePayload] = useState("");
   const [batchPayload, setBatchPayload] = useState("");
   const [batchMode, setBatchMode] = useState(false);
   const [running, setRunning] = useState(false);
   const [rules, setRules] = useState<NestedDecodeRule[]>([]);
-  const [allMessageTypes, setAllMessageTypes] = useState<string[]>([]);
+  const [messageTypeOptions, setMessageTypeOptions] = useState<MessageTypeOption[]>([]);
   const [messageFields, setMessageFields] = useState<FieldInfo[]>([]);
   const [fieldsLoading, setFieldsLoading] = useState(false);
   const [templates, setTemplates] = useState<DecodeTemplate[]>([]);
@@ -45,12 +48,12 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
 
   useEffect(() => {
     if (!currentProjectId) {
-      setAllMessageTypes([]);
+      setMessageTypeOptions([]);
       return;
     }
-    window.go.main.App.GetAllMessageTypes(currentProjectId)
-      .then((types) => setAllMessageTypes((types ?? []).filter(Boolean)))
-      .catch(() => setAllMessageTypes([]));
+    window.go.main.App.ListMessageTypeOptions(currentProjectId)
+      .then((options) => setMessageTypeOptions((options ?? []).filter((opt) => opt.messageType && opt.protoPath)))
+      .catch(() => setMessageTypeOptions([]));
   }, [protoFiles, currentProjectId]);
 
   useEffect(() => {
@@ -82,82 +85,155 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
 
   const hasSelectedTemplate = useMemo(
     () => templates.some((tpl) => String(tpl.id) === selectedTemplateId),
-    [templates, selectedTemplateId]
+    [templates, selectedTemplateId],
   );
 
-  const messageOptions = useMemo<MessageOption[]>(
-    () =>
-      allMessageTypes
-        .map((name) => ({ value: name, label: name, searchExtra: name }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [allMessageTypes]
+  const protoFileGroups = useMemo(
+    () => buildProtoFileGroups(messageTypeOptions),
+    [messageTypeOptions],
   );
+
+  const protoSelectOptions = useMemo(
+    () =>
+      protoFileGroups.map((group) => ({
+        value: group.protoPath,
+        label: formatProtoFileLabel(group),
+        searchExtra: group.protoPath,
+        title: group.protoPath,
+      })),
+    [protoFileGroups],
+  );
+
+  const messagesInSelectedProto = useMemo(
+    () => filterMessagesForProto(messageTypeOptions, selectedProtoPath),
+    [messageTypeOptions, selectedProtoPath],
+  );
+
+  const messageSelectOptions = useMemo(
+    () =>
+      messagesInSelectedProto.map((opt) => ({
+        value: opt.messageType,
+        label: messageShortName(opt.messageType),
+        searchExtra: opt.messageType,
+        title: opt.messageType,
+      })),
+    [messagesInSelectedProto],
+  );
+
+  const applySelection = useCallback((messageType: string, protoPath: string) => {
+    const resolved = resolveSelection(messageType, protoPath, messageTypeOptions);
+    setSelectedProtoPath(resolved.protoPath);
+    setSelectedMessageType(resolved.messageType);
+  }, [messageTypeOptions]);
 
   useEffect(() => {
     if (seedTick && seedPayload !== undefined) {
       setSinglePayload(seedPayload);
-      setExplicitMessageType(seedMessageType || "");
+      applySelection(seedMessageType || "", "");
       setBatchMode(false);
       window.dispatchEvent(new CustomEvent("rpccall:decode-output", {
         detail: { result: null, batchResult: null },
       }));
     }
-  }, [seedTick, seedPayload, seedMessageType]);
+  }, [seedTick, seedPayload, seedMessageType, applySelection]);
 
   useEffect(() => {
     if (forceBatchTick) setBatchMode(true);
   }, [forceBatchTick]);
 
   useEffect(() => {
-    if (!explicitMessageType.trim()) {
+    if (!selectedMessageType.trim()) {
+      setMessageFields([]);
+      setFieldsLoading(false);
+      return;
+    }
+    if (!selectedProtoPath.trim() || !currentProjectId) {
       setMessageFields([]);
       setFieldsLoading(false);
       return;
     }
     setFieldsLoading(true);
-    if (!currentProjectId) {
-      setMessageFields([]);
-      setFieldsLoading(false);
-      return;
-    }
-    window.go.main.App.GetMessageTypeFields(currentProjectId, explicitMessageType.trim())
+    window.go.main.App.GetMessageTypeFields(
+      currentProjectId,
+      selectedMessageType.trim(),
+      selectedProtoPath.trim(),
+    )
       .then((fields) => setMessageFields(fields ?? []))
       .catch(() => setMessageFields([]))
       .finally(() => setFieldsLoading(false));
-  }, [explicitMessageType, currentProjectId]);
+  }, [selectedMessageType, selectedProtoPath, currentProjectId]);
 
   useEffect(() => {
     const applyHistory = (e: Event) => {
       const custom = e as CustomEvent<DecodeHistoryDetail>;
       const detail = custom.detail;
       if (!detail) return;
-      const payload = detail.payloadText || "";
-      setExplicitMessageType(detail.messageType || "");
+      applySelection(detail.messageType || "", detail.protoPath || "");
       setEncoding((detail.inputEncoding as DecodeEncoding) || "auto");
-      setSinglePayload(payload);
-      setBatchPayload(payload);
+      setSinglePayload(detail.payloadText || "");
+      setBatchPayload(detail.payloadText || "");
       setRules(detail.nestedRules || []);
       setBatchMode(false);
     };
     window.addEventListener("rpccall:decode-apply-history", applyHistory as EventListener);
     return () =>
       window.removeEventListener("rpccall:decode-apply-history", applyHistory as EventListener);
-  }, []);
+  }, [applySelection]);
 
   useEffect(() => {
-    if (tab?.method?.inputTypeName && !explicitMessageType) {
-      setExplicitMessageType(tab.method.inputTypeName);
-    }
-  }, [tab?.method?.inputTypeName, explicitMessageType]);
+    if (!currentProjectId || !tab?.method) return;
+    if (selectedProtoPath || selectedMessageType) return;
 
-  const canDecode = !!explicitMessageType.trim() && !!currentProjectId;
+    window.go.main.App.ResolveMethodInputMessage(
+      currentProjectId,
+      tab.method.serviceName,
+      tab.method.methodName,
+    )
+      .then((opt) => {
+        if (opt) {
+          applySelection(opt.messageType, opt.protoPath);
+          return;
+        }
+        if (tab.method?.inputTypeName) {
+          applySelection(tab.method.inputTypeName, "");
+        }
+      })
+      .catch(() => {
+        if (tab.method?.inputTypeName) {
+          applySelection(tab.method.inputTypeName, "");
+        }
+      });
+  }, [
+    currentProjectId,
+    tab?.method?.serviceName,
+    tab?.method?.methodName,
+    tab?.method?.inputTypeName,
+    selectedProtoPath,
+    selectedMessageType,
+    applySelection,
+  ]);
+
+  const handleProtoChange = (protoPath: string) => {
+    setSelectedProtoPath(protoPath);
+    if (!selectedMessageType) return;
+    if (messageExistsInProto(selectedMessageType, protoPath, messageTypeOptions)) {
+      return;
+    }
+    setSelectedMessageType("");
+  };
+
+  const canDecode =
+    !!selectedMessageType.trim() &&
+    !!selectedProtoPath.trim() &&
+    !!currentProjectId;
 
   const buildCommon = (): DecodeRequest => ({
     projectId: currentProjectId,
     serviceName: "",
     methodName: "",
     target: "message",
-    explicitMessageType,
+    explicitMessageType: selectedMessageType,
+    explicitMessageProtoPath: selectedProtoPath,
     payload: "",
     encoding,
     nestedRules: rules,
@@ -193,7 +269,17 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
     } finally {
       setRunning(false);
     }
-  }, [batchMode, batchPayload, canDecode, encoding, explicitMessageType, rules, singlePayload]);
+  }, [
+    batchMode,
+    batchPayload,
+    canDecode,
+    encoding,
+    selectedMessageType,
+    selectedProtoPath,
+    rules,
+    singlePayload,
+    currentProjectId,
+  ]);
 
   useEffect(() => {
     const runHandler = () => runDecode();
@@ -214,7 +300,7 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
   };
 
   const applyTemplate = useCallback((tpl: DecodeTemplate) => {
-    setExplicitMessageType(tpl.messageType || "");
+    applySelection(tpl.messageType || "", tpl.protoPath || "");
     setEncoding((tpl.encoding as DecodeEncoding) || "auto");
     setRules(tpl.nestedRules || []);
     setBatchMode(!!tpl.batchMode);
@@ -222,11 +308,13 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
     const payload = tpl.payloadText || "";
     setSinglePayload(payload);
     setBatchPayload(payload);
-  }, []);
+  }, [applySelection]);
 
   const handleSaveTemplate = useCallback(async () => {
-    if (!currentProjectId || !explicitMessageType.trim()) return;
-    const name = templateName.trim() || `${explicitMessageType}${batchMode ? " (batch)" : ""}`;
+    if (!currentProjectId || !selectedMessageType.trim() || !selectedProtoPath.trim()) return;
+    const name =
+      templateName.trim() ||
+      `${messageShortName(selectedMessageType)}${batchMode ? " (batch)" : ""}`;
     try {
       if (!window.go?.main?.App?.SaveDecodeTemplate) {
         window.alert("SaveDecodeTemplate API not available, please restart dev/build.");
@@ -236,11 +324,12 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
       const created = await window.go.main.App.SaveDecodeTemplate(
         currentProjectId,
         name,
-        explicitMessageType,
+        selectedMessageType,
+        selectedProtoPath,
         encoding,
         batchMode,
         payload,
-        rules
+        rules,
       );
       await loadTemplates();
       if (created?.id) {
@@ -253,7 +342,8 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
   }, [
     currentProjectId,
     templateName,
-    explicitMessageType,
+    selectedMessageType,
+    selectedProtoPath,
     batchMode,
     batchPayload,
     singlePayload,
@@ -274,16 +364,56 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
     }
   }, [selectedTemplateId, loadTemplates]);
 
+  const updateNestedRuleMessage = (index: number, messageType: string) => {
+    setRules((prev) =>
+      prev.map((rule, idx) =>
+        idx === index
+          ? {
+              ...rule,
+              messageType,
+              protoPath: selectedProtoPath || rule.protoPath || "",
+            }
+          : rule,
+      ),
+    );
+  };
+
+  const addNestedRule = () => {
+    setRules((prev) => [
+      ...prev,
+      { fieldPath: "", messageType: "", protoPath: selectedProtoPath || "" },
+    ]);
+  };
+
+  const selectedProtoDisplay =
+    protoFileGroups.find((g) => g.protoPath === selectedProtoPath)?.displayPath ??
+    selectedProtoPath.split("/").slice(-2).join("/");
+
   return (
     <div className="h-full flex flex-col min-w-0 p-2 gap-2 bg-[var(--surface-0)]" data-decode-panel="true">
       <Card className="p-2 flex flex-col gap-2">
-        <SearchableSelect
-          value={explicitMessageType}
-          options={messageOptions}
-          placeholder={t("decode.selectMessage")}
-          onChange={(val) => setExplicitMessageType(val)}
-          className="w-[430px] max-w-full"
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <SearchableSelect
+            value={selectedProtoPath}
+            options={protoSelectOptions}
+            placeholder={t("decode.selectProtoFile")}
+            onChange={handleProtoChange}
+            disabled={!currentProjectId || protoSelectOptions.length === 0}
+            className="min-w-0"
+          />
+          <SearchableSelect
+            value={selectedMessageType}
+            options={messageSelectOptions}
+            placeholder={t("decode.selectMessage")}
+            onChange={setSelectedMessageType}
+            disabled={!selectedProtoPath}
+            className="min-w-0"
+          />
+        </div>
+        {selectedProtoPath && !selectedMessageType && (
+          <p className="text-[10px] text-[var(--text-muted)]">{t("decode.pickMessageInProto")}</p>
+        )}
+
         <div className="grid grid-cols-[1.2fr_1fr_auto_auto] gap-2 items-center">
           <Select
             value={selectedTemplateId}
@@ -315,7 +445,7 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
           />
           <Button
             onClick={handleSaveTemplate}
-            disabled={!currentProjectId || !explicitMessageType.trim()}
+            disabled={!currentProjectId || !selectedMessageType.trim() || !selectedProtoPath.trim()}
             size="sm"
             title={t("decode.saveTemplate")}
           >
@@ -374,6 +504,12 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
         <Card className="flex flex-col">
           <div className="px-2 py-1.5 text-[11px] border-b text-[var(--text-muted)]">
             {t("decode.fieldsTitle")}
+            {selectedMessageType && (
+              <span className="ml-2 font-mono text-[10px] opacity-80">
+                {messageShortName(selectedMessageType)}
+                {selectedProtoDisplay ? ` · ${selectedProtoDisplay}` : ""}
+              </span>
+            )}
           </div>
           <div className="max-h-[140px] overflow-auto">
             {fieldsLoading ? (
@@ -408,9 +544,10 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
               />
               <SearchableSelect
                 value={r.messageType}
-                options={messageOptions}
+                options={messageSelectOptions}
                 placeholder={t("decode.messageTypePlaceholder")}
-                onChange={(val) => setRules((prev) => prev.map((x, idx) => idx === i ? { ...x, messageType: val } : x))}
+                onChange={(val) => updateNestedRuleMessage(i, val)}
+                disabled={!selectedProtoPath}
                 className="flex-1"
               />
               <Button
@@ -424,10 +561,11 @@ export function DecodePanel({ seedPayload, seedMessageType, seedTick, forceBatch
             </div>
           ))}
           <Button
-            onClick={() => setRules((prev) => [...prev, { fieldPath: "", messageType: "" }])}
+            onClick={addNestedRule}
             variant="ghost"
             size="sm"
             className="self-start"
+            disabled={!selectedProtoPath}
           >
             <Plus size={11} /> {t("decode.addRule")}
           </Button>

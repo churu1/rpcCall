@@ -8,7 +8,7 @@ RpcCall 是一个基于 Wails、Go 和 React 的桌面端 gRPC 调试工具，�
 - 支持 gRPC Server Reflection，快速读取远程服务列表。
 - 支持 Unary、Server Streaming、Client Streaming、Bidi Streaming 四类调用。
 - 支持 TLS/mTLS、按地址持久化 TLS 配置（443 端口默认启用 TLS）、请求 Metadata、地址级默认 Metadata、请求超时、地址收藏。
-- 支持请求历史、历史对比、请求收藏集合、环境变量替换。
+- 支持请求历史、解码历史（各最多保留 500 条）、历史对比、请求收藏集合、环境变量替换。
 - 支持链式调用、Mock Server、Benchmark 压测、Payload Decode。
 - 支持浅色/深色主题、中英文切换和全局字号调整。
 
@@ -42,7 +42,7 @@ RpcCall 支持通过快捷键调整全局界面字号，适合高分屏、投屏
 
 | 日期 | 功能 |
 |------|------|
-| 2026-07-04 | 按地址持久化 TLS 配置；443 端口默认启用 TLS；地址栏盾牌图标支持开关 TLS 并保存证书路径 |
+| 2026-07-04 | 按地址持久化 TLS 配置；443 端口默认启用 TLS；解码 tab 两层选择 proto 文件与消息结构，并优化搜索性能；请求/解码历史各最多保留 500 条 |
 | 2026-06-21 | 地址级默认 Metadata：从 RPC 响应字段映射到 metadata key，按地址自动附加，支持刷新与手动值优先 |
 
 ## 开发

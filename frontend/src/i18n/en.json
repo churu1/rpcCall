@@ -221,6 +221,8 @@
     "decodeThisPayload": "Decode this payload",
     "selectMethod": "Select service/method",
     "selectMessage": "Select message type",
+    "selectProtoFile": "Select proto file",
+    "pickMessageInProto": "Select a proto file first, then choose a message from that file",
     "selectTemplate": "Select decode template",
     "saveTemplate": "Save Template",
     "deleteTemplate": "Delete Template",

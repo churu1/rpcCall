@@ -308,12 +308,162 @@ func (p *ProtoParser) GetAllFileDescriptors() []*desc.FileDescriptor {
 }
 
 func (p *ProtoParser) GetAllFileDescriptorsByProject(projectID string) []*desc.FileDescriptor {
-	projectID = p.ensureProject(projectID)
-	var all []*desc.FileDescriptor
-	for _, fds := range p.fileDescriptors[projectID] {
-		all = append(all, fds...)
+	refs := p.ListFileDescriptorRefs(projectID)
+	all := make([]*desc.FileDescriptor, 0, len(refs))
+	for _, ref := range refs {
+		all = append(all, ref.FD)
 	}
 	return all
+}
+
+type FileDescriptorRef struct {
+	Path string
+	FD   *desc.FileDescriptor
+}
+
+func (p *ProtoParser) ListFileDescriptorRefs(projectID string) []FileDescriptorRef {
+	projectID = p.ensureProject(projectID)
+	byPath := p.fileDescriptors[projectID]
+	paths := make([]string, 0, len(byPath))
+	for path := range byPath {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	refs := make([]FileDescriptorRef, 0, len(paths))
+	for _, path := range paths {
+		fds := byPath[path]
+		if len(fds) == 0 {
+			continue
+		}
+		refs = append(refs, FileDescriptorRef{Path: path, FD: fds[0]})
+	}
+	return refs
+}
+
+func findMessageDescriptorInFile(fd *desc.FileDescriptor, messageType string) *desc.MessageDescriptor {
+	if fd == nil {
+		return nil
+	}
+	for _, md := range fd.GetMessageTypes() {
+		if hit := findMessageDescriptorRecursive(md, messageType); hit != nil {
+			return hit
+		}
+	}
+	return nil
+}
+
+func findMessageDescriptorRecursive(md *desc.MessageDescriptor, messageType string) *desc.MessageDescriptor {
+	if md == nil {
+		return nil
+	}
+	if md.GetFullyQualifiedName() == messageType || md.GetName() == messageType {
+		return md
+	}
+	for _, nested := range md.GetNestedMessageTypes() {
+		if hit := findMessageDescriptorRecursive(nested, messageType); hit != nil {
+			return hit
+		}
+	}
+	return nil
+}
+
+func (p *ProtoParser) FindMessageDescriptor(projectID, messageType, protoPath string) *desc.MessageDescriptor {
+	messageType = strings.TrimSpace(messageType)
+	if messageType == "" {
+		return nil
+	}
+	protoPath = strings.TrimSpace(protoPath)
+	for _, ref := range p.ListFileDescriptorRefs(projectID) {
+		if protoPath != "" && ref.Path != protoPath {
+			continue
+		}
+		if md := findMessageDescriptorInFile(ref.FD, messageType); md != nil {
+			return md
+		}
+	}
+	return nil
+}
+
+func messageDescriptorStats(md *desc.MessageDescriptor) (fieldCount int, maxFieldNumber int32) {
+	fields := md.GetFields()
+	fieldCount = len(fields)
+	for _, f := range fields {
+		if n := f.GetNumber(); n > maxFieldNumber {
+			maxFieldNumber = n
+		}
+	}
+	return fieldCount, maxFieldNumber
+}
+
+func (p *ProtoParser) ListMessageTypeOptions(projectID string) []models.MessageTypeOption {
+	seen := make(map[string]struct{})
+	var opts []models.MessageTypeOption
+	for _, ref := range p.ListFileDescriptorRefs(projectID) {
+		var walk func(*desc.MessageDescriptor)
+		walk = func(md *desc.MessageDescriptor) {
+			if md == nil {
+				return
+			}
+			key := md.GetFullyQualifiedName() + "\x00" + ref.Path
+			if _, dup := seen[key]; dup {
+				return
+			}
+			seen[key] = struct{}{}
+			fieldCount, maxFieldNumber := messageDescriptorStats(md)
+			opts = append(opts, models.MessageTypeOption{
+				MessageType:    md.GetFullyQualifiedName(),
+				ProtoPath:      ref.Path,
+				FieldCount:     fieldCount,
+				MaxFieldNumber: maxFieldNumber,
+			})
+			for _, nested := range md.GetNestedMessageTypes() {
+				walk(nested)
+			}
+		}
+		for _, md := range ref.FD.GetMessageTypes() {
+			walk(md)
+		}
+	}
+	sort.Slice(opts, func(i, j int) bool {
+		if opts[i].MessageType != opts[j].MessageType {
+			return opts[i].MessageType < opts[j].MessageType
+		}
+		return opts[i].ProtoPath < opts[j].ProtoPath
+	})
+	return opts
+}
+
+func (p *ProtoParser) FindMethodInputMessage(projectID, serviceName, methodName string) *models.MessageTypeOption {
+	serviceName = strings.TrimSpace(serviceName)
+	methodName = strings.TrimSpace(methodName)
+	if serviceName == "" || methodName == "" {
+		return nil
+	}
+	for _, ref := range p.ListFileDescriptorRefs(projectID) {
+		for _, svc := range ref.FD.GetServices() {
+			if svc.GetFullyQualifiedName() != serviceName && svc.GetName() != serviceName {
+				continue
+			}
+			for _, md := range svc.GetMethods() {
+				if md.GetName() != methodName {
+					continue
+				}
+				input := md.GetInputType()
+				if input == nil {
+					return nil
+				}
+				fieldCount, maxFieldNumber := messageDescriptorStats(input)
+				return &models.MessageTypeOption{
+					MessageType:    input.GetFullyQualifiedName(),
+					ProtoPath:      ref.Path,
+					FieldCount:     fieldCount,
+					MaxFieldNumber: maxFieldNumber,
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (p *ProtoParser) ClearProject(projectID string) {

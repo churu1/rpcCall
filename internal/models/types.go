@@ -214,14 +214,22 @@ type NestedDecodeRule struct {
 }
 
 type DecodeRequest struct {
-	ProjectID           string             `json:"projectId"`
-	ServiceName         string             `json:"serviceName"`
-	MethodName          string             `json:"methodName"`
-	Target              DecodeTarget       `json:"target"`
-	ExplicitMessageType string             `json:"explicitMessageType"`
-	Payload             string             `json:"payload"`
-	Encoding            DecodeEncoding     `json:"encoding"`
-	NestedRules         []NestedDecodeRule `json:"nestedRules"`
+	ProjectID                string             `json:"projectId"`
+	ServiceName              string             `json:"serviceName"`
+	MethodName               string             `json:"methodName"`
+	Target                   DecodeTarget       `json:"target"`
+	ExplicitMessageType      string             `json:"explicitMessageType"`
+	ExplicitMessageProtoPath string             `json:"explicitMessageProtoPath,omitempty"`
+	Payload                  string             `json:"payload"`
+	Encoding                 DecodeEncoding     `json:"encoding"`
+	NestedRules              []NestedDecodeRule `json:"nestedRules"`
+}
+
+type MessageTypeOption struct {
+	MessageType    string `json:"messageType"`
+	ProtoPath      string `json:"protoPath"`
+	FieldCount     int    `json:"fieldCount"`
+	MaxFieldNumber int32  `json:"maxFieldNumber"`
 }
 
 type DecodeResponse struct {
