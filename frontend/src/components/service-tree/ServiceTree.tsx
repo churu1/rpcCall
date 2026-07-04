@@ -194,6 +194,8 @@ export function ServiceTree() {
     setActiveProjectId,
     addProtoFile,
     removeProtoFile,
+    refreshProtoSources,
+    clearProtoSourcesForProject,
     addTab,
     updateTab,
     activeTabId,
@@ -245,6 +247,7 @@ export function ServiceTree() {
         removeProtoFile(f.path, f.projectId);
       }
       window.go.main.App.ClearProtoSources(activeProjectId).catch(() => {});
+      clearProtoSourcesForProject(activeProjectId);
     };
     const onReloadProtos = () => handlersRef.current.handleReload();
     document.addEventListener("rpccall:import-file", onImportFile);
@@ -259,7 +262,7 @@ export function ServiceTree() {
       document.removeEventListener("rpccall:clear-protos", onClearProtos);
       document.removeEventListener("rpccall:reload-protos", onReloadProtos);
     };
-  }, [activeProjectId, protoFiles, removeProtoFile]);
+  }, [activeProjectId, protoFiles, removeProtoFile, clearProtoSourcesForProject]);
 
   const visibleFiles = useMemo(
     () => protoFiles.filter((f) => (activeProjectId ? f.projectId === activeProjectId : false)),
@@ -294,6 +297,7 @@ export function ServiceTree() {
         const files = await window.go.main.App.LoadSavedProtos(activeProjectId);
         (files || []).forEach((f: any) => addProtoFile(f));
         loadedProjectsRef.current.add(activeProjectId);
+        await refreshProtoSources(activeProjectId);
       } catch {
         // ignore
       } finally {
@@ -350,6 +354,7 @@ export function ServiceTree() {
         }
       }
     }).catch(() => {});
+    refreshProtoSources(activeProjectId).catch(() => {});
   };
 
   const handleImportFile = async () => {
@@ -363,6 +368,7 @@ export function ServiceTree() {
       const files = await window.go.main.App.OpenProtoFileDialog(activeProjectId);
       if (files) {
         files.forEach((f: any) => addProtoFile(f));
+        await refreshProtoSources(activeProjectId);
       }
     } catch (e: any) {
       setError(typeof e === "string" ? e : e?.message || String(e));
@@ -382,6 +388,7 @@ export function ServiceTree() {
       const files = await window.go.main.App.OpenProtoDirDialog(activeProjectId);
       if (files) {
         files.forEach((f: any) => addProtoFile(f));
+        await refreshProtoSources(activeProjectId);
       }
     } catch (e: any) {
       setError(typeof e === "string" ? e : e?.message || String(e));
@@ -427,6 +434,7 @@ export function ServiceTree() {
       if (files && files.length > 0) {
         files.forEach((f: any) => addProtoFile(f));
       }
+      await refreshProtoSources(activeProjectId);
       loadedProjectsRef.current.add(activeProjectId);
     } catch (e: any) {
       setError(typeof e === "string" ? e : e?.message || String(e));
@@ -552,6 +560,7 @@ export function ServiceTree() {
                       removeProtoFile(f.path, f.projectId);
                     }
                     window.go.main.App.ClearProtoSources(activeProjectId).catch(() => {});
+                    clearProtoSourcesForProject(activeProjectId);
                   }}
                 >
                   <Trash2 size={12} />

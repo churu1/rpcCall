@@ -151,9 +151,18 @@
     "searchAllProjects": "全部项目",
     "scopeCurrentProject": "当前项目：{{project}}",
     "scopeNoProject": "当前标签页未绑定项目",
+    "allFolders": "全部文件夹",
+    "folderFilter": "导入目录",
+    "methodsSection": "方法 ({{shown}}/{{total}})",
+    "sourcesLoading": "正在加载导入目录…",
     "navigate": "导航",
     "select": "选择",
     "close": "关闭"
+  },
+  "select": {
+    "searchPlaceholder": "搜索…",
+    "noMatches": "无匹配项",
+    "refineSearch": "{{count}} 个匹配 — 请缩小搜索范围"
   },
   "shortcuts": {
     "title": "快捷键参考",
@@ -370,7 +379,7 @@
     "timeout": "请求超时",
     "timeoutDesc": "在发送按钮旁设置超时时间（秒），失焦后自动校验。默认 30 秒，范围 1-3600 秒。",
     "commandPalette": "命令面板",
-    "commandPaletteDesc": "⌘+K 打开命令面板，快速搜索方法、执行命令。支持模糊搜索，键盘上下选择，Enter 执行。",
+    "commandPaletteDesc": "⌘+K 打开命令面板，快速搜索方法、执行命令。支持按文件夹筛选、方法名优先匹配，键盘上下选择，Enter 执行。",
     "diff": "请求对比",
     "diffDesc": "在历史记录中 ⌘+点击选择两条记录（标记为 A/B），然后点击「对比」按钮，可逐行对比请求体、响应体和元数据的差异。",
     "theme": "主题 & 语言",
