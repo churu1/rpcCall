@@ -283,7 +283,8 @@
     "keyFile": "客户端密钥",
     "caFile": "CA 证书",
     "selectFile": "选择文件",
-    "notSelected": "未选择"
+    "notSelected": "未选择",
+    "port443Default": "443 端口默认启用 TLS；每个地址的 TLS 选择会自动保存"
   },
   "common": {
     "save": "保存",

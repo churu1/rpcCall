@@ -283,7 +283,8 @@
     "keyFile": "Client Key",
     "caFile": "CA Cert",
     "selectFile": "Select file",
-    "notSelected": "Not selected"
+    "notSelected": "Not selected",
+    "port443Default": "Port 443 enables TLS by default. Your TLS choice is saved per address."
   },
   "common": {
     "save": "Save",

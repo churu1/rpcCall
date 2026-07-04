@@ -7,7 +7,7 @@ RpcCall 是一个基于 Wails、Go 和 React 的桌面端 gRPC 调试工具，�
 - 导入单个 `.proto` 文件或整个 Proto 目录，按项目隔离管理服务定义。
 - 支持 gRPC Server Reflection，快速读取远程服务列表。
 - 支持 Unary、Server Streaming、Client Streaming、Bidi Streaming 四类调用。
-- 支持 TLS/mTLS、请求 Metadata、地址级默认 Metadata、请求超时、地址收藏。
+- 支持 TLS/mTLS、按地址持久化 TLS 配置（443 端口默认启用 TLS）、请求 Metadata、地址级默认 Metadata、请求超时、地址收藏。
 - 支持请求历史、历史对比、请求收藏集合、环境变量替换。
 - 支持链式调用、Mock Server、Benchmark 压测、Payload Decode。
 - 支持浅色/深色主题、中英文切换和全局字号调整。
@@ -32,6 +32,19 @@ RpcCall 支持通过快捷键调整全局界面字号，适合高分屏、投屏
 
 点击刷新时，RpcCall 会重新调用保存默认 Metadata 时记录的来源 RPC，并按原字段映射更新默认 Metadata。刷新不会调用当前正在编辑的 RPC，也不会覆盖当前请求中手动填写的同名 Metadata。
 
+## 按地址 TLS 配置
+
+地址栏右侧的盾牌图标用于开关 TLS，并可配置 CA / 客户端证书 / 密钥文件。RpcCall 会按 `host:port` 将 TLS 选择保存到本地数据库；切换地址时自动恢复该地址的历史配置。
+
+若某地址尚未保存过 TLS 偏好，且端口为 **443**（HTTPS / 线上 gRPC 常用端口），则默认启用 TLS。手动关闭后会持久化保存，下次仍保持关闭。
+
+## 更新日志
+
+| 日期 | 功能 |
+|------|------|
+| 2026-07-04 | 按地址持久化 TLS 配置；443 端口默认启用 TLS；地址栏盾牌图标支持开关 TLS 并保存证书路径 |
+| 2026-06-21 | 地址级默认 Metadata：从 RPC 响应字段映射到 metadata key，按地址自动附加，支持刷新与手动值优先 |
+
 ## 开发
 
 开发模式支持热更新：
@@ -50,8 +63,8 @@ wails dev
 wails build
 ```
 
-构建产物位于：
+构建产物位于 `build/bin/RpcCall.app`。打开方式：
 
 ```bash
-build/bin/RpcCall.app
+open build/bin/RpcCall.app
 ```

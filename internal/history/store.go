@@ -288,7 +288,24 @@ func createTables(db *sql.DB) error {
 	if err := migrateMetadataProfilesMulti(db); err != nil {
 		return err
 	}
+	if err := migrateAddressTLSSettings(db); err != nil {
+		return err
+	}
 	return migrateDecodeHistoryProjectScope(db)
+}
+
+func migrateAddressTLSSettings(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS address_tls_settings (
+			address TEXT PRIMARY KEY,
+			use_tls INTEGER NOT NULL DEFAULT 0,
+			cert_path TEXT NOT NULL DEFAULT '',
+			key_path TEXT NOT NULL DEFAULT '',
+			ca_path TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL
+		)
+	`)
+	return err
 }
 
 func migrateHistoryTLSColumns(db *sql.DB) error {
@@ -644,6 +661,67 @@ func (s *Store) UpdateAddress(id int64, name, address string) error {
 func (s *Store) DeleteAddress(id int64) error {
 	_, err := s.db.Exec("DELETE FROM saved_addresses WHERE id = ?", id)
 	return err
+}
+
+// --- Address TLS Settings ---
+
+type AddressTLSSettings struct {
+	Address  string `json:"address"`
+	UseTLS   bool   `json:"useTls"`
+	CertPath string `json:"certPath"`
+	KeyPath  string `json:"keyPath"`
+	CaPath   string `json:"caPath"`
+}
+
+func (s *Store) GetAddressTLSSettings(address string) (*AddressTLSSettings, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+
+	var useTLS int
+	var settings AddressTLSSettings
+	settings.Address = address
+	err := s.db.QueryRow(`
+		SELECT use_tls, cert_path, key_path, ca_path
+		FROM address_tls_settings
+		WHERE address = ?
+	`, address).Scan(&useTLS, &settings.CertPath, &settings.KeyPath, &settings.CaPath)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	settings.UseTLS = useTLS == 1
+	return &settings, nil
+}
+
+func (s *Store) SaveAddressTLSSettings(settings AddressTLSSettings) (*AddressTLSSettings, error) {
+	settings.Address = strings.TrimSpace(settings.Address)
+	if settings.Address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+
+	useTLS := 0
+	if settings.UseTLS {
+		useTLS = 1
+	}
+	now := time.Now().Format(time.RFC3339)
+	_, err := s.db.Exec(`
+		INSERT INTO address_tls_settings (address, use_tls, cert_path, key_path, ca_path, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(address) DO UPDATE SET
+			use_tls = excluded.use_tls,
+			cert_path = excluded.cert_path,
+			key_path = excluded.key_path,
+			ca_path = excluded.ca_path,
+			updated_at = excluded.updated_at
+	`, settings.Address, useTLS, settings.CertPath, settings.KeyPath, settings.CaPath, now)
+	if err != nil {
+		return nil, err
+	}
+	return &settings, nil
 }
 
 // --- Saved Proto Sources ---

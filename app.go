@@ -461,6 +461,34 @@ func (a *App) DeleteAddress(id int64) error {
 	return a.history.DeleteAddress(id)
 }
 
+func (a *App) GetAddressTLSSettings(address string) (*history.AddressTLSSettings, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+	settings, err := a.history.GetAddressTLSSettings(address)
+	if err != nil {
+		return nil, err
+	}
+	if settings != nil {
+		return settings, nil
+	}
+	return &history.AddressTLSSettings{
+		Address: address,
+		UseTLS:  grpclib.DefaultUseTLSForAddress(address),
+	}, nil
+}
+
+func (a *App) SaveAddressTLSSettings(settings history.AddressTLSSettings) (*history.AddressTLSSettings, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.SaveAddressTLSSettings(settings)
+}
+
 // --- Saved Proto Sources ---
 
 func (a *App) ListProtoProjects() ([]history.ProtoProject, error) {

@@ -12,15 +12,11 @@ RpcCall is a cross-platform desktop gRPC debugging tool (similar to BloomRPC/Pos
 # Development (hot reload for both Go and frontend)
 wails dev
 
-# Production build (outputs to build/bin/)
+# Production build (outputs to build/bin/RpcCall.app on macOS)
 wails build
 
-# Run Go tests
-go test ./...
-
-# Run tests for a specific package
-go test ./internal/grpc -v
-go test ./internal/history -v
+# Open built app (macOS)
+open build/bin/RpcCall.app
 
 # Frontend only (from frontend/ directory)
 cd frontend && npm install
@@ -45,9 +41,9 @@ cd frontend && npm run build  # tsc && vite build
 - **`internal/grpc/reflection.go`** — gRPC Reflection API client, caches ServiceDescriptors, filters internal services.
 - **`internal/grpc/decoder.go`** — Multi-encoding protobuf payload decoder (auto-detect, hex, base64, escape, raw). Supports nested message decoding with field path rules and batch operations.
 - **`internal/grpc/benchmark.go`** — Load testing with count/duration/QPS modes, concurrency ramp-up, latency percentiles (P50/P90/P99).
-- **`internal/grpc/connection.go`** — TLS/mTLS connection configuration.
+- **`internal/grpc/connection.go`** — TLS/mTLS connection configuration; `DefaultUseTLSForAddress()` enables TLS by default for port 443.
 - **`internal/grpc/mock_server.go`** — Mock gRPC server for testing.
-- **`internal/history/store.go`** — SQLite persistence (pure Go via `modernc.org/sqlite`, no CGO). Stores history, addresses, proto sources, projects, collections, decode templates, environments. DB location: `~/Library/Application Support/RpcCall/history.db`.
+- **`internal/history/store.go`** — SQLite persistence (pure Go via `modernc.org/sqlite`, no CGO). Stores history, addresses, address TLS settings, proto sources, projects, collections, metadata profiles, decode templates, environments. DB location: `~/Library/Application Support/RpcCall/history.db`.
 - **`internal/models/types.go`** — Shared data types (GrpcRequest, GrpcResponse, ServiceMethod, BenchmarkConfig, etc.).
 - **`internal/ai/ai.go`** — OpenAI-compatible AI client integration.
 
@@ -55,6 +51,7 @@ cd frontend && npm run build  # tsc && vite build
 
 - **State management**: Zustand stores in `frontend/src/store/` — `app-store.ts` (tabs, proto files, projects), `env-store.ts` (environment variables), `theme-store.ts` (dark/light theme via CSS custom properties).
 - **Components** in `frontend/src/components/` — organized by feature: `layout/`, `service-tree/`, `connection/`, `editor/`, `response/`, `history/`, `command-palette/`, `benchmark/`, `decode/`, `mock/`, `chain/`, `collection/`, `environment/`, `ai/`, `search/`, `shortcuts/`, `ui/` (reusable primitives).
+- **Hooks**: `useGrpc.ts` (RPC invoke), `useAddressTls.ts` (load/save per-address TLS settings when address changes).
 - **Path alias**: `@/*` maps to `frontend/src/*` (configured in tsconfig.json and vite.config.ts).
 - **Wails bindings**: Auto-generated in `frontend/wailsjs/` — do not edit manually.
 - **i18n**: Chinese (`zh.json`) and English (`en.json`) via i18next in `frontend/src/i18n/`.
