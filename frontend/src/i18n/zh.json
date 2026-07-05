@@ -48,6 +48,12 @@
     "jsonParseError": "JSON 解析失败：{{detail}}",
     "placeholder": "{\n  \"field\": \"value\"\n}"
   },
+  "grpcurl": {
+    "title": "导出 grpcurl 命令",
+    "copy": "复制命令",
+    "copied": "已复制",
+    "streamingNote": "流式 RPC：grpcurl 对 client-streaming / bidi-streaming 需用 @file 或 stdin 提供请求体，请按实际场景调整。"
+  },
   "response": {
     "noResponse": "暂无响应，发送请求后在此查看结果。",
     "tree": "树形",
@@ -121,6 +127,9 @@
     "title": "历史记录",
     "clear": "清空历史",
     "noHistory": "暂无历史记录",
+    "noFilteredHistory": "没有匹配的历史记录",
+    "searchPlaceholder": "搜索方法/地址/状态...",
+    "loadMore": "显示更多（已显示 {{shown}}/{{total}}）",
     "compare": "对比",
     "selectToCompare": "⌘+点击再选一条进行对比",
     "diff": "请求对比",
@@ -221,7 +230,18 @@
     "p50": "P50",
     "p90": "P90",
     "p99": "P99",
-    "max": "Max"
+    "max": "Max",
+    "avgLatency": "平均延迟",
+    "successRate": "成功率",
+    "totalSent": "已发送",
+    "errorCount": "错误数",
+    "metric": "指标",
+    "delta": "变化",
+    "compare": "对比",
+    "selectToCompare": "⌘+点击再选一条进行对比",
+    "compareTitle": "Benchmark 对比",
+    "configCompare": "配置对比",
+    "configMismatch": "配置不一致，对比结果仅供参考"
   },
   "decode": {
     "decode": "解码",
@@ -302,7 +322,19 @@
     "add": "添加",
     "cancel": "取消",
     "delete": "删除",
-    "close": "关闭"
+    "close": "关闭",
+    "clear": "清除",
+    "confirm": "确认"
+  },
+  "tab": {
+    "close": "关闭",
+    "closeOthers": "关闭其他",
+    "closeRight": "关闭右侧",
+    "closeAll": "关闭全部",
+    "unsavedTitle": "未保存的改动",
+    "unsavedMessage": "此请求自上次保存到 Collection 后已有改动，确定关闭吗？",
+    "unsavedBulkMessage": "{{count}} 个请求有未保存改动，确定全部关闭吗？",
+    "closeWithoutSaving": "不保存关闭"
   },
   "lang": {
     "switch": "EN"
@@ -387,7 +419,7 @@
   },
   "chain": {
     "title": "链式调用",
-    "description": "链式调用 - 按顺序执行多个请求，支持 {{prev.field}} 变量引用上一步结果",
+    "description": "链式调用 - 按顺序执行多个请求，支持 {{prev.field}} 变量引用上一步结果（支持 dot-path 嵌套与数组下标）",
     "stepN": "步骤 {{n}}",
     "addressPlaceholder": "localhost:50051",
     "servicePlaceholder": "ServiceName",
@@ -409,6 +441,11 @@
     "templateSaved": "模板已保存",
     "deleteTemplate": "删除模板",
     "updateTemplate": "更新模板",
-    "savedTemplates": "已保存的链式调用模板"
+    "savedTemplates": "已保存的链式调用模板",
+    "prevFields": "上一步响应字段",
+    "prevFieldsEmpty": "上一步响应不可解析或为空",
+    "prevFieldsHint": "点击字段插入变量",
+    "insertVar": "插入变量引用",
+    "stepProgress": "逐步执行中"
   }
 }

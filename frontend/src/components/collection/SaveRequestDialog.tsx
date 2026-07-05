@@ -70,6 +70,10 @@ export function SaveRequestDialog({ onClose }: Props) {
         keyPath: tab.keyPath,
         caPath: tab.caPath,
         createdAt: "",
+      }).then((saved) => {
+        if (saved?.id && activeTabId) {
+          useAppStore.getState().markCollectionSaved(activeTabId, saved.id);
+        }
       });
       document.dispatchEvent(new CustomEvent("rpccall:collections-changed"));
       onClose();

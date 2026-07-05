@@ -327,7 +327,7 @@ func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error)
 	}
 
 	result := &models.ChainResult{}
-	var prevResponse map[string]interface{}
+	var prevResponse interface{}
 
 	re := regexp.MustCompile(`\{\{prev\.([^}]+)\}\}`)
 
@@ -353,15 +353,9 @@ func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error)
 				if len(groups) < 2 {
 					return match
 				}
-				fieldName := groups[1]
-				if val, ok := prevResponse[fieldName]; ok {
-					switch v := val.(type) {
-					case string:
-						return v
-					default:
-						b, _ := json.Marshal(v)
-						return string(b)
-					}
+				fieldPath := groups[1]
+				if val, ok := grpclib.ResolvePrevVar(prevResponse, fieldPath); ok {
+					return val
 				}
 				return match
 			})
@@ -374,6 +368,7 @@ func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error)
 			stepResult.Error = err.Error()
 			stepResult.StatusCode = "ERROR"
 			result.Steps = append(result.Steps, stepResult)
+			runtime.EventsEmit(a.ctx, "chain:step", stepResult)
 			return result, nil
 		}
 
@@ -387,11 +382,15 @@ func (a *App) InvokeChain(steps []models.ChainStep) (*models.ChainResult, error)
 		}
 
 		result.Steps = append(result.Steps, stepResult)
+		runtime.EventsEmit(a.ctx, "chain:step", stepResult)
 
 		// Parse response for next step
 		prevResponse = nil
 		if resp != nil && resp.Body != "" {
-			json.Unmarshal([]byte(resp.Body), &prevResponse)
+			var parsed interface{}
+			if json.Unmarshal([]byte(resp.Body), &parsed) == nil {
+				prevResponse = parsed
+			}
 		}
 
 		// If error status, stop chain

@@ -119,6 +119,9 @@ export function CollectionPanel() {
           keyPath: req.keyPath,
           caPath: req.caPath,
         });
+        if (req.id) {
+          state.markCollectionLoaded(newTab.id, req.id);
+        }
       }
     }, 0);
   };

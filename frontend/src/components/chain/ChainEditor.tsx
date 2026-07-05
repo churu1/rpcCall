@@ -8,6 +8,8 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { JsonEditor } from "@/components/editor/JsonEditor";
+import { PrevFieldsPanel } from "./PrevFieldsPanel";
 
 export function ChainEditor() {
   const { t } = useTranslation();
@@ -41,6 +43,8 @@ export function ChainEditor() {
   useEffect(() => {
     window.go.main.App.ListAddresses().then((list) => setSavedAddresses(list ?? [])).catch(() => {});
   }, []);
+
+  const bodyRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +109,26 @@ export function ChainEditor() {
     setSteps(steps.map((s, idx) => (idx === i ? { ...s, ...updates } : s)));
   };
 
+  const insertVarAt = (stepIndex: number, dotpath: string, container: HTMLDivElement | null) => {
+    if (!container) return;
+    const textarea = container.querySelector("textarea");
+    if (!textarea) return;
+    const insertText = `{{prev.${dotpath}}}`;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const current = steps[stepIndex]?.body ?? "";
+    const next = current.slice(0, start) + insertText + current.slice(end);
+    updateStep(stepIndex, { body: next });
+    requestAnimationFrame(() => {
+      const ta = container.querySelector("textarea");
+      if (ta) {
+        const pos = start + insertText.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      }
+    });
+  };
+
   const handleServiceChange = (i: number, serviceName: string) => {
     updateStep(i, { serviceName, methodName: "", body: '{\n  \n}' });
   };
@@ -125,7 +149,24 @@ export function ChainEditor() {
     setRunning(true);
     setError(null);
     updateTab(activeTabId, { chainResults: [] });
+
+    const stepHandler = (r: ChainStepResult) => {
+      const current = useAppStore.getState().tabs.find((t) => t.id === activeTabId);
+      const existing = current?.chainResults ?? [];
+      if (r.index === existing.length) {
+        updateTab(activeTabId, { chainResults: [...existing, r] });
+      } else if (r.index < existing.length) {
+        const next = [...existing];
+        next[r.index] = r;
+        updateTab(activeTabId, { chainResults: next });
+      } else {
+        updateTab(activeTabId, { chainResults: [...existing, r] });
+      }
+      document.dispatchEvent(new CustomEvent("rpccall:show-chain-results"));
+    };
+
     try {
+      const off = window.runtime.EventsOn("chain:step", stepHandler);
       const chainSteps: ChainStep[] = steps.map((s) => ({
         address: resolveVariables(s.address),
         projectId: s.projectId || tab?.projectId || "",
@@ -139,6 +180,7 @@ export function ChainEditor() {
         caPath: tab?.caPath || "",
       }));
       const result = await window.go.main.App.InvokeChain(chainSteps);
+      off();
       updateTab(activeTabId, { chainResults: result.steps || [] });
       document.dispatchEvent(new CustomEvent("rpccall:show-chain-results"));
     } catch (e: unknown) {
@@ -249,7 +291,10 @@ export function ChainEditor() {
         </div>
       )}
 
-      {steps.map((step, i) => (
+      {steps.map((step, i) => {
+        const prevResult = tab?.chainResults?.[i - 1];
+        const bodyContainerRef = bodyRefs.current[i] ?? null;
+        return (
         <Card key={i} className="p-2 flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-medium text-[var(--state-info)]">{t("chain.stepN", { n: i + 1 })}</span>
@@ -341,18 +386,25 @@ export function ChainEditor() {
               </Button>
             </div>
           )}
-          <textarea
-            value={step.body}
-            onChange={(e) => updateStep(i, { body: e.target.value })}
-            placeholder={'{\n  "field": "{{prev.id}}"\n}'}
-            className="w-full bg-[var(--surface-2)] px-2 py-1 rounded border border-[var(--line-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring)] text-[11px] font-mono resize-none h-16"
-            spellCheck={false}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-          />
+          {i > 0 && prevResult && (
+            <PrevFieldsPanel
+              prevResultBody={prevResult.body}
+              onInsert={(dotpath) => insertVarAt(i, dotpath, bodyContainerRef)}
+            />
+          )}
+          <div
+            ref={(el) => { bodyRefs.current[i] = el; }}
+            className="rounded border border-[var(--line-strong)] bg-[var(--surface-2)] min-h-[64px] max-h-[200px] overflow-auto"
+          >
+            <JsonEditor
+              value={step.body}
+              onChange={(next) => updateStep(i, { body: next })}
+              placeholder={'{\n  "field": "{{prev.id}}"\n}'}
+            />
+          </div>
         </Card>
-      ))}
+        );
+      })}
 
       <Button onClick={addStep} variant="ghost" size="sm" className="self-start">
         <Plus size={12} /> {t("chain.addStep")}

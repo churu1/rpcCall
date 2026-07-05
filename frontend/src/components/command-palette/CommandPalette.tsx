@@ -61,7 +61,7 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const keyboardNavRef = useRef(false);
-  const { tabs, addTab, removeTab, activeTabId, activeProjectId, updateTab } = useAppStore();
+  const { tabs, addTab, activeTabId, activeProjectId, updateTab } = useAppStore();
   const { theme, toggleTheme } = useThemeStore();
   const { increaseFontScale, decreaseFontScale, resetFontScale } = useFontScaleStore();
   const { t } = useTranslation();
@@ -407,7 +407,9 @@ export function CommandPalette() {
 
       if ((e.metaKey || e.ctrlKey) && e.key === "w") {
         e.preventDefault();
-        if (activeTabId) removeTab(activeTabId);
+        if (activeTabId) {
+          document.dispatchEvent(new CustomEvent("rpccall:request-close-tab", { detail: { id: activeTabId } }));
+        }
         return;
       }
 
@@ -466,7 +468,7 @@ export function CommandPalette() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addTab, removeTab, activeTabId, increaseFontScale, decreaseFontScale, resetFontScale]);
+  }, [addTab, activeTabId, increaseFontScale, decreaseFontScale, resetFontScale]);
 
   useEffect(() => {
     if (open) {

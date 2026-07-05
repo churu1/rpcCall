@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { RefreshCw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Props {
   address: string;
@@ -159,24 +160,15 @@ export function MetadataProfileBar({ address }: Props) {
       </div>
       {message && <div className="mt-1 text-[10px] text-[var(--text-muted)]">{message}</div>}
       {pendingDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="w-[360px] rounded-xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-4 shadow-xl">
-            <div className="mb-2 text-sm font-semibold text-[var(--text-strong)]">
-              {t("metadataProfile.deleteTitle")}
-            </div>
-            <div className="mb-4 text-xs leading-relaxed text-[var(--text-muted)]">
-              {t("metadataProfile.deleteMessage", { name: pendingDelete.name })}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button onClick={() => setPendingDelete(null)} variant="ghost">
-                {t("common.cancel")}
-              </Button>
-              <Button onClick={confirmDelete} variant="danger">
-                {t("common.delete")}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={t("metadataProfile.deleteTitle")}
+          message={t("metadataProfile.deleteMessage", { name: pendingDelete.name })}
+          confirmLabel={t("common.delete")}
+          cancelLabel={t("common.cancel")}
+          variant="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );

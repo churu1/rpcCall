@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
-import { Plus, Trash2, Braces, WrapText, Minimize2, Sparkles, Loader2 } from "lucide-react";
+import { useEnvStore } from "@/store/env-store";
+import { Plus, Trash2, Braces, WrapText, Minimize2, Sparkles, Loader2, Terminal } from "lucide-react";
 import { SearchBar, type SearchMatch } from "@/components/search/SearchBar";
 import { BenchmarkPanel } from "@/components/benchmark/BenchmarkPanel";
 import { ChainEditor } from "@/components/chain/ChainEditor";
@@ -14,6 +15,9 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
 import { JsonEditor } from "./JsonEditor";
 import { AutocompletePopup } from "./AutocompletePopup";
+import { GrpcurlDialog } from "./GrpcurlDialog";
+import { buildGrpcurlCommand } from "@/lib/grpcurl-export";
+import { mergeMetadata } from "@/lib/metadata-profile";
 
 function parseJsonToEntries(json: string): MetadataEntry[] | null {
   try {
@@ -250,6 +254,8 @@ export function RequestEditor() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [bodyJsonError, setBodyJsonError] = useState<string | null>(null);
+  const [grpcurlCommand, setGrpcurlCommand] = useState<string | null>(null);
+  const [grpcurlStreaming, setGrpcurlStreaming] = useState(false);
 
   const handleHighlight = useCallback((_matches: SearchMatch[], _currentIndex: number) => {
     // For textarea, highlighting is done via setSelectionRange in onScrollTo
@@ -440,6 +446,49 @@ export function RequestEditor() {
     setAiLoading(false);
   };
 
+  const handleExportGrpcurl = async () => {
+    if (!tab?.method) return;
+    const resolveVariables = useEnvStore.getState().resolveVariables;
+    try {
+      let metadata = tab.metadata;
+      try {
+        const profile = await window.go.main.App.GetMetadataProfile(tab.address);
+        if (profile?.enabled) {
+          metadata = mergeMetadata(tab.metadata, profile.metadata.map((m) => ({ ...m, enabled: true })));
+        }
+      } catch { /* ignore profile load errors */ }
+
+      const resolvedMetadata = metadata
+        .filter((m) => m.enabled && m.key.trim())
+        .map((m) => ({ key: m.key.trim(), value: resolveVariables(m.value) }));
+
+      const command = buildGrpcurlCommand({
+        address: resolveVariables(tab.address),
+        method: {
+          serviceName: tab.method.serviceName,
+          methodName: tab.method.methodName,
+          fullName: tab.method.fullName,
+          methodType: tab.method.methodType,
+        },
+        body: resolveVariables(tab.requestBody),
+        metadata: resolvedMetadata,
+        useTls: tab.useTls,
+        certPath: tab.certPath,
+        keyPath: tab.keyPath,
+        caPath: tab.caPath,
+      });
+      setGrpcurlStreaming(
+        tab.method.methodType === "server_streaming" ||
+          tab.method.methodType === "client_streaming" ||
+          tab.method.methodType === "bidi_streaming"
+      );
+      setGrpcurlCommand(command);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : String(e));
+      setTimeout(() => setAiError(null), 5000);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[var(--surface-1)]" ref={containerRef} tabIndex={-1}>
       <div className="border-b border-[var(--line-soft)] min-h-[33px] relative" style={{ display: "grid", gridTemplateColumns: (activePanel === "body" || activePanel === "metadata") ? "1fr auto" : "1fr" }}>
@@ -479,6 +528,17 @@ export function RequestEditor() {
             >
               <Minimize2 size={11} />
             </IconButton>
+            {activePanel === "body" && tab.method && (
+              <IconButton
+                onClick={handleExportGrpcurl}
+                size="sm"
+                className="h-7 w-7 border-transparent bg-transparent"
+                title={t("grpcurl.title")}
+                aria-label={t("grpcurl.title")}
+              >
+                <Terminal size={11} />
+              </IconButton>
+            )}
           </div>
         )}
       </div>
@@ -563,6 +623,13 @@ export function RequestEditor() {
         }}
         onClose={() => setAcVisible(false)}
       />
+      {grpcurlCommand && (
+        <GrpcurlDialog
+          command={grpcurlCommand}
+          isStreaming={grpcurlStreaming}
+          onClose={() => setGrpcurlCommand(null)}
+        />
+      )}
     </div>
   );
 }

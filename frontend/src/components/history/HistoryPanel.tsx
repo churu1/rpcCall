@@ -1,12 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
-import { Clock, Trash2, RefreshCw, CheckCircle2, AlertCircle, ChevronUp, ChevronDown, GitCompareArrows } from "lucide-react";
+import { scoreFuzzyText } from "@/lib/fuzzy-search";
+import { Clock, Trash2, RefreshCw, CheckCircle2, AlertCircle, ChevronUp, ChevronDown, GitCompareArrows, Search } from "lucide-react";
 import { DiffViewer } from "./DiffViewer";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { HISTORY_LIST_LIMIT } from "@/lib/history-limits";
+
+const INITIAL_VISIBLE_COUNT = 100;
+const VISIBLE_STEP = 100;
 
 interface HistoryEntry {
   id: number;
@@ -47,6 +51,8 @@ export function HistoryPanel() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [compareIds, setCompareIds] = useState<Set<number>>(new Set());
   const [diffData, setDiffData] = useState<{ left: HistoryDetail; right: HistoryDetail } | null>(null);
+  const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -153,6 +159,30 @@ export function HistoryPanel() {
     } catch { /* ignore */ }
   };
 
+  const filteredEntries = useMemo(() => {
+    const q = query.trim();
+    if (!q) return entries;
+    return entries.filter((entry) => {
+      const text = [
+        entry.serviceName,
+        entry.methodName,
+        entry.address,
+        entry.statusCode,
+        entry.error || "",
+      ].join(" ");
+      return scoreFuzzyText(text, q) >= 0;
+    });
+  }, [entries, query]);
+
+  const visibleEntries = filteredEntries.slice(0, visibleCount);
+  const hasMore = visibleEntries.length < filteredEntries.length;
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+    setCompareIds(new Set());
+  };
+
   return (
     <div className={cn("border-t border-[var(--line-soft)] bg-[var(--surface-1)]", collapsed ? "h-8" : "h-48")}>
       <div className="flex items-center justify-between px-3 h-8 border-b border-[var(--line-soft)]">
@@ -204,64 +234,106 @@ export function HistoryPanel() {
         </div>
       </div>
       {!collapsed && (
-        <div className="overflow-y-auto" style={{ height: "calc(100% - 2rem)" }}>
-          {entries.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
-              {t("history.noHistory")}
-            </div>
-          ) : (
-            entries.map((entry) => {
-              const compareArr = Array.from(compareIds);
-              const compareIndex = compareArr.indexOf(entry.id);
-              const isCompare = compareIndex !== -1;
-              return (
-              <div
-                key={entry.id}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs border-b border-[var(--line-soft)] group transition-colors duration-150",
-                  selectedId === entry.id && !isCompare
-                    ? "bg-[var(--state-info)]/12 border-l-2 border-l-[var(--state-info)] pl-2.5"
-                    : isCompare
-                      ? "bg-[var(--state-info)]/8 border-l-2 border-l-[var(--state-info)] pl-2.5"
-                      : "hover:bg-[var(--surface-2)]"
-                )}
-                onClick={(e) => handleClick(entry, e)}
-              >
-                {isCompare ? (
-                  <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--state-info)] text-white text-[9px] font-bold shrink-0">
-                    {compareIndex === 0 ? "A" : "B"}
-                  </span>
-                ) : entry.statusCode === "OK" ? (
-                  <CheckCircle2 size={12} className="text-[var(--color-method-unary)] shrink-0" />
-                ) : (
-                  <AlertCircle size={12} className="text-[var(--state-error)] shrink-0" />
-                )}
-                  <span className="text-[var(--text-muted)] font-mono text-[10px] shrink-0">
-                    {new Date(entry.timestamp).toLocaleTimeString()}
-                  </span>
-                <span className="truncate font-medium">
-                  {entry.serviceName}/{entry.methodName}
-                </span>
-                <span className="text-[var(--text-muted)] truncate">
-                  {entry.address}
-                </span>
-                <span className="flex items-center gap-0.5 text-[var(--text-muted)] shrink-0 ml-auto">
-                  <Clock size={10} />
-                  {entry.elapsedMs}ms
-                </span>
+        <div className="flex flex-col" style={{ height: "calc(100% - 2rem)" }}>
+          {entries.length > 0 && (
+            <div className="flex items-center gap-1 px-2 py-1 border-b border-[var(--line-soft)] shrink-0">
+              <Search size={11} className="text-[var(--text-muted)] shrink-0" />
+              <input
+                value={query}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                placeholder={t("history.searchPlaceholder")}
+                className="flex-1 min-w-0 bg-transparent text-[11px] outline-none placeholder:text-[var(--text-muted)]"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-form-type="other"
+                data-lpignore="true"
+              />
+              {query && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(entry.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--surface-1)] rounded text-[var(--text-muted)] hover:text-[var(--state-error)]"
+                  onClick={() => handleQueryChange("")}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-normal)] text-[10px] px-1"
+                  title={t("common.clear")}
                 >
-                  <Trash2 size={10} />
+                  ✕
                 </button>
-              </div>
-              );
-            })
+              )}
+            </div>
           )}
+          <div className="overflow-y-auto flex-1">
+            {entries.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
+                {t("history.noHistory")}
+              </div>
+            ) : filteredEntries.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
+                {t("history.noFilteredHistory")}
+              </div>
+            ) : (
+              <>
+                {visibleEntries.map((entry) => {
+                  const compareArr = Array.from(compareIds);
+                  const compareIndex = compareArr.indexOf(entry.id);
+                  const isCompare = compareIndex !== -1;
+                  return (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs border-b border-[var(--line-soft)] group transition-colors duration-150",
+                      selectedId === entry.id && !isCompare
+                        ? "bg-[var(--state-info)]/12 border-l-2 border-l-[var(--state-info)] pl-2.5"
+                        : isCompare
+                          ? "bg-[var(--state-info)]/8 border-l-2 border-l-[var(--state-info)] pl-2.5"
+                          : "hover:bg-[var(--surface-2)]"
+                    )}
+                    onClick={(e) => handleClick(entry, e)}
+                  >
+                    {isCompare ? (
+                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--state-info)] text-white text-[9px] font-bold shrink-0">
+                        {compareIndex === 0 ? "A" : "B"}
+                      </span>
+                    ) : entry.statusCode === "OK" ? (
+                      <CheckCircle2 size={12} className="text-[var(--color-method-unary)] shrink-0" />
+                    ) : (
+                      <AlertCircle size={12} className="text-[var(--state-error)] shrink-0" />
+                    )}
+                    <span className="text-[var(--text-muted)] font-mono text-[10px] shrink-0">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="truncate font-medium">
+                      {entry.serviceName}/{entry.methodName}
+                    </span>
+                    <span className="text-[var(--text-muted)] truncate">
+                      {entry.address}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-[var(--text-muted)] shrink-0 ml-auto">
+                      <Clock size={10} />
+                      {entry.elapsedMs}ms
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(entry.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--surface-1)] rounded text-[var(--text-muted)] hover:text-[var(--state-error)]"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                  );
+                })}
+                {hasMore && (
+                  <button
+                    onClick={() => setVisibleCount((c) => c + VISIBLE_STEP)}
+                    className="w-full py-1.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-normal)] hover:bg-[var(--surface-2)] transition-colors"
+                  >
+                    {t("history.loadMore", { shown: visibleEntries.length, total: filteredEntries.length })}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
       {diffData && (

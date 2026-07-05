@@ -48,6 +48,12 @@
     "jsonParseError": "JSON parse failed: {{detail}}",
     "placeholder": "{\n  \"field\": \"value\"\n}"
   },
+  "grpcurl": {
+    "title": "Export grpcurl Command",
+    "copy": "Copy Command",
+    "copied": "Copied",
+    "streamingNote": "Streaming RPC: grpcurl requires @file or stdin for client-streaming / bidi-streaming request bodies. Adjust accordingly."
+  },
   "response": {
     "noResponse": "No response yet. Send a request to see the result.",
     "tree": "Tree",
@@ -121,6 +127,9 @@
     "title": "HISTORY",
     "clear": "Clear History",
     "noHistory": "No history records",
+    "noFilteredHistory": "No matching history records",
+    "searchPlaceholder": "Search method/address/status...",
+    "loadMore": "Show more ({{shown}}/{{total}} shown)",
     "compare": "Compare",
     "selectToCompare": "⌘+Click one more to compare",
     "diff": "Request Diff",
@@ -221,7 +230,18 @@
     "p50": "P50",
     "p90": "P90",
     "p99": "P99",
-    "max": "Max"
+    "max": "Max",
+    "avgLatency": "Avg Latency",
+    "successRate": "Success Rate",
+    "totalSent": "Total Sent",
+    "errorCount": "Errors",
+    "metric": "Metric",
+    "delta": "Delta",
+    "compare": "Compare",
+    "selectToCompare": "⌘+Click one more to compare",
+    "compareTitle": "Benchmark Comparison",
+    "configCompare": "Config Comparison",
+    "configMismatch": "Config mismatch — comparison is for reference only"
   },
   "decode": {
     "decode": "Decode",
@@ -302,7 +322,19 @@
     "add": "Add",
     "cancel": "Cancel",
     "delete": "Delete",
-    "close": "Close"
+    "close": "Close",
+    "clear": "Clear",
+    "confirm": "Confirm"
+  },
+  "tab": {
+    "close": "Close",
+    "closeOthers": "Close Others",
+    "closeRight": "Close to the Right",
+    "closeAll": "Close All",
+    "unsavedTitle": "Unsaved Changes",
+    "unsavedMessage": "This request has changes since it was last saved to a Collection. Close anyway?",
+    "unsavedBulkMessage": "{{count}} request(s) have unsaved changes. Close all anyway?",
+    "closeWithoutSaving": "Close Without Saving"
   },
   "lang": {
     "switch": "中文"
@@ -387,7 +419,7 @@
   },
   "chain": {
     "title": "Chain Request",
-    "description": "Chain Request - sequential calls with {{prev.field}} variables",
+    "description": "Chain Request - sequential calls with {{prev.field}} variables (supports dot-path nesting and array indices)",
     "stepN": "Step {{n}}",
     "addressPlaceholder": "localhost:50051",
     "servicePlaceholder": "ServiceName",
@@ -409,6 +441,11 @@
     "templateSaved": "Template saved",
     "deleteTemplate": "Delete Template",
     "updateTemplate": "Update Template",
-    "savedTemplates": "Saved Chain Templates"
+    "savedTemplates": "Saved Chain Templates",
+    "prevFields": "Previous step response fields",
+    "prevFieldsEmpty": "Previous response not parseable or empty",
+    "prevFieldsHint": "Click a field to insert variable",
+    "insertVar": "Insert variable reference",
+    "stepProgress": "Running step by step"
   }
 }

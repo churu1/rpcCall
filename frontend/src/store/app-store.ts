@@ -69,6 +69,24 @@ export interface Tab {
   chainSteps?: ChainStepConfig[];
   chainResults?: ChainStepResult[];
   projectId: string | null;
+  collectionRequestId?: number;
+  savedSnapshot?: string;
+  isDirty?: boolean;
+}
+
+const DIRTY_TRACKED_KEYS = ["address", "requestBody", "metadata", "useTls", "certPath", "keyPath", "caPath"] as const;
+
+function buildSavedSnapshot(tab: Tab): string {
+  const snapshot = {
+    address: tab.address,
+    requestBody: tab.requestBody,
+    metadata: tab.metadata.filter((m) => m.enabled && m.key.trim()).map((m) => ({ key: m.key.trim(), value: m.value })),
+    useTls: tab.useTls,
+    certPath: tab.certPath,
+    keyPath: tab.keyPath,
+    caPath: tab.caPath,
+  };
+  return JSON.stringify(snapshot);
 }
 
 interface AppState {
@@ -92,10 +110,14 @@ interface AppState {
 
   addTab: (method?: ServiceMethod) => string;
   removeTab: (id: string) => void;
+  removeTabsByIds: (ids: string[]) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
   getActiveTab: () => Tab | undefined;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
+  markCollectionLoaded: (id: string, collectionRequestId: number) => void;
+  markCollectionSaved: (id: string, collectionRequestId: number) => void;
+  clearCollectionLink: (id: string) => void;
 
   setSidebarWidth: (width: number) => void;
 }
@@ -250,13 +272,69 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateTab: (id, updates) =>
     set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      tabs: state.tabs.map((t) => {
+        if (t.id !== id) return t;
+        const next = { ...t, ...updates };
+        if (t.collectionRequestId !== undefined && t.savedSnapshot !== undefined) {
+          const touched = DIRTY_TRACKED_KEYS.some((k) => k in updates);
+          if (touched) {
+            next.isDirty = buildSavedSnapshot(next) !== t.savedSnapshot;
+          }
+        }
+        return next;
+      }),
     })),
 
   getActiveTab: () => {
     const state = get();
     return state.tabs.find((t) => t.id === state.activeTabId);
   },
+
+  markCollectionLoaded: (id, collectionRequestId) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => {
+        if (t.id !== id) return t;
+        return { ...t, collectionRequestId, savedSnapshot: buildSavedSnapshot(t), isDirty: false };
+      }),
+    })),
+
+  markCollectionSaved: (id, collectionRequestId) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => {
+        if (t.id !== id) return t;
+        return { ...t, collectionRequestId, savedSnapshot: buildSavedSnapshot(t), isDirty: false };
+      }),
+    })),
+
+  clearCollectionLink: (id) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === id ? { ...t, collectionRequestId: undefined, savedSnapshot: undefined, isDirty: false } : t
+      ),
+    })),
+
+  removeTabsByIds: (ids) =>
+    set((state) => {
+      const idSet = new Set(ids);
+      const newTabs = state.tabs.filter((t) => !idSet.has(t.id));
+      if (newTabs.length === 0) {
+        const tab = createTab();
+        return { tabs: [tab], activeTabId: tab.id };
+      }
+      let newActiveId = state.activeTabId;
+      if (idSet.has(state.activeTabId ?? "")) {
+        const activeIdx = state.tabs.findIndex((t) => t.id === state.activeTabId);
+        let survivorId: string | undefined;
+        for (let i = activeIdx; i < state.tabs.length; i++) {
+          if (!idSet.has(state.tabs[i].id)) {
+            survivorId = state.tabs[i].id;
+            break;
+          }
+        }
+        newActiveId = survivorId ?? newTabs[newTabs.length - 1].id;
+      }
+      return { tabs: newTabs, activeTabId: newActiveId };
+    }),
 
   reorderTabs: (fromIndex, toIndex) =>
     set((state) => {
