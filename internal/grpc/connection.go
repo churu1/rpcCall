@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"os"
 
 	"google.golang.org/grpc"
@@ -16,6 +17,15 @@ type TLSConfig struct {
 	CertPath string `json:"certPath"`
 	KeyPath  string `json:"keyPath"`
 	CaPath   string `json:"caPath"`
+}
+
+// DefaultUseTLSForAddress returns true when the address uses the standard HTTPS/gRPC-TLS port.
+func DefaultUseTLSForAddress(address string) bool {
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return false
+	}
+	return port == "443"
 }
 
 func CreateDialOptions(tlsCfg TLSConfig) ([]grpc.DialOption, error) {

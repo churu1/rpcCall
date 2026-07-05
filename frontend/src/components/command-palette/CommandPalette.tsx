@@ -26,6 +26,8 @@ import {
 import { useThemeStore } from "@/store/theme-store";
 import { useFontScaleStore } from "@/store/font-scale-store";
 import { scoreFuzzyText } from "@/lib/fuzzy-search";
+import { useCommandPaletteData, type PaletteMethodItem } from "@/hooks/useCommandPaletteData";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 interface CommandItem {
   id: string;
@@ -34,16 +36,6 @@ interface CommandItem {
   icon: React.ReactNode;
   shortcut?: string;
   action: () => void;
-}
-
-interface MethodItem {
-  id: string;
-  method: ServiceMethod;
-  serviceName: string;
-  methodName: string;
-  fullName: string;
-  methodType: string;
-  projectId: string;
 }
 
 const METHOD_TYPE_I18N: Record<string, string> = {
@@ -65,50 +57,48 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchAllProjects, setSearchAllProjects] = useState(false);
+  const [selectedFolderKey, setSelectedFolderKey] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const keyboardNavRef = useRef(false);
-  const { protoFiles, protoProjects, tabs, addTab, removeTab, activeTabId, activeProjectId, updateTab } = useAppStore();
+  const { tabs, addTab, removeTab, activeTabId, activeProjectId, updateTab } = useAppStore();
   const { theme, toggleTheme } = useThemeStore();
   const { increaseFontScale, decreaseFontScale, resetFontScale } = useFontScaleStore();
   const { t } = useTranslation();
-  const projectNameById = useMemo(() => {
-    const names: Record<string, string> = {};
-    for (const project of protoProjects) names[project.id] = project.name;
-    return names;
-  }, [protoProjects]);
   const activeTabProjectId = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId)?.projectId ?? null,
     [tabs, activeTabId]
   );
   const scopedProjectId = activeTabProjectId ?? activeProjectId;
+
+  const {
+    projectNameById,
+    sourcesReady,
+    folderGroups,
+    filteredMethods,
+    methodMatchTotal,
+  } = useCommandPaletteData(open, scopedProjectId, searchAllProjects, selectedFolderKey, query);
+
   const scopedProjectName = scopedProjectId ? (projectNameById[scopedProjectId] ?? "") : "";
 
-  const allMethods = useMemo<MethodItem[]>(() => {
-    const methods: MethodItem[] = [];
-    for (const file of protoFiles) {
-      for (const service of file.services ?? []) {
-        for (const method of service.methods ?? []) {
-          methods.push({
-            id: method.fullName,
-            method,
-            serviceName: service.name,
-            methodName: method.methodName,
-            fullName: method.fullName,
-            methodType: method.methodType,
-            projectId: file.projectId,
-          });
-        }
-      }
-    }
-    return methods;
-  }, [protoFiles]);
-
-  const searchableMethods = useMemo(() => {
-    if (searchAllProjects) return allMethods;
-    if (!scopedProjectId) return [];
-    return allMethods.filter((method) => method.projectId === scopedProjectId);
-  }, [allMethods, scopedProjectId, searchAllProjects]);
+  const folderOptions = useMemo(() => {
+    const totalMethods = folderGroups.reduce((sum, g) => sum + g.methodCount, 0);
+    return [
+      {
+        value: "",
+        label: t("command.allFolders"),
+        searchExtra: t("command.allFolders"),
+        badge: totalMethods > 0 ? String(totalMethods) : undefined,
+      },
+      ...folderGroups.map((group) => ({
+        value: group.folderKey,
+        label: group.displayPath,
+        searchExtra: `${group.displayPath} ${group.fullPath}`,
+        title: group.fullPath || group.displayPath,
+        badge: String(group.methodCount),
+      })),
+    ];
+  }, [folderGroups, t]);
 
   const commands = useMemo<CommandItem[]>(() => {
     const items: CommandItem[] = [
@@ -344,24 +334,7 @@ export function CommandPalette() {
     setOpen(false);
     setQuery("");
     setSelectedIndex(0);
-    setSearchAllProjects(false);
   }, []);
-
-  const filteredMethods = useMemo(() => {
-    if (!query.trim()) return [];
-    return searchableMethods
-      .map((m) => {
-        const score = Math.max(
-          scoreFuzzyText(m.methodName, query),
-          scoreFuzzyText(m.serviceName, query),
-          scoreFuzzyText(m.fullName, query)
-        );
-        return { m, score };
-      })
-      .filter((x) => x.score >= 0)
-      .sort((a, b) => b.score - a.score)
-      .map((x) => x.m);
-  }, [query, searchableMethods]);
 
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands;
@@ -379,9 +352,16 @@ export function CommandPalette() {
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query, searchAllProjects, scopedProjectId]);
+  }, [query, searchAllProjects, scopedProjectId, selectedFolderKey]);
 
-  const openMethod = useCallback(async (item: MethodItem) => {
+  useEffect(() => {
+    if (!sourcesReady) return;
+    if (selectedFolderKey && !folderGroups.some((g) => g.folderKey === selectedFolderKey)) {
+      setSelectedFolderKey("");
+    }
+  }, [selectedFolderKey, folderGroups, sourcesReady]);
+
+  const openMethod = useCallback(async (item: PaletteMethodItem) => {
     const tabId = addTab(item.method);
     updateTab(tabId, { projectId: item.projectId });
     try {
@@ -520,21 +500,10 @@ export function CommandPalette() {
   }, []);
 
   useEffect(() => {
+    if (!keyboardNavRef.current) return;
     const el = listRef.current?.querySelector(`[data-index="${selectedIndex}"]`) as HTMLElement | null;
-    if (!el || !listRef.current) return;
-
-    const list = listRef.current;
-    const pad = 40;
-    const elTop = el.offsetTop;
-    const elBottom = elTop + el.offsetHeight;
-    const viewTop = list.scrollTop;
-    const viewBottom = viewTop + list.clientHeight;
-
-    if (elTop - pad < viewTop) {
-      list.scrollTop = Math.max(0, elTop - pad);
-    } else if (elBottom + pad > viewBottom) {
-      list.scrollTop = elBottom + pad - list.clientHeight;
-    }
+    if (!el) return;
+    el.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
   if (!open) return null;
@@ -554,45 +523,75 @@ export function CommandPalette() {
     >
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative w-[560px] max-h-[62vh] bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-xl shadow-[var(--elevation-2)] overflow-hidden flex flex-col"
+        className="relative w-[680px] max-h-[70vh] bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-xl shadow-[var(--elevation-2)] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Search input */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--line-soft)] bg-[var(--surface-1)]">
-          <Search size={16} className="text-[var(--text-muted)] shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder={t("command.placeholder")}
-            className="flex-1 bg-transparent text-sm text-[var(--text-normal)] outline-none placeholder:text-[var(--text-muted)]"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-          />
-          <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] select-none">
+        <div className="shrink-0 overflow-visible border-b border-[var(--line-soft)] bg-[var(--surface-1)]">
+          {/* Search row */}
+          <div className="flex items-center gap-2 px-4 py-3">
+            <Search size={16} className="text-[var(--text-muted)] shrink-0" />
             <input
-              type="checkbox"
-              checked={searchAllProjects}
-              onChange={(e) => setSearchAllProjects(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border border-[var(--line-strong)] accent-[var(--state-info)]"
+              ref={inputRef}
+              type="text"
+              placeholder={t("command.placeholder")}
+              className="flex-1 min-w-0 bg-transparent text-sm text-[var(--text-normal)] outline-none placeholder:text-[var(--text-muted)]"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-form-type="other"
+              data-lpignore="true"
             />
-            <span>{t("command.searchAllProjects")}</span>
-          </label>
-          <kbd className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded font-mono border border-[var(--line-soft)]">
-            ESC
-          </kbd>
-        </div>
-        {!searchAllProjects && (
-          <div className="px-4 py-1.5 border-b border-[var(--line-soft)] text-[11px] text-[var(--text-muted)] truncate bg-[var(--surface-1)]">
-            {scopedProjectId
-              ? t("command.scopeCurrentProject", { project: scopedProjectName || scopedProjectId })
-              : t("command.scopeNoProject")}
+            <kbd className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded font-mono border border-[var(--line-soft)] shrink-0">
+              ESC
+            </kbd>
           </div>
-        )}
+
+          {/* Folder + scope row */}
+          <div className="flex items-center gap-3 px-4 pb-3">
+            <span className="text-xs text-[var(--text-muted)] shrink-0">{t("command.folderFilter")}</span>
+            <SearchableSelect
+              value={selectedFolderKey}
+              options={folderOptions}
+              placeholder={t("command.allFolders")}
+              onChange={setSelectedFolderKey}
+              disabled={!sourcesReady}
+              className="flex-1 min-w-0"
+              dropdownMinWidth="420px"
+              dropdownMaxWidth="640px"
+              listMaxHeightClass="max-h-[240px]"
+              wrapOptions
+              emptyQueryLimit={40}
+              maxResults={60}
+            />
+            <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] select-none shrink-0">
+              <input
+                type="checkbox"
+                checked={searchAllProjects}
+                onChange={(e) => setSearchAllProjects(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border border-[var(--line-strong)] accent-[var(--state-info)]"
+              />
+              <span>{t("command.searchAllProjects")}</span>
+            </label>
+          </div>
+
+          {!searchAllProjects && (
+            <div className="px-4 pb-2 text-[11px] text-[var(--text-muted)] truncate">
+              {scopedProjectId
+                ? t("command.scopeCurrentProject", { project: scopedProjectName || scopedProjectId })
+                : t("command.scopeNoProject")}
+              {!sourcesReady && scopedProjectId && (
+                <span className="ml-2 text-[var(--text-muted)]">{t("command.sourcesLoading")}</span>
+              )}
+            </div>
+          )}
+          {searchAllProjects && !sourcesReady && (
+            <div className="px-4 pb-2 text-[11px] text-[var(--text-muted)]">{t("command.sourcesLoading")}</div>
+          )}
+        </div>
 
         {/* Results */}
         <div ref={listRef} className="overflow-y-auto max-h-[50vh] py-1" onMouseMove={handleMouseMove}>
@@ -633,7 +632,10 @@ export function CommandPalette() {
           {filteredMethods.length > 0 && (
             <div>
               <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                METHODS ({filteredMethods.length})
+                {t("command.methodsSection", {
+                  shown: filteredMethods.length,
+                  total: methodMatchTotal,
+                })}
               </div>
               {filteredMethods.map((item) => {
                 const idx = itemIndex++;
@@ -662,8 +664,13 @@ export function CommandPalette() {
                       </span>
                       <span className="font-medium">{item.methodName}</span>
                     </span>
+                    <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[140px] shrink-0">
+                      {!selectedFolderKey
+                        ? item.folderLabel
+                        : item.protoBasename}
+                    </span>
                     {searchAllProjects && (
-                      <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[120px]">
+                      <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[88px] shrink-0">
                         {projectNameById[item.projectId] ?? item.projectId}
                       </span>
                     )}

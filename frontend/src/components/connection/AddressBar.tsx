@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type MethodType } from "@/store/app-store";
 import { useGrpc } from "@/hooks/useGrpc";
+import { useAddressTls } from "@/hooks/useAddressTls";
 import { cn } from "@/lib/utils";
 import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save, Shield, ShieldOff, FileKey, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +35,35 @@ export function AddressBar() {
   const { activeTabId, tabs, updateTab } = useAppStore();
   const { send } = useGrpc();
   const tab = tabs.find((tabItem) => tabItem.id === activeTabId);
+
+  const { saveTlsSettings, loadTlsSettingsNow } = useAddressTls(
+    tab?.id,
+    tab?.address ?? "",
+    {
+      useTls: tab?.useTls ?? false,
+      certPath: tab?.certPath ?? "",
+      keyPath: tab?.keyPath ?? "",
+      caPath: tab?.caPath ?? "",
+    },
+    updateTab,
+  );
+
+  const applyTlsUpdate = (updates: {
+    useTls?: boolean;
+    certPath?: string;
+    keyPath?: string;
+    caPath?: string;
+  }) => {
+    if (!tab) return;
+    const next = {
+      useTls: updates.useTls ?? tab.useTls,
+      certPath: updates.certPath ?? tab.certPath,
+      keyPath: updates.keyPath ?? tab.keyPath,
+      caPath: updates.caPath ?? tab.caPath,
+    };
+    updateTab(tab.id, next);
+    void saveTlsSettings(next);
+  };
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
@@ -105,6 +135,7 @@ export function AddressBar() {
 
   const handleSelectAddress = (addr: SavedAddress) => {
     updateTab(tab.id, { address: addr.address });
+    void loadTlsSettingsNow(addr.address);
     setShowDropdown(false);
   };
 
@@ -351,7 +382,7 @@ export function AddressBar() {
               <input
                 type="checkbox"
                 checked={tab.useTls ?? false}
-                onChange={(e) => updateTab(tab.id, { useTls: e.target.checked })}
+                onChange={(e) => applyTlsUpdate({ useTls: e.target.checked })}
                 className="rounded"
               />
               {tab.useTls ? (
@@ -361,16 +392,17 @@ export function AddressBar() {
               )}
               <span className="font-medium">{t("tls.enableTls")}</span>
             </label>
+            <p className="text-[10px] text-[var(--text-muted)] mb-2">{t("tls.port443Default")}</p>
             {tab.useTls && (
               <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--line-soft)]">
                 <CertFileRow label={t("tls.caFile")} value={tab.caPath} notSelected={t("tls.notSelected")} onSelect={async () => {
-                  try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { caPath: p }); } catch {}
+                  try { const p = await window.go.main.App.SelectCertFile(); if (p) applyTlsUpdate({ caPath: p }); } catch {}
                 }} />
                 <CertFileRow label={t("tls.certFile")} value={tab.certPath} notSelected={t("tls.notSelected")} onSelect={async () => {
-                  try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { certPath: p }); } catch {}
+                  try { const p = await window.go.main.App.SelectCertFile(); if (p) applyTlsUpdate({ certPath: p }); } catch {}
                 }} />
                 <CertFileRow label={t("tls.keyFile")} value={tab.keyPath} notSelected={t("tls.notSelected")} onSelect={async () => {
-                  try { const p = await window.go.main.App.SelectCertFile(); if (p) updateTab(tab.id, { keyPath: p }); } catch {}
+                  try { const p = await window.go.main.App.SelectCertFile(); if (p) applyTlsUpdate({ keyPath: p }); } catch {}
                 }} />
               </div>
             )}

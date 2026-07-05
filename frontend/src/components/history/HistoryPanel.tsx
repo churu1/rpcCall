@@ -6,6 +6,7 @@ import { Clock, Trash2, RefreshCw, CheckCircle2, AlertCircle, ChevronUp, Chevron
 import { DiffViewer } from "./DiffViewer";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
+import { HISTORY_LIST_LIMIT } from "@/lib/history-limits";
 
 interface HistoryEntry {
   id: number;
@@ -49,7 +50,7 @@ export function HistoryPanel() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const data = await window.go.main.App.GetHistory(50);
+      const data = await window.go.main.App.GetHistory(HISTORY_LIST_LIMIT);
       setEntries(data || []);
     } catch {
       setEntries([]);
@@ -58,8 +59,13 @@ export function HistoryPanel() {
 
   useEffect(() => {
     loadHistory();
-    const interval = setInterval(loadHistory, 5000);
-    return () => clearInterval(interval);
+    const onRefresh = () => loadHistory();
+    window.addEventListener("rpccall:history-refresh", onRefresh);
+    const interval = setInterval(loadHistory, 30000);
+    return () => {
+      window.removeEventListener("rpccall:history-refresh", onRefresh);
+      clearInterval(interval);
+    };
   }, [loadHistory]);
 
   const handleReplay = async (entry: HistoryEntry) => {

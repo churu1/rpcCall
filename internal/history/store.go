@@ -14,6 +14,11 @@ import (
 	"rpccall/internal/models"
 )
 
+const (
+	maxRetainedHistoryEntries = 500
+	defaultHistoryListLimit   = 500
+)
+
 type Store struct {
 	db *sql.DB
 }
@@ -288,7 +293,45 @@ func createTables(db *sql.DB) error {
 	if err := migrateMetadataProfilesMulti(db); err != nil {
 		return err
 	}
+	if err := migrateAddressTLSSettings(db); err != nil {
+		return err
+	}
+	if err := migrateDecodeProtoPathColumns(db); err != nil {
+		return err
+	}
 	return migrateDecodeHistoryProjectScope(db)
+}
+
+func migrateDecodeProtoPathColumns(db *sql.DB) error {
+	columns := []struct {
+		table string
+		sql   string
+	}{
+		{"decode_history", `ALTER TABLE decode_history ADD COLUMN proto_path TEXT NOT NULL DEFAULT ''`},
+		{"decode_templates", `ALTER TABLE decode_templates ADD COLUMN proto_path TEXT NOT NULL DEFAULT ''`},
+	}
+	for _, col := range columns {
+		if _, err := db.Exec(col.sql); err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func migrateAddressTLSSettings(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS address_tls_settings (
+			address TEXT PRIMARY KEY,
+			use_tls INTEGER NOT NULL DEFAULT 0,
+			cert_path TEXT NOT NULL DEFAULT '',
+			key_path TEXT NOT NULL DEFAULT '',
+			ca_path TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL
+		)
+	`)
+	return err
 }
 
 func migrateHistoryTLSColumns(db *sql.DB) error {
@@ -482,6 +525,21 @@ func (s *Store) Save(req models.GrpcRequest, resp models.GrpcResponse) error {
 		req.KeyPath,
 		req.CaPath,
 	)
+	if err != nil {
+		return err
+	}
+	return s.trimRetainedEntries("history", "id")
+}
+
+func (s *Store) trimRetainedEntries(table, orderColumn string) error {
+	_, err := s.db.Exec(fmt.Sprintf(`
+		DELETE FROM %s
+		WHERE id IN (
+			SELECT id FROM %s
+			ORDER BY %s DESC
+			LIMIT -1 OFFSET ?
+		)
+	`, table, table, orderColumn), maxRetainedHistoryEntries)
 	return err
 }
 
@@ -511,7 +569,7 @@ type HistoryDetail struct {
 
 func (s *Store) List(limit int) ([]HistoryEntry, error) {
 	if limit <= 0 {
-		limit = 100
+		limit = defaultHistoryListLimit
 	}
 
 	rows, err := s.db.Query(`
@@ -644,6 +702,67 @@ func (s *Store) UpdateAddress(id int64, name, address string) error {
 func (s *Store) DeleteAddress(id int64) error {
 	_, err := s.db.Exec("DELETE FROM saved_addresses WHERE id = ?", id)
 	return err
+}
+
+// --- Address TLS Settings ---
+
+type AddressTLSSettings struct {
+	Address  string `json:"address"`
+	UseTLS   bool   `json:"useTls"`
+	CertPath string `json:"certPath"`
+	KeyPath  string `json:"keyPath"`
+	CaPath   string `json:"caPath"`
+}
+
+func (s *Store) GetAddressTLSSettings(address string) (*AddressTLSSettings, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+
+	var useTLS int
+	var settings AddressTLSSettings
+	settings.Address = address
+	err := s.db.QueryRow(`
+		SELECT use_tls, cert_path, key_path, ca_path
+		FROM address_tls_settings
+		WHERE address = ?
+	`, address).Scan(&useTLS, &settings.CertPath, &settings.KeyPath, &settings.CaPath)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	settings.UseTLS = useTLS == 1
+	return &settings, nil
+}
+
+func (s *Store) SaveAddressTLSSettings(settings AddressTLSSettings) (*AddressTLSSettings, error) {
+	settings.Address = strings.TrimSpace(settings.Address)
+	if settings.Address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+
+	useTLS := 0
+	if settings.UseTLS {
+		useTLS = 1
+	}
+	now := time.Now().Format(time.RFC3339)
+	_, err := s.db.Exec(`
+		INSERT INTO address_tls_settings (address, use_tls, cert_path, key_path, ca_path, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(address) DO UPDATE SET
+			use_tls = excluded.use_tls,
+			cert_path = excluded.cert_path,
+			key_path = excluded.key_path,
+			ca_path = excluded.ca_path,
+			updated_at = excluded.updated_at
+	`, settings.Address, useTLS, settings.CertPath, settings.KeyPath, settings.CaPath, now)
+	if err != nil {
+		return nil, err
+	}
+	return &settings, nil
 }
 
 // --- Saved Proto Sources ---
@@ -1483,6 +1602,7 @@ type DecodeHistoryEntry struct {
 	MethodName       string `json:"methodName"`
 	Target           string `json:"target"`
 	MessageType      string `json:"messageType"`
+	ProtoPath        string `json:"protoPath,omitempty"`
 	InputEncoding    string `json:"inputEncoding"`
 	DetectedEncoding string `json:"detectedEncoding"`
 	Success          bool   `json:"success"`
@@ -1509,6 +1629,7 @@ type DecodeTemplate struct {
 	ProjectName string                    `json:"projectName"`
 	Name        string                    `json:"name"`
 	MessageType string                    `json:"messageType"`
+	ProtoPath   string                    `json:"protoPath,omitempty"`
 	Encoding    string                    `json:"encoding"`
 	BatchMode   bool                      `json:"batchMode"`
 	PayloadText string                    `json:"payloadText"`
@@ -1550,21 +1671,24 @@ func (s *Store) SaveDecodeHistory(req models.DecodeRequest, resp *models.DecodeR
 	}
 	_, err := s.db.Exec(`
 		INSERT INTO decode_history (
-			project_id, project_name, service_name, method_name, target, message_type, input_encoding, detected_encoding,
+			project_id, project_name, service_name, method_name, target, message_type, proto_path, input_encoding, detected_encoding,
 			payload_text, payload_size, result_json, success, error_code, error_msg,
 			elapsed_ms, nested_hits, nested_rules_json, warnings_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		projectID, projectName, req.ServiceName, req.MethodName, target, messageType, inputEncoding, detected,
+		projectID, projectName, req.ServiceName, req.MethodName, target, messageType, strings.TrimSpace(req.ExplicitMessageProtoPath), inputEncoding, detected,
 		req.Payload, len(req.Payload), resp.JSON, success, resp.ErrorCode, resp.Error,
 		resp.ElapsedMs, resp.NestedHits, string(rulesJSON), string(warningsJSON),
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.trimRetainedEntries("decode_history", "id")
 }
 
 func (s *Store) ListDecodeHistory(limit int) ([]DecodeHistoryEntry, error) {
 	if limit <= 0 {
-		limit = 200
+		limit = defaultHistoryListLimit
 	}
 	rows, err := s.db.Query(`
 		SELECT id, created_at, project_id, project_name, service_name, method_name, target, message_type,
@@ -1598,7 +1722,7 @@ func (s *Store) ListDecodeHistory(limit int) ([]DecodeHistoryEntry, error) {
 
 func (s *Store) GetDecodeHistoryDetail(id int64) (*DecodeHistoryDetail, error) {
 	row := s.db.QueryRow(`
-		SELECT id, created_at, project_id, project_name, service_name, method_name, target, message_type,
+		SELECT id, created_at, project_id, project_name, service_name, method_name, target, message_type, proto_path,
 		       input_encoding, detected_encoding, success, error_code, error_msg,
 		       elapsed_ms, payload_size, nested_hits, payload_text, result_json,
 		       nested_rules_json, warnings_json
@@ -1610,7 +1734,7 @@ func (s *Store) GetDecodeHistoryDetail(id int64) (*DecodeHistoryDetail, error) {
 	var success int
 	var rulesJSON, warningsJSON string
 	if err := row.Scan(
-		&d.ID, &d.CreatedAt, &d.ProjectID, &d.ProjectName, &d.ServiceName, &d.MethodName, &d.Target, &d.MessageType,
+		&d.ID, &d.CreatedAt, &d.ProjectID, &d.ProjectName, &d.ServiceName, &d.MethodName, &d.Target, &d.MessageType, &d.ProtoPath,
 		&d.InputEncoding, &d.DetectedEncoding, &success, &d.ErrorCode, &d.Error,
 		&d.ElapsedMs, &d.PayloadSize, &d.NestedHits, &d.PayloadText, &d.ResultJSON,
 		&rulesJSON, &warningsJSON,
@@ -1637,6 +1761,7 @@ func (s *Store) SaveDecodeTemplate(
 	projectID string,
 	name string,
 	messageType string,
+	protoPath string,
 	encoding string,
 	batchMode bool,
 	payloadText string,
@@ -1644,6 +1769,7 @@ func (s *Store) SaveDecodeTemplate(
 ) (*DecodeTemplate, error) {
 	projectID = strings.TrimSpace(projectID)
 	messageType = strings.TrimSpace(messageType)
+	protoPath = strings.TrimSpace(protoPath)
 	if projectID == "" {
 		return nil, fmt.Errorf("projectId is required")
 	}
@@ -1670,9 +1796,9 @@ func (s *Store) SaveDecodeTemplate(
 	}
 	result, err := s.db.Exec(`
 		INSERT INTO decode_templates (
-			created_at, updated_at, project_id, project_name, name, message_type, encoding, batch_mode, payload_text, nested_rules_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, now, now, projectID, projectName, name, messageType, encoding, batchInt, payloadText, string(rulesJSON))
+			created_at, updated_at, project_id, project_name, name, message_type, proto_path, encoding, batch_mode, payload_text, nested_rules_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, now, now, projectID, projectName, name, messageType, protoPath, encoding, batchInt, payloadText, string(rulesJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -1685,6 +1811,7 @@ func (s *Store) SaveDecodeTemplate(
 		ProjectName: projectName,
 		Name:        name,
 		MessageType: messageType,
+		ProtoPath:   protoPath,
 		Encoding:    encoding,
 		BatchMode:   batchMode,
 		PayloadText: payloadText,
@@ -1703,14 +1830,14 @@ func (s *Store) ListDecodeTemplates(projectID string, limit int) ([]DecodeTempla
 	)
 	if projectID == "" {
 		rows, err = s.db.Query(`
-			SELECT id, created_at, updated_at, project_id, project_name, name, message_type, encoding, batch_mode, payload_text, nested_rules_json
+			SELECT id, created_at, updated_at, project_id, project_name, name, message_type, proto_path, encoding, batch_mode, payload_text, nested_rules_json
 			FROM decode_templates
 			ORDER BY updated_at DESC, id DESC
 			LIMIT ?
 		`, limit)
 	} else {
 		rows, err = s.db.Query(`
-			SELECT id, created_at, updated_at, project_id, project_name, name, message_type, encoding, batch_mode, payload_text, nested_rules_json
+			SELECT id, created_at, updated_at, project_id, project_name, name, message_type, proto_path, encoding, batch_mode, payload_text, nested_rules_json
 			FROM decode_templates
 			WHERE project_id = ?
 			ORDER BY updated_at DESC, id DESC
@@ -1731,7 +1858,7 @@ func (s *Store) ListDecodeTemplates(projectID string, limit int) ([]DecodeTempla
 		)
 		if err := rows.Scan(
 			&item.ID, &item.CreatedAt, &item.UpdatedAt, &item.ProjectID, &item.ProjectName, &item.Name,
-			&item.MessageType, &item.Encoding, &batchInt, &item.PayloadText, &rulesRaw,
+			&item.MessageType, &item.ProtoPath, &item.Encoding, &batchInt, &item.PayloadText, &rulesRaw,
 		); err != nil {
 			continue
 		}

@@ -55,7 +55,7 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 			resp.ElapsedMs = time.Since(start).Milliseconds()
 			return resp
 		}
-		msgDesc = d.findMessageDescriptor(projectID, msgType)
+		msgDesc = d.parser.FindMessageDescriptor(projectID, msgType, req.ExplicitMessageProtoPath)
 		if msgDesc == nil {
 			resp.ErrorCode = "message_not_found"
 			resp.Error = fmt.Sprintf("message type %s not found", msgType)
@@ -229,7 +229,7 @@ func (d *Decoder) resolveMessageDescriptor(method *desc.MethodDescriptor, req mo
 		if strings.TrimSpace(req.ExplicitMessageType) == "" {
 			return nil, fmt.Errorf("explicit message type is required when target=message")
 		}
-		md := d.findMessageDescriptor(req.ProjectID, req.ExplicitMessageType)
+		md := d.parser.FindMessageDescriptor(req.ProjectID, req.ExplicitMessageType, req.ExplicitMessageProtoPath)
 		if md == nil {
 			return nil, fmt.Errorf("message type %s not found", req.ExplicitMessageType)
 		}
@@ -237,37 +237,6 @@ func (d *Decoder) resolveMessageDescriptor(method *desc.MethodDescriptor, req mo
 	default:
 		return nil, fmt.Errorf("invalid decode target: %s", req.Target)
 	}
-}
-
-func (d *Decoder) findMessageDescriptor(projectID, messageType string) *desc.MessageDescriptor {
-	fds := d.parser.GetAllFileDescriptorsByProject(projectID)
-	for i := len(fds) - 1; i >= 0; i-- {
-		if md := findMessageInFile(fds[i], messageType); md != nil {
-			return md
-		}
-	}
-	return nil
-}
-
-func findMessageInFile(fd *desc.FileDescriptor, messageType string) *desc.MessageDescriptor {
-	for _, md := range fd.GetMessageTypes() {
-		if hit := findMessageRecursive(md, messageType); hit != nil {
-			return hit
-		}
-	}
-	return nil
-}
-
-func findMessageRecursive(md *desc.MessageDescriptor, messageType string) *desc.MessageDescriptor {
-	if md.GetFullyQualifiedName() == messageType || md.GetName() == messageType {
-		return md
-	}
-	for _, nested := range md.GetNestedMessageTypes() {
-		if hit := findMessageRecursive(nested, messageType); hit != nil {
-			return hit
-		}
-	}
-	return nil
 }
 
 func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.NestedDecodeRule, rootDesc *desc.MessageDescriptor) (int, []string) {
@@ -282,7 +251,7 @@ func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.Nes
 		if path == "" || msgType == "" {
 			continue
 		}
-		md := d.findMessageDescriptor(projectID, msgType)
+		md := d.parser.FindMessageDescriptor(projectID, msgType, rule.ProtoPath)
 		if md == nil {
 			warnings = append(warnings, fmt.Sprintf("nested rule %s: message %s not found", path, msgType))
 			continue

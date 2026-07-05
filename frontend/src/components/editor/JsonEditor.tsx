@@ -19,15 +19,17 @@ interface JsonEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   readOnly?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 
-export function JsonEditor({ value, onChange, placeholder, readOnly }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, placeholder, readOnly, onKeyDown }: JsonEditorProps) {
   const handleHighlight = useCallback((code: string) => highlightJson(code), []);
 
   return (
     <Editor
       value={value}
       onValueChange={readOnly ? () => {} : onChange}
+      onKeyDown={onKeyDown as never}
       highlight={handleHighlight}
       padding={12}
       tabSize={2}

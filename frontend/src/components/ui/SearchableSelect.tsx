@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Search } from "lucide-react";
 import {
@@ -7,39 +8,62 @@ import {
   subsequenceMatchIndices,
 } from "@/lib/fuzzy-search";
 
-interface Option {
+export interface SearchableSelectOption {
   value: string;
   label: string;
   searchExtra?: string;
+  title?: string;
+  badge?: string;
+}
+
+interface IndexedOption extends SearchableSelectOption {
+  searchBlob: string;
 }
 
 interface Props {
   value: string;
-  options: Option[];
+  options: SearchableSelectOption[];
   placeholder?: string;
   disabled?: boolean;
   onChange: (value: string) => void;
   className?: string;
+  maxResults?: number;
+  debounceMs?: number;
+  emptyQueryLimit?: number;
+  dropdownMinWidth?: string;
+  dropdownMaxWidth?: string;
+  listMaxHeightClass?: string;
+  wrapOptions?: boolean;
+  searchPlaceholder?: string;
+  noMatchesText?: string;
+  refineSearchText?: (totalMatches: number) => string;
 }
 
-function scoreOption(option: Option, query: string): number {
-  const labelScore = scoreFuzzyText(option.label, query);
-  const valueScore = scoreFuzzyText(option.value, query);
-  const extraScore = option.searchExtra ? scoreFuzzyText(option.searchExtra, query) : -1;
-  const all = [labelScore, valueScore, extraScore];
-  const best = Math.max(...all);
-  if (best < 0) return -1;
+const DEFAULT_MAX_RESULTS = 80;
+const DEFAULT_DEBOUNCE_MS = 80;
+const DEFAULT_EMPTY_QUERY_LIMIT = 40;
 
-  // Label matches should win for user-facing readability.
-  let weighted = best;
-  if (best === labelScore) weighted += 800;
-  if (best === valueScore) weighted += 300;
+function scoreIndexedOption(option: IndexedOption, query: string, queryNorm: string): number {
+  const blobLower = option.searchBlob.toLowerCase();
+  const qLower = query.toLowerCase().trim();
 
-  const queryNorm = normalizeSearchText(query);
+  if (!qLower) return 0;
+
+  if (blobLower.includes(qLower)) {
+    return 35000 - blobLower.indexOf(qLower);
+  }
+
+  const labelLower = option.label.toLowerCase();
+  if (labelLower.startsWith(qLower)) {
+    return 32000 - option.label.length;
+  }
+
   const shortName = option.value.split(".").pop() || option.value;
-  if (shortName.toLowerCase().startsWith(queryNorm)) weighted += 1200;
+  if (shortName.toLowerCase().startsWith(queryNorm)) {
+    return 30000;
+  }
 
-  return weighted;
+  return scoreFuzzyText(option.label, query);
 }
 
 function highlightLabel(label: string, query: string) {
@@ -102,21 +126,66 @@ function buildHighlightParts(label: string, matchSet: Set<number>) {
   return <>{parts}</>;
 }
 
-export function SearchableSelect({ value, options, placeholder, disabled, onChange, className }: Props) {
+export function SearchableSelect({
+  value,
+  options,
+  placeholder,
+  disabled,
+  onChange,
+  className,
+  maxResults = DEFAULT_MAX_RESULTS,
+  debounceMs = DEFAULT_DEBOUNCE_MS,
+  emptyQueryLimit = DEFAULT_EMPTY_QUERY_LIMIT,
+  dropdownMinWidth,
+  dropdownMaxWidth = "480px",
+  listMaxHeightClass = "max-h-[160px]",
+  wrapOptions = false,
+  searchPlaceholder,
+  noMatchesText,
+  refineSearchText,
+}: Props) {
+  const { t } = useTranslation();
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t("select.searchPlaceholder");
+  const resolvedNoMatches = noMatchesText ?? t("select.noMatches");
+  const resolvedRefineSearch = refineSearchText ?? ((count: number) => t("select.refineSearch", { count }));
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const isKeyboardNav = useRef(false);
 
-  const filtered = useMemo(() => {
-    if (!query) return options;
-    return options
-      .map((o) => {
-        return { option: o, score: scoreOption(o, query) };
-      })
+  const indexedOptions = useMemo<IndexedOption[]>(
+    () =>
+      options.map((o) => ({
+        ...o,
+        searchBlob: normalizeSearchText(`${o.label} ${o.searchExtra ?? ""} ${o.value}`),
+      })),
+    [options],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), debounceMs);
+    return () => window.clearTimeout(timer);
+  }, [query, debounceMs]);
+
+  const { filtered, truncated, totalMatches } = useMemo(() => {
+    const q = debouncedQuery.trim();
+    const queryNorm = normalizeSearchText(q);
+
+    if (!q) {
+      const slice = indexedOptions.slice(0, emptyQueryLimit);
+      return {
+        filtered: slice,
+        truncated: indexedOptions.length > emptyQueryLimit,
+        totalMatches: indexedOptions.length,
+      };
+    }
+
+    const scored = indexedOptions
+      .map((option) => ({ option, score: scoreIndexedOption(option, q, queryNorm) }))
       .filter((x) => x.score >= 0)
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
@@ -124,17 +193,23 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
           return a.option.label.length - b.option.label.length;
         }
         return a.option.label.localeCompare(b.option.label);
-      })
-      .map((x) => x.option);
-  }, [options, query]);
+      });
+
+    return {
+      filtered: scored.slice(0, maxResults).map((x) => x.option),
+      truncated: scored.length > maxResults,
+      totalMatches: scored.length,
+    };
+  }, [indexedOptions, debouncedQuery, maxResults, emptyQueryLimit]);
 
   useEffect(() => {
     setHighlightIndex(0);
-  }, [filtered.length]);
+  }, [filtered.length, debouncedQuery]);
 
   useEffect(() => {
     if (open) {
       setQuery("");
+      setDebouncedQuery("");
       setTimeout(() => inputRef.current?.focus(), 10);
     }
   }, [open]);
@@ -159,7 +234,7 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
       onChange(val);
       setOpen(false);
     },
-    [onChange]
+    [onChange],
   );
 
   const handleKeyDown = useCallback(
@@ -180,10 +255,12 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
         setOpen(false);
       }
     },
-    [filtered, highlightIndex, select]
+    [filtered, highlightIndex, select],
   );
 
-  const selectedLabel = options.find((o) => o.value === value)?.label;
+  const selectedOption = options.find((o) => o.value === value);
+  const selectedLabel = selectedOption?.label;
+  const highlightQuery = debouncedQuery;
 
   return (
     <div ref={ref} className={cn("relative", className)}>
@@ -191,20 +268,30 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen(!open)}
+        title={selectedOption?.title ?? selectedOption?.label}
         className={cn(
-          "w-full h-8 flex items-center justify-between gap-1 bg-[var(--surface-2)] px-2.5 py-1 rounded-md border border-[var(--line-strong)] text-[11px] font-mono text-left text-[var(--text-normal)]",
+          "w-full h-8 flex items-center justify-between gap-2 bg-[var(--surface-2)] px-2.5 py-1 rounded-md border border-[var(--line-strong)] text-xs text-left text-[var(--text-normal)]",
           disabled && "opacity-50 cursor-not-allowed",
-          !disabled && "hover:border-[var(--focus-ring)]/55"
+          !disabled && "hover:border-[var(--focus-ring)]/55",
         )}
       >
-        <span className={cn("truncate", !selectedLabel && "text-[var(--text-muted)]")}>
+        <span className={cn("truncate font-mono", !selectedLabel && "text-[var(--text-muted)]")}>
           {selectedLabel || placeholder || ""}
         </span>
         <ChevronDown size={12} className="shrink-0 text-[var(--text-muted)]" />
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] flex flex-col overflow-hidden">
+        <div
+          className={cn(
+            "absolute z-[60] top-full left-0 mt-1 bg-[var(--surface-0)] border border-[var(--line-soft)] rounded-md shadow-[var(--elevation-2)] flex flex-col overflow-hidden",
+            dropdownMinWidth ? "w-max" : "right-0",
+          )}
+          style={{
+            minWidth: dropdownMinWidth ?? undefined,
+            maxWidth: dropdownMinWidth ? dropdownMaxWidth : undefined,
+          }}
+        >
           <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--line-soft)]">
             <Search size={12} className="shrink-0 text-[var(--text-muted)]" />
             <input
@@ -212,40 +299,59 @@ export function SearchableSelect({ value, options, placeholder, disabled, onChan
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Search..."
+              placeholder={resolvedSearchPlaceholder}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
               data-form-type="other"
               data-lpignore="true"
-              className="flex-1 bg-transparent text-[11px] focus:outline-none text-[var(--text-normal)] placeholder:text-[var(--text-muted)]"
+              className="flex-1 bg-transparent text-xs focus:outline-none text-[var(--text-normal)] placeholder:text-[var(--text-muted)]"
             />
           </div>
-          <div ref={listRef} className="max-h-[160px] overflow-y-auto">
+          <div ref={listRef} className={cn("overflow-y-auto", listMaxHeightClass)}>
             {filtered.length === 0 ? (
-              <div className="px-2 py-3 text-[11px] text-center text-[var(--text-muted)]">
-                No matches
+              <div className="px-3 py-3 text-xs text-center text-[var(--text-muted)]">
+                {resolvedNoMatches}
               </div>
             ) : (
               filtered.map((opt, idx) => (
                 <div
                   key={opt.value}
-                  title={opt.value}
+                  title={opt.title ?? opt.label}
                   className={cn(
-                    "flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-mono cursor-pointer",
+                    "flex items-start gap-2 px-3 py-2 text-xs cursor-pointer",
                     idx === highlightIndex && "bg-[var(--surface-1)] text-[var(--text-strong)]",
-                    idx !== highlightIndex && "hover:bg-[var(--surface-1)] text-[var(--text-normal)]"
+                    idx !== highlightIndex && "hover:bg-[var(--surface-1)] text-[var(--text-normal)]",
                   )}
                   onMouseEnter={() => setHighlightIndex(idx)}
                   onClick={() => select(opt.value)}
                 >
-                  {opt.value === value && (
-                    <span className="w-1 h-1 rounded-full bg-[var(--state-info)] shrink-0" />
+                  <span className="w-1.5 pt-1.5 shrink-0 flex justify-center">
+                    {opt.value === value && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--state-info)]" />
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      "flex-1 min-w-0 font-mono leading-snug",
+                      wrapOptions ? "break-all whitespace-normal" : "truncate",
+                    )}
+                  >
+                    {highlightLabel(opt.label, highlightQuery)}
+                  </span>
+                  {opt.badge && (
+                    <span className="shrink-0 pt-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
+                      {opt.badge}
+                    </span>
                   )}
-                  <span className="truncate">{highlightLabel(opt.label, query)}</span>
                 </div>
               ))
+            )}
+            {truncated && (
+              <div className="px-2 py-1.5 text-[10px] text-center text-[var(--text-muted)] border-t border-[var(--line-soft)]">
+                {resolvedRefineSearch(totalMatches)}
+              </div>
             )}
           </div>
         </div>

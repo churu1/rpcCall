@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import type { ProtoImportSource } from "@/lib/proto-import-groups";
+import { fetchProtoSources, type ProtoSourcesLoadStatus } from "@/lib/proto-source-api";
 
 export type MethodType = "unary" | "server_streaming" | "client_streaming" | "bidi_streaming";
 
@@ -72,6 +74,8 @@ export interface Tab {
 interface AppState {
   protoFiles: ProtoFile[];
   protoProjects: ProtoProject[];
+  protoSourcesByProject: Record<string, ProtoImportSource[]>;
+  protoSourcesStatus: Record<string, ProtoSourcesLoadStatus>;
   activeProjectId: string | null;
   tabs: Tab[];
   activeTabId: string | null;
@@ -82,6 +86,9 @@ interface AppState {
   clearProtoFiles: () => void;
   setProtoProjects: (projects: ProtoProject[]) => void;
   setActiveProjectId: (projectId: string | null) => void;
+  refreshProtoSources: (projectId: string) => Promise<void>;
+  ensureProtoSources: (projectIds: string[]) => Promise<void>;
+  clearProtoSourcesForProject: (projectId: string) => void;
 
   addTab: (method?: ServiceMethod) => string;
   removeTab: (id: string) => void;
@@ -94,6 +101,8 @@ interface AppState {
 }
 
 let tabCounter = 0;
+
+const protoSourcesInflight = new Map<string, Promise<void>>();
 
 function createTab(method?: ServiceMethod): Tab {
   tabCounter++;
@@ -123,6 +132,8 @@ function createTab(method?: ServiceMethod): Tab {
 export const useAppStore = create<AppState>((set, get) => ({
   protoFiles: [],
   protoProjects: [],
+  protoSourcesByProject: {},
+  protoSourcesStatus: {},
   activeProjectId: null,
   tabs: [createTab()],
   activeTabId: "tab-1",
@@ -150,6 +161,57 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearProtoFiles: () => set({ protoFiles: [] }),
   setProtoProjects: (projects) => set({ protoProjects: projects ?? [] }),
   setActiveProjectId: (projectId) => set({ activeProjectId: projectId }),
+
+  refreshProtoSources: async (projectId) => {
+    if (!projectId) return;
+    const existing = protoSourcesInflight.get(projectId);
+    if (existing) return existing;
+
+    const task = (async () => {
+      const hasCache = (get().protoSourcesByProject[projectId]?.length ?? 0) > 0;
+      if (!hasCache) {
+        set((state) => ({
+          protoSourcesStatus: { ...state.protoSourcesStatus, [projectId]: "loading" },
+        }));
+      }
+      try {
+        const sources = await fetchProtoSources(projectId);
+        set((state) => ({
+          protoSourcesByProject: { ...state.protoSourcesByProject, [projectId]: sources },
+          protoSourcesStatus: { ...state.protoSourcesStatus, [projectId]: "ready" },
+        }));
+      } catch {
+        if (!hasCache) {
+          set((state) => ({
+            protoSourcesStatus: { ...state.protoSourcesStatus, [projectId]: "error" },
+          }));
+        }
+      }
+    })();
+
+    protoSourcesInflight.set(projectId, task);
+    try {
+      await task;
+    } finally {
+      protoSourcesInflight.delete(projectId);
+    }
+  },
+
+  ensureProtoSources: async (projectIds) => {
+    const unique = [...new Set(projectIds.filter(Boolean))];
+    const pending = unique.filter((id) => {
+      const status = get().protoSourcesStatus[id];
+      return status !== "ready" && status !== "loading";
+    });
+    await Promise.all(pending.map((id) => get().refreshProtoSources(id)));
+  },
+
+  clearProtoSourcesForProject: (projectId) =>
+    set((state) => {
+      const { [projectId]: _sources, ...protoSourcesByProject } = state.protoSourcesByProject;
+      const { [projectId]: _status, ...protoSourcesStatus } = state.protoSourcesStatus;
+      return { protoSourcesByProject, protoSourcesStatus };
+    }),
 
   addTab: (method) => {
     const tab = createTab(method);

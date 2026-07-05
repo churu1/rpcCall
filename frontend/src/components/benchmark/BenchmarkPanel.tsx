@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
+import { useEnvStore } from "@/store/env-store";
 import { Play, Square, Download, RotateCcw, History } from "lucide-react";
 import { VariableConfig } from "./VariableConfig";
 import { BenchmarkChart, MetricCards } from "./BenchmarkChart";
@@ -28,6 +29,7 @@ function defaultConfig(): BenchmarkConfig {
 export function BenchmarkPanel() {
   const { t } = useTranslation();
   const { activeTabId, tabs } = useAppStore();
+  const resolveVariables = useEnvStore((s) => s.resolveVariables);
   const tab = tabs.find((t) => t.id === activeTabId);
 
   const [config, setConfig] = useState<BenchmarkConfig>(defaultConfig);
@@ -105,13 +107,13 @@ export function BenchmarkPanel() {
 
     const req: GrpcRequest = {
       projectId: tab.projectId,
-      address: tab.address,
+      address: resolveVariables(tab.address),
       serviceName: tab.method.serviceName,
       methodName: tab.method.methodName,
-      body: tab.requestBody,
+      body: resolveVariables(tab.requestBody),
       metadata: tab.metadata
         .filter((m) => m.enabled && m.key)
-        .map((m) => ({ key: m.key, value: m.value })),
+        .map((m) => ({ key: m.key, value: resolveVariables(m.value) })),
       useTls: tab.useTls,
       certPath: tab.certPath,
       keyPath: tab.keyPath,
@@ -125,7 +127,7 @@ export function BenchmarkPanel() {
       setError(e instanceof Error ? e.message : String(e));
       setStatus("idle");
     }
-  }, [tab, config]);
+  }, [tab, config, resolveVariables]);
 
   const handleStop_ = useCallback(async () => {
     try {

@@ -461,6 +461,34 @@ func (a *App) DeleteAddress(id int64) error {
 	return a.history.DeleteAddress(id)
 }
 
+func (a *App) GetAddressTLSSettings(address string) (*history.AddressTLSSettings, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, fmt.Errorf("address cannot be empty")
+	}
+	settings, err := a.history.GetAddressTLSSettings(address)
+	if err != nil {
+		return nil, err
+	}
+	if settings != nil {
+		return settings, nil
+	}
+	return &history.AddressTLSSettings{
+		Address: address,
+		UseTLS:  grpclib.DefaultUseTLSForAddress(address),
+	}, nil
+}
+
+func (a *App) SaveAddressTLSSettings(settings history.AddressTLSSettings) (*history.AddressTLSSettings, error) {
+	if a.history == nil {
+		return nil, nil
+	}
+	return a.history.SaveAddressTLSSettings(settings)
+}
+
 // --- Saved Proto Sources ---
 
 func (a *App) ListProtoProjects() ([]history.ProtoProject, error) {
@@ -1116,34 +1144,7 @@ func (a *App) GetMessageFields(projectID, serviceName, methodName string) []mode
 	return fields
 }
 
-func findMessageDescriptorInFile(fd *desc.FileDescriptor, messageType string) *desc.MessageDescriptor {
-	if fd == nil {
-		return nil
-	}
-	for _, md := range fd.GetMessageTypes() {
-		if hit := findMessageDescriptorRecursive(md, messageType); hit != nil {
-			return hit
-		}
-	}
-	return nil
-}
-
-func findMessageDescriptorRecursive(md *desc.MessageDescriptor, messageType string) *desc.MessageDescriptor {
-	if md == nil {
-		return nil
-	}
-	if md.GetFullyQualifiedName() == messageType || md.GetName() == messageType {
-		return md
-	}
-	for _, nested := range md.GetNestedMessageTypes() {
-		if hit := findMessageDescriptorRecursive(nested, messageType); hit != nil {
-			return hit
-		}
-	}
-	return nil
-}
-
-func (a *App) GetMessageTypeFields(projectID, messageType string) []models.FieldInfo {
+func (a *App) GetMessageTypeFields(projectID, messageType, protoPath string) []models.FieldInfo {
 	if strings.TrimSpace(projectID) == "" {
 		return nil
 	}
@@ -1152,14 +1153,24 @@ func (a *App) GetMessageTypeFields(projectID, messageType string) []models.Field
 		return nil
 	}
 
-	fds := a.parser.GetAllFileDescriptorsByProject(projectID)
-	for i := len(fds) - 1; i >= 0; i-- {
-		if md := findMessageDescriptorInFile(fds[i], mt); md != nil {
-			return grpclib.ExtractFieldsFromDesc(md)
-		}
+	if md := a.parser.FindMessageDescriptor(projectID, mt, protoPath); md != nil {
+		return grpclib.ExtractFieldsFromDesc(md)
 	}
-
 	return nil
+}
+
+func (a *App) ListMessageTypeOptions(projectID string) []models.MessageTypeOption {
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
+	return a.parser.ListMessageTypeOptions(projectID)
+}
+
+func (a *App) ResolveMethodInputMessage(projectID, serviceName, methodName string) *models.MessageTypeOption {
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
+	return a.parser.FindMethodInputMessage(projectID, serviceName, methodName)
 }
 
 func (a *App) GetAllMessageTypes(projectID string) []string {
@@ -1290,6 +1301,7 @@ func (a *App) SaveDecodeTemplate(
 	projectID string,
 	name string,
 	messageType string,
+	protoPath string,
 	encoding models.DecodeEncoding,
 	batchMode bool,
 	payloadText string,
@@ -1306,6 +1318,7 @@ func (a *App) SaveDecodeTemplate(
 		projectID,
 		name,
 		messageType,
+		protoPath,
 		string(encoding),
 		batchMode,
 		payloadText,

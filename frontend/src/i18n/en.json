@@ -151,9 +151,18 @@
     "searchAllProjects": "All projects",
     "scopeCurrentProject": "Current project: {{project}}",
     "scopeNoProject": "Current tab is not bound to a project",
+    "allFolders": "All folders",
+    "folderFilter": "Import root",
+    "methodsSection": "Methods ({{shown}}/{{total}})",
+    "sourcesLoading": "Loading import roots…",
     "navigate": "navigate",
     "select": "select",
     "close": "close"
+  },
+  "select": {
+    "searchPlaceholder": "Search…",
+    "noMatches": "No matches",
+    "refineSearch": "{{count}} matches — refine search"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
@@ -221,6 +230,8 @@
     "decodeThisPayload": "Decode this payload",
     "selectMethod": "Select service/method",
     "selectMessage": "Select message type",
+    "selectProtoFile": "Select proto file",
+    "pickMessageInProto": "Select a proto file first, then choose a message from that file",
     "selectTemplate": "Select decode template",
     "saveTemplate": "Save Template",
     "deleteTemplate": "Delete Template",
@@ -283,7 +294,8 @@
     "keyFile": "Client Key",
     "caFile": "CA Cert",
     "selectFile": "Select file",
-    "notSelected": "Not selected"
+    "notSelected": "Not selected",
+    "port443Default": "Port 443 enables TLS by default. Your TLS choice is saved per address."
   },
   "common": {
     "save": "Save",
@@ -367,7 +379,7 @@
     "timeout": "Request Timeout",
     "timeoutDesc": "Set timeout (seconds) next to the Send button. Auto-validates on blur. Default 30s, range 1-3600s.",
     "commandPalette": "Command Palette",
-    "commandPaletteDesc": "⌘+K to open. Quickly search methods and execute commands. Supports fuzzy search, arrow key navigation, Enter to execute.",
+    "commandPaletteDesc": "⌘+K to open. Search methods and run commands. Optional folder filter, method-name-first matching, arrow keys to navigate, Enter to execute.",
     "diff": "Request Diff",
     "diffDesc": "⌘+Click two history records (marked A/B), then click Compare to view line-by-line diffs of request body, response body, and metadata.",
     "theme": "Theme & Language",
