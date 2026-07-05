@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type ChainStepConfig } from "@/store/app-store";
+import { useEnvStore } from "@/store/env-store";
 import { Plus, Trash2, Play, Loader2, ChevronDown, Save, FolderOpen, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -11,6 +12,7 @@ import { Card } from "@/components/ui/Card";
 export function ChainEditor() {
   const { t } = useTranslation();
   const { tabs, activeTabId, updateTab, protoFiles } = useAppStore();
+  const resolveVariables = useEnvStore((s) => s.resolveVariables);
   const tab = tabs.find((t) => t.id === activeTabId);
 
   const allServices = useMemo(() => {
@@ -125,12 +127,12 @@ export function ChainEditor() {
     updateTab(activeTabId, { chainResults: [] });
     try {
       const chainSteps: ChainStep[] = steps.map((s) => ({
-        address: s.address,
+        address: resolveVariables(s.address),
         projectId: s.projectId || tab?.projectId || "",
         serviceName: s.serviceName,
         methodName: s.methodName,
-        body: s.body,
-        metadata: tab?.metadata?.filter((m) => m.enabled && m.key).map((m) => ({ key: m.key, value: m.value })) || [],
+        body: resolveVariables(s.body),
+        metadata: tab?.metadata?.filter((m) => m.enabled && m.key).map((m) => ({ key: m.key, value: resolveVariables(m.value) })) || [],
         useTls: tab?.useTls || false,
         certPath: tab?.certPath || "",
         keyPath: tab?.keyPath || "",
@@ -144,7 +146,7 @@ export function ChainEditor() {
     } finally {
       setRunning(false);
     }
-  }, [steps, tab, activeTabId, updateTab]);
+  }, [steps, tab, activeTabId, updateTab, resolveVariables]);
 
   return (
     <div className="flex flex-col gap-3 p-3 text-xs bg-[var(--surface-1)] h-full overflow-auto">

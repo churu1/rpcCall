@@ -509,6 +509,11 @@ export function RequestEditor() {
               updateTab(tab.id, { requestBody: nextValue });
               setBodyJsonError(null);
             }}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+              }
+            }}
             placeholder='{\n  "field": "value"\n}'
           />
         ) : activePanel === "metadata" ? (

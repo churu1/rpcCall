@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
+import { useEnvStore } from "@/store/env-store";
 import { mergeMetadata } from "@/lib/metadata-profile";
 
 function getJsonParseErrorMessage(error: unknown, t: (key: string, options?: Record<string, unknown>) => string) {
@@ -11,6 +12,7 @@ function getJsonParseErrorMessage(error: unknown, t: (key: string, options?: Rec
 export function useGrpc() {
   const { t } = useTranslation();
   const { activeTabId, tabs, updateTab } = useAppStore();
+  const resolveVariables = useEnvStore((s) => s.resolveVariables);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export function useGrpc() {
     if (!tab || !tab.method || !tab.projectId) return;
 
     try {
-      JSON.parse(tab.requestBody);
+      JSON.parse(resolveVariables(tab.requestBody));
     } catch (error) {
       const message = getJsonParseErrorMessage(error, t);
       window.dispatchEvent(new CustomEvent("rpccall:request-json-error", {
@@ -62,13 +64,17 @@ export function useGrpc() {
       }
     } catch { /* ignore profile load errors and send manual metadata */ }
 
+    const resolvedBody = resolveVariables(tab.requestBody);
+
     const request = {
       projectId: tab.projectId,
-      address: tab.address,
+      address: resolveVariables(tab.address),
       serviceName: tab.method.serviceName,
       methodName: tab.method.methodName,
-      body: tab.requestBody,
-      metadata: metadata.filter((m) => m.enabled && m.key),
+      body: resolvedBody,
+      metadata: metadata
+        .filter((m) => m.enabled && m.key)
+        .map((m) => ({ key: m.key, value: resolveVariables(m.value) })),
       useTls: tab.useTls,
       certPath: tab.certPath,
       keyPath: tab.keyPath,
@@ -90,6 +96,7 @@ export function useGrpc() {
           elapsedMs: resp.elapsedMs,
           timing: resp.timing ?? null,
         });
+        window.dispatchEvent(new CustomEvent("rpccall:history-refresh"));
       } else if (methodType === "client_streaming") {
         const resp: GrpcResponse = await window.go.main.App.InvokeClientStream(request);
         updateTab(tab.id, {
@@ -101,6 +108,7 @@ export function useGrpc() {
           elapsedMs: resp.elapsedMs,
           timing: resp.timing ?? null,
         });
+        window.dispatchEvent(new CustomEvent("rpccall:history-refresh"));
       } else if (methodType === "server_streaming" || methodType === "bidi_streaming") {
         let messages: string[] = [];
 
@@ -124,6 +132,7 @@ export function useGrpc() {
           });
           offMessage();
           offDone();
+          window.dispatchEvent(new CustomEvent("rpccall:history-refresh"));
         });
 
         cleanupRef.current = () => {
@@ -144,8 +153,9 @@ export function useGrpc() {
         responseBody: `Error: ${message}`,
         statusCode: "ERROR",
       });
+      window.dispatchEvent(new CustomEvent("rpccall:history-refresh"));
     }
-  }, [activeTabId, tabs, updateTab, t]);
+  }, [activeTabId, tabs, updateTab, resolveVariables, t]);
 
   return { send };
 }

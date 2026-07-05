@@ -59,8 +59,13 @@ export function HistoryPanel() {
 
   useEffect(() => {
     loadHistory();
-    const interval = setInterval(loadHistory, 5000);
-    return () => clearInterval(interval);
+    const onRefresh = () => loadHistory();
+    window.addEventListener("rpccall:history-refresh", onRefresh);
+    const interval = setInterval(loadHistory, 30000);
+    return () => {
+      window.removeEventListener("rpccall:history-refresh", onRefresh);
+      clearInterval(interval);
+    };
   }, [loadHistory]);
 
   const handleReplay = async (entry: HistoryEntry) => {
