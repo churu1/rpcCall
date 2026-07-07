@@ -644,6 +644,7 @@ type SavedAddress struct {
 }
 
 func (s *Store) SaveAddress(name, address string) (*SavedAddress, error) {
+	address = strings.Join(strings.Fields(address), "")
 	if address == "" {
 		return nil, fmt.Errorf("address cannot be empty")
 	}

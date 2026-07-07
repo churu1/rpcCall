@@ -56,9 +56,14 @@ export function useGrpc() {
       timing: null,
     });
 
+    const normalizedAddress = resolveVariables(tab.address).replace(/\s+/g, "");
+    if (normalizedAddress !== tab.address) {
+      updateTab(tab.id, { address: normalizedAddress });
+    }
+
     let metadata = tab.metadata;
     try {
-      const profile = await window.go.main.App.GetMetadataProfile(tab.address);
+      const profile = await window.go.main.App.GetMetadataProfile(normalizedAddress);
       if (profile?.enabled) {
         metadata = mergeMetadata(tab.metadata, profile.metadata.map((m) => ({ ...m, enabled: true })));
       }
@@ -68,7 +73,7 @@ export function useGrpc() {
 
     const request = {
       projectId: tab.projectId,
-      address: resolveVariables(tab.address),
+      address: normalizedAddress,
       serviceName: tab.method.serviceName,
       methodName: tab.method.methodName,
       body: resolvedBody,

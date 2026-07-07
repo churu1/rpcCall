@@ -93,6 +93,7 @@ func (c *Caller) findMethodDescriptor(projectID, serviceName, methodName string)
 }
 
 func dialWithConfig(address string, req models.GrpcRequest) (*grpc.ClientConn, error) {
+	address = strings.Join(strings.Fields(address), "")
 	tlsCfg := TLSConfig{
 		UseTLS:   req.UseTLS,
 		CertPath: req.CertPath,

@@ -255,6 +255,7 @@ func (a *App) SelectDecodeFile() (string, error) {
 }
 
 func (a *App) resolveEnvVariables(req *models.GrpcRequest) {
+	req.Address = normalizeAddress(req.Address)
 	if a.history == nil {
 		return
 	}
@@ -270,6 +271,15 @@ func (a *App) resolveEnvVariables(req *models.GrpcRequest) {
 			req.Metadata[i].Value = strings.ReplaceAll(req.Metadata[i].Value, placeholder, v)
 		}
 	}
+	req.Address = normalizeAddress(req.Address)
+}
+
+// normalizeAddress removes whitespace characters from the address to avoid
+// connection failures caused by accidentally pasted spaces (e.g. leading
+// space in " localhost:50051"). Spaces inside a valid host:port are never
+// legitimate, so trimming them is safe and helps debugging.
+func normalizeAddress(address string) string {
+	return strings.Join(strings.Fields(address), "")
 }
 
 func (a *App) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, error) {
