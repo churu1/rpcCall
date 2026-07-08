@@ -187,6 +187,22 @@ wails build      # 产物输出到 build/bin/RpcCall.app（macOS）
 open build/bin/RpcCall.app
 ```
 
+### macOS 下载安装（DMG）
+
+从 [GitHub Releases](https://github.com/churu1/rpcCall/releases) 下载 `RpcCall-<version>-macos.dmg`，双击挂载后把 **RpcCall** 拖入 **Applications** 文件夹即可。
+
+> 应用未做代码签名与公证。首次打开会被 Gatekeeper 拦截，提示「无法打开，因为来自身份不明的开发者」。两种绕过方式：
+> - **右键** RpcCall.app → 「打开」→ 在弹窗里再次点「打开」；
+> - 或进入「系统设置 → 隐私与安全性」，在底部找到「已阻止 RpcCall」，点「仍要打开」。
+
+### 打包 DMG（开发者）
+
+```bash
+./scripts/build-dmg.sh   # 读取 wails.json 中的 productVersion，输出 build/bin/RpcCall-<version>-macos.dmg
+```
+
+脚本内部依次执行 `wails build` 与 `hdiutil`，无需额外依赖。如需更换 Go 模块代理，可前置 `GOPROXY=https://proxy.golang.org,direct`。
+
 ### 运行测试
 
 ```bash

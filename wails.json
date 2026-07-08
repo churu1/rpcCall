@@ -9,5 +9,11 @@
   "author": {
     "name": "churu",
     "email": "churu@micous.com"
+  },
+  "info": {
+    "productName": "RpcCall",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026 churu",
+    "comments": "Cross-platform desktop gRPC debugging tool"
   }
 }
