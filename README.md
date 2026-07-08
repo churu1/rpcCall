@@ -191,9 +191,14 @@ open build/bin/RpcCall.app
 
 从 [GitHub Releases](https://github.com/churu1/rpcCall/releases) 下载 `RpcCall-<version>-macos.dmg`，双击挂载后把 **RpcCall** 拖入 **Applications** 文件夹即可。
 
-> 应用未做代码签名与公证。首次打开会被 Gatekeeper 拦截，提示「无法打开，因为来自身份不明的开发者」。两种绕过方式：
-> - **右键** RpcCall.app → 「打开」→ 在弹窗里再次点「打开」；
-> - 或进入「系统设置 → 隐私与安全性」，在底部找到「已阻止 RpcCall」，点「仍要打开」。
+> 应用未做 Apple Developer ID 签名与公证。首次打开如果提示「RpcCall.app 已损坏，无法打开」，请在终端执行：
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/RpcCall.app
+> open /Applications/RpcCall.app
+> ```
+>
+> 该命令只移除 RpcCall 的下载隔离标记。
 
 ### 打包 DMG（开发者）
 
