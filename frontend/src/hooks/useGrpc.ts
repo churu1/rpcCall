@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/app-store";
 import { useEnvStore } from "@/store/env-store";
 import { mergeMetadata } from "@/lib/metadata-profile";
 
-function getJsonParseErrorMessage(error: unknown, t: (key: string, options?: Record<string, unknown>) => string) {
-  const detail = error instanceof Error ? error.message : String(error);
-  return t("editor.jsonParseError", { detail });
-}
-
 export function useGrpc() {
-  const { t } = useTranslation();
   const { activeTabId, tabs, updateTab } = useAppStore();
   const resolveVariables = useEnvStore((s) => s.resolveVariables);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -26,25 +19,6 @@ export function useGrpc() {
   const send = useCallback(async () => {
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab || !tab.method || !tab.projectId) return;
-
-    try {
-      JSON.parse(resolveVariables(tab.requestBody));
-    } catch (error) {
-      const message = getJsonParseErrorMessage(error, t);
-      window.dispatchEvent(new CustomEvent("rpccall:request-json-error", {
-        detail: { tabId: tab.id, message },
-      }));
-      updateTab(tab.id, {
-        isLoading: false,
-        responseBody: `Error: ${message}`,
-        responseMetadata: [],
-        responseTrailers: [],
-        statusCode: "ERROR",
-        elapsedMs: null,
-        timing: null,
-      });
-      return;
-    }
 
     updateTab(tab.id, {
       isLoading: true,
@@ -88,6 +62,30 @@ export function useGrpc() {
     };
 
     try {
+      const validationErrors = await window.go.main.App.ValidateRequestBody(request);
+      if (validationErrors && validationErrors.length > 0) {
+        const first = validationErrors[0];
+        const summary = validationErrors.length === 1
+          ? first.message
+          : `${first.message}，另有 ${validationErrors.length - 1} 个错误`;
+        window.dispatchEvent(new CustomEvent("rpccall:request-validation-error", {
+          detail: { tabId: tab.id, message: summary, errors: validationErrors },
+        }));
+        updateTab(tab.id, {
+          isLoading: false,
+          responseBody: `Error: 请求参数校验失败\n${validationErrors.map((e) => `Line ${e.line}: ${e.message}`).join("\n")}`,
+          responseMetadata: [],
+          responseTrailers: [],
+          statusCode: "ERROR",
+          elapsedMs: null,
+          timing: null,
+        });
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("rpccall:request-validation-error", {
+        detail: { tabId: tab.id, message: "", errors: [] },
+      }));
+
       const methodType = tab.method.methodType;
 
       if (methodType === "unary") {
@@ -160,7 +158,7 @@ export function useGrpc() {
       });
       window.dispatchEvent(new CustomEvent("rpccall:history-refresh"));
     }
-  }, [activeTabId, tabs, updateTab, resolveVariables, t]);
+  }, [activeTabId, tabs, updateTab, resolveVariables]);
 
   return { send };
 }

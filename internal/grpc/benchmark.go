@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -72,6 +71,7 @@ func (c *Caller) RunBenchmark(
 		errCodeMu    sync.Mutex
 		seqCounter   atomic.Int64
 	)
+	codec := c.dynamicCodec(req.ProjectID, methodDesc)
 
 	appendLatency := func(ms int64) {
 		latMu.Lock()
@@ -86,7 +86,7 @@ func (c *Caller) RunBenchmark(
 	}
 
 	worker := func(conn *grpc.ClientConn, limiter func() bool) {
-		stub := grpcdynamic.NewStub(conn)
+		stub := grpcdynamic.NewStubWithMessageFactory(conn, codec.factory)
 		outMD := buildOutgoingMetadata(req.Metadata)
 
 		for limiter() {
@@ -95,8 +95,8 @@ func (c *Caller) RunBenchmark(
 			}
 
 			body := resolveVariables(req.Body, cfg.Variables, &seqCounter)
-			reqMsg := dynamic.NewMessage(methodDesc.GetInputType())
-			if err := reqMsg.UnmarshalJSON([]byte(body)); err != nil {
+			reqMsg := codec.newMessage(methodDesc.GetInputType())
+			if err := codec.unmarshal(reqMsg, []byte(body)); err != nil {
 				totalSent.Add(1)
 				totalError.Add(1)
 				recordError("JSON_ERROR")

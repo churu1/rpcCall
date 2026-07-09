@@ -112,11 +112,15 @@ func (m *MockServer) buildResponseMessage(fullMethod string, rule *MockRule) (pr
 	if err != nil {
 		return nil, err
 	}
-	msg := dynamic.NewMessage(methodDesc.GetOutputType())
+	m.mu.Lock()
+	parser := m.parser
+	m.mu.Unlock()
+	codec := newDynamicJSONCodec(collectAllParserFiles(parser))
+	msg := codec.newMessage(methodDesc.GetOutputType())
 	if strings.TrimSpace(rule.ResponseBody) == "" {
 		return msg, nil
 	}
-	if err := msg.UnmarshalJSON([]byte(rule.ResponseBody)); err != nil {
+	if err := codec.unmarshal(msg, []byte(rule.ResponseBody)); err != nil {
 		return nil, fmt.Errorf("invalid mock response JSON for %s: %w", fullMethod, err)
 	}
 	return msg, nil

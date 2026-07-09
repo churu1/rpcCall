@@ -13,7 +13,7 @@ import { PanelTabs } from "@/components/ui/PanelTabs";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
-import { JsonEditor } from "./JsonEditor";
+import { JsonEditor, type JsonEditorDiagnostic } from "./JsonEditor";
 import { AutocompletePopup } from "./AutocompletePopup";
 import { GrpcurlDialog } from "./GrpcurlDialog";
 import { buildGrpcurlCommand } from "@/lib/grpcurl-export";
@@ -254,6 +254,7 @@ export function RequestEditor() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [bodyJsonError, setBodyJsonError] = useState<string | null>(null);
+  const [bodyValidationErrors, setBodyValidationErrors] = useState<JsonEditorDiagnostic[]>([]);
   const [grpcurlCommand, setGrpcurlCommand] = useState<string | null>(null);
   const [grpcurlStreaming, setGrpcurlStreaming] = useState(false);
 
@@ -287,6 +288,7 @@ export function RequestEditor() {
           tab.requestBody.slice(0, start) + insert + tab.requestBody.slice(end);
         updateTab(tab.id, { requestBody: newBody });
         setBodyJsonError(null);
+        setBodyValidationErrors([]);
         requestAnimationFrame(() => {
           el.focus();
           const newPos = start + insert.length;
@@ -368,10 +370,28 @@ export function RequestEditor() {
       if (!custom.detail?.message || custom.detail.tabId !== activeTabId) return;
       setActivePanel("body");
       setBodyJsonError(custom.detail.message);
+      setBodyValidationErrors([]);
+    };
+    const handleRequestValidationError = (event: Event) => {
+      const custom = event as CustomEvent<{ tabId?: string; message?: string; errors?: RequestValidationError[] }>;
+      if (custom.detail?.tabId !== activeTabId) return;
+      if (!custom.detail.message && (!custom.detail.errors || custom.detail.errors.length === 0)) {
+        setBodyJsonError(null);
+        setBodyValidationErrors([]);
+        return;
+      }
+      setActivePanel("body");
+      setBodyJsonError(custom.detail.message || null);
+      setBodyValidationErrors((custom.detail.errors || []).map((err) => ({
+        line: err.line,
+        message: err.path ? `${err.path}: ${err.message}` : err.message,
+      })));
     };
     window.addEventListener("rpccall:request-json-error", handleRequestJsonError as EventListener);
+    window.addEventListener("rpccall:request-validation-error", handleRequestValidationError as EventListener);
     return () => {
       window.removeEventListener("rpccall:request-json-error", handleRequestJsonError as EventListener);
+      window.removeEventListener("rpccall:request-validation-error", handleRequestValidationError as EventListener);
     };
   }, [activeTabId]);
 
@@ -391,6 +411,7 @@ export function RequestEditor() {
       const formatted = JSON.stringify(JSON.parse(tab.requestBody), null, 2);
       updateTab(tab.id, { requestBody: formatted });
       setBodyJsonError(null);
+      setBodyValidationErrors([]);
     } catch (error) {
       setBodyJsonError(getJsonParseErrorMessage(error, t));
     }
@@ -401,6 +422,7 @@ export function RequestEditor() {
       const minified = JSON.stringify(JSON.parse(tab.requestBody));
       updateTab(tab.id, { requestBody: minified });
       setBodyJsonError(null);
+      setBodyValidationErrors([]);
     } catch (error) {
       setBodyJsonError(getJsonParseErrorMessage(error, t));
     }
@@ -568,12 +590,14 @@ export function RequestEditor() {
             onChange={(nextValue) => {
               updateTab(tab.id, { requestBody: nextValue });
               setBodyJsonError(null);
+              setBodyValidationErrors([]);
             }}
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
               }
             }}
+            diagnostics={bodyValidationErrors}
             placeholder='{\n  "field": "value"\n}'
           />
         ) : activePanel === "metadata" ? (

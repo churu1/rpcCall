@@ -95,6 +95,15 @@ type GrpcResponse struct {
 	Timing     *TimingDetail   `json:"timing,omitempty"`
 }
 
+type RequestValidationError struct {
+	Path     string `json:"path"`
+	Line     int    `json:"line"`
+	Column   int    `json:"column"`
+	Expected string `json:"expected"`
+	Actual   string `json:"actual"`
+	Message  string `json:"message"`
+}
+
 type FieldInfo struct {
 	FieldNumber int32  `json:"fieldNumber"`
 	Name        string `json:"name"`

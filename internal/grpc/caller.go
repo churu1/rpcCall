@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
@@ -19,19 +17,6 @@ import (
 
 	"rpccall/internal/models"
 )
-
-var jsonMarshaler = &jsonpb.Marshaler{
-	EmitDefaults: true,
-	Indent:       "  ",
-}
-
-func marshalDynamicMessage(msg *dynamic.Message) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := jsonMarshaler.Marshal(&buf, msg); err != nil {
-		return msg.MarshalJSONIndent()
-	}
-	return buf.Bytes(), nil
-}
 
 type Caller struct {
 	parser     *ProtoParser
@@ -90,6 +75,24 @@ func (c *Caller) findMethodDescriptor(projectID, serviceName, methodName string)
 	}
 
 	return nil, fmt.Errorf("method %s/%s not found in project %s", serviceName, methodName, projectID)
+}
+
+func (c *Caller) dynamicCodec(projectID string, methodDesc *desc.MethodDescriptor) dynamicJSONCodec {
+	files := collectProjectFiles(c.parser, projectID)
+	seen := make(map[*desc.FileDescriptor]struct{}, len(files)+1)
+	unique := make([]*desc.FileDescriptor, 0, len(files)+1)
+	for _, fd := range files {
+		unique = appendUniqueFile(unique, seen, fd)
+	}
+	if methodDesc != nil {
+		unique = appendUniqueFile(unique, seen, methodDesc.GetFile())
+	}
+	if c.reflection != nil {
+		for _, svc := range c.reflection.GetAllServiceDescriptors() {
+			unique = appendUniqueFile(unique, seen, svc.GetFile())
+		}
+	}
+	return newDynamicJSONCodec(unique)
 }
 
 func dialWithConfig(address string, req models.GrpcRequest) (*grpc.ClientConn, error) {
@@ -153,8 +156,9 @@ func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, erro
 	defer conn.Close()
 
 	tSerStart := time.Now()
-	reqMsg := dynamic.NewMessage(methodDesc.GetInputType())
-	if err := reqMsg.UnmarshalJSON([]byte(req.Body)); err != nil {
+	codec := c.dynamicCodec(req.ProjectID, methodDesc)
+	reqMsg := codec.newMessage(methodDesc.GetInputType())
+	if err := codec.unmarshal(reqMsg, []byte(req.Body)); err != nil {
 		return nil, fmt.Errorf("invalid request JSON: %w", err)
 	}
 	tSerialize := time.Since(tSerStart)
@@ -166,7 +170,7 @@ func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, erro
 	ctx, cancel := context.WithTimeout(ctx, getTimeout(req))
 	defer cancel()
 
-	stub := grpcdynamic.NewStub(conn)
+	stub := grpcdynamic.NewStubWithMessageFactory(conn, codec.factory)
 
 	var respHeaders, respTrailers metadata.MD
 	tRpcStart := time.Now()
@@ -198,7 +202,7 @@ func (c *Caller) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, erro
 		}, nil
 	}
 
-	respJSON, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
+	respJSON, marshalErr := codec.marshal(resp.(*dynamic.Message))
 	if marshalErr != nil {
 		return nil, fmt.Errorf("failed to marshal response: %w", marshalErr)
 	}
@@ -224,8 +228,9 @@ func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(strin
 		return err
 	}
 
-	reqMsg := dynamic.NewMessage(methodDesc.GetInputType())
-	if err := reqMsg.UnmarshalJSON([]byte(req.Body)); err != nil {
+	codec := c.dynamicCodec(req.ProjectID, methodDesc)
+	reqMsg := codec.newMessage(methodDesc.GetInputType())
+	if err := codec.unmarshal(reqMsg, []byte(req.Body)); err != nil {
 		conn.Close()
 		return fmt.Errorf("invalid request JSON: %w", err)
 	}
@@ -240,7 +245,7 @@ func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(strin
 		_ = cancel
 	}
 
-	stub := grpcdynamic.NewStub(conn)
+	stub := grpcdynamic.NewStubWithMessageFactory(conn, codec.factory)
 
 	go func() {
 		defer conn.Close()
@@ -276,7 +281,7 @@ func (c *Caller) InvokeServerStream(req models.GrpcRequest, onMessage func(strin
 				})
 				return
 			}
-			jsonBytes, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
+			jsonBytes, marshalErr := codec.marshal(resp.(*dynamic.Message))
 			if marshalErr != nil {
 				onMessage(fmt.Sprintf(`{"error":"marshal failed: %s"}`, marshalErr.Error()))
 				continue
@@ -318,7 +323,8 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 	ctx, cancel := context.WithTimeout(ctx, getTimeout(req))
 	defer cancel()
 
-	stub := grpcdynamic.NewStub(conn)
+	codec := c.dynamicCodec(req.ProjectID, methodDesc)
+	stub := grpcdynamic.NewStubWithMessageFactory(conn, codec.factory)
 
 	stream, err := stub.InvokeRpcClientStream(ctx, methodDesc)
 	if err != nil {
@@ -327,8 +333,8 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 
 	var messages []json.RawMessage
 	if err := json.Unmarshal([]byte(req.Body), &messages); err != nil {
-		msg := dynamic.NewMessage(methodDesc.GetInputType())
-		if err := msg.UnmarshalJSON([]byte(req.Body)); err != nil {
+		msg := codec.newMessage(methodDesc.GetInputType())
+		if err := codec.unmarshal(msg, []byte(req.Body)); err != nil {
 			return nil, fmt.Errorf("invalid request JSON: %w", err)
 		}
 		if err := stream.SendMsg(msg); err != nil {
@@ -336,8 +342,8 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 		}
 	} else {
 		for _, rawMsg := range messages {
-			msg := dynamic.NewMessage(methodDesc.GetInputType())
-			if err := msg.UnmarshalJSON(rawMsg); err != nil {
+			msg := codec.newMessage(methodDesc.GetInputType())
+			if err := codec.unmarshal(msg, rawMsg); err != nil {
 				return nil, fmt.Errorf("invalid message in array: %w", err)
 			}
 			if err := stream.SendMsg(msg); err != nil {
@@ -362,7 +368,7 @@ func (c *Caller) InvokeClientStream(req models.GrpcRequest) (*models.GrpcRespons
 		}, nil
 	}
 
-	respJSON, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
+	respJSON, marshalErr := codec.marshal(resp.(*dynamic.Message))
 	if marshalErr != nil {
 		return nil, fmt.Errorf("failed to marshal response: %w", marshalErr)
 	}
@@ -398,7 +404,8 @@ func (c *Caller) InvokeBidiStream(req models.GrpcRequest, onMessage func(string)
 		_ = cancel
 	}
 
-	stub := grpcdynamic.NewStub(conn)
+	codec := c.dynamicCodec(req.ProjectID, methodDesc)
+	stub := grpcdynamic.NewStubWithMessageFactory(conn, codec.factory)
 
 	go func() {
 		defer conn.Close()
@@ -417,14 +424,14 @@ func (c *Caller) InvokeBidiStream(req models.GrpcRequest, onMessage func(string)
 
 		var messages []json.RawMessage
 		if err := json.Unmarshal([]byte(req.Body), &messages); err != nil {
-			msg := dynamic.NewMessage(methodDesc.GetInputType())
-			if jsonErr := msg.UnmarshalJSON([]byte(req.Body)); jsonErr == nil {
+			msg := codec.newMessage(methodDesc.GetInputType())
+			if jsonErr := codec.unmarshal(msg, []byte(req.Body)); jsonErr == nil {
 				stream.SendMsg(msg)
 			}
 		} else {
 			for _, rawMsg := range messages {
-				msg := dynamic.NewMessage(methodDesc.GetInputType())
-				if jsonErr := msg.UnmarshalJSON(rawMsg); jsonErr == nil {
+				msg := codec.newMessage(methodDesc.GetInputType())
+				if jsonErr := codec.unmarshal(msg, rawMsg); jsonErr == nil {
 					stream.SendMsg(msg)
 				}
 			}
@@ -450,7 +457,7 @@ func (c *Caller) InvokeBidiStream(req models.GrpcRequest, onMessage func(string)
 				})
 				return
 			}
-			jsonBytes, marshalErr := marshalDynamicMessage(resp.(*dynamic.Message))
+			jsonBytes, marshalErr := codec.marshal(resp.(*dynamic.Message))
 			if marshalErr != nil {
 				onMessage(fmt.Sprintf(`{"error":"marshal failed: %s"}`, marshalErr.Error()))
 				continue

@@ -292,6 +292,11 @@ func (a *App) InvokeUnary(req models.GrpcRequest) (*models.GrpcResponse, error) 
 	return resp, err
 }
 
+func (a *App) ValidateRequestBody(req models.GrpcRequest) []models.RequestValidationError {
+	a.resolveEnvVariables(&req)
+	return a.caller.ValidateRequestJSON(req)
+}
+
 func (a *App) InvokeClientStream(req models.GrpcRequest) (*models.GrpcResponse, error) {
 	a.resolveEnvVariables(&req)
 	resp, err := a.caller.InvokeClientStream(req)

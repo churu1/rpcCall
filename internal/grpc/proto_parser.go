@@ -508,6 +508,14 @@ func GenerateDefaultJSON(msgDesc *desc.MessageDescriptor) string {
 	return generateJSONForMessage(msgDesc, 0, make(map[string]bool))
 }
 
+func indentForDepth(depth int) string {
+	indent := ""
+	for i := 0; i < depth; i++ {
+		indent += "  "
+	}
+	return indent
+}
+
 func generateJSONForMessage(md *desc.MessageDescriptor, depth int, visited map[string]bool) string {
 	if depth > 5 || visited[md.GetFullyQualifiedName()] {
 		return "{}"
@@ -522,10 +530,7 @@ func generateJSONForMessage(md *desc.MessageDescriptor, depth int, visited map[s
 
 	result := "{\n"
 	for i, f := range fields {
-		indent := ""
-		for j := 0; j <= depth; j++ {
-			indent += "  "
-		}
+		indent := indentForDepth(depth + 1)
 		result += indent + `"` + f.GetJSONName() + `": `
 
 		val := defaultValueForField(f, depth, visited)
@@ -538,11 +543,7 @@ func generateJSONForMessage(md *desc.MessageDescriptor, depth int, visited map[s
 		}
 		result += "\n"
 	}
-	closeIndent := ""
-	for j := 0; j < depth; j++ {
-		closeIndent += "  "
-	}
-	result += closeIndent + "}"
+	result += indentForDepth(depth) + "}"
 	return result
 }
 
@@ -613,8 +614,117 @@ func defaultValueForField(f *desc.FieldDescriptor, depth int, visited map[string
 		if f.IsMap() {
 			return "{}"
 		}
+		if f.GetMessageType() != nil && f.GetMessageType().GetFullyQualifiedName() == "google.protobuf.Any" {
+			return defaultAnyValueForField(f, depth, visited)
+		}
 		return generateJSONForMessage(f.GetMessageType(), depth+1, visited)
 	default:
 		return `""`
 	}
+}
+
+func defaultAnyValueForField(f *desc.FieldDescriptor, depth int, visited map[string]bool) string {
+	candidate := inferAnyMessageType(f)
+	fieldIndent := indentForDepth(depth + 1)
+	innerIndent := indentForDepth(depth + 2)
+	if candidate == nil || visited[candidate.GetFullyQualifiedName()] {
+		return "{\n" + innerIndent + `"@type": ""` + "\n" + fieldIndent + "}"
+	}
+
+	visited[candidate.GetFullyQualifiedName()] = true
+	defer delete(visited, candidate.GetFullyQualifiedName())
+
+	result := "{\n"
+	result += innerIndent + `"@type": "type.googleapis.com/` + candidate.GetFullyQualifiedName() + `"`
+	fields := candidate.GetFields()
+	if len(fields) > 0 {
+		result += ",\n"
+		for i, child := range fields {
+			result += innerIndent + `"` + child.GetJSONName() + `": ` + defaultValueForField(child, depth+1, visited)
+			if i < len(fields)-1 {
+				result += ","
+			}
+			result += "\n"
+		}
+	} else {
+		result += "\n"
+	}
+	result += fieldIndent + "}"
+	return result
+}
+
+func inferAnyMessageType(f *desc.FieldDescriptor) *desc.MessageDescriptor {
+	if f == nil || f.GetFile() == nil {
+		return nil
+	}
+	fieldNorm := normalizeTypeHint(f.GetJSONName())
+	if fieldNorm == "" {
+		fieldNorm = normalizeTypeHint(f.GetName())
+	}
+	files := []*desc.FileDescriptor{f.GetFile()}
+	files = append(files, f.GetFile().GetDependencies()...)
+
+	var best *desc.MessageDescriptor
+	bestScore := -1
+	for _, fd := range files {
+		for _, md := range collectMessagesInFile(fd) {
+			name := normalizeTypeHint(md.GetName())
+			score := anyMessageMatchScore(name, fieldNorm)
+			if score > bestScore {
+				best = md
+				bestScore = score
+			}
+		}
+	}
+	if bestScore <= 0 {
+		return nil
+	}
+	return best
+}
+
+func collectMessagesInFile(fd *desc.FileDescriptor) []*desc.MessageDescriptor {
+	if fd == nil {
+		return nil
+	}
+	var out []*desc.MessageDescriptor
+	var walk func(messages []*desc.MessageDescriptor)
+	walk = func(messages []*desc.MessageDescriptor) {
+		for _, md := range messages {
+			if md.GetFullyQualifiedName() != "google.protobuf.Any" {
+				out = append(out, md)
+			}
+			walk(md.GetNestedMessageTypes())
+		}
+	}
+	walk(fd.GetMessageTypes())
+	return out
+}
+
+func anyMessageMatchScore(messageName, fieldName string) int {
+	if messageName == "" || fieldName == "" {
+		return 0
+	}
+	if messageName == fieldName {
+		return 1000
+	}
+	if strings.HasSuffix(messageName, fieldName) {
+		return 800 - len(messageName)
+	}
+	if strings.Contains(messageName, fieldName) {
+		return 400 - len(messageName)
+	}
+	return 0
+}
+
+func normalizeTypeHint(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			r = r - 'A' + 'a'
+		}
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

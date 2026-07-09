@@ -153,8 +153,41 @@ body {
 .token.punctuation { color: var(--color-muted-foreground); }
 
 /* JSON Editor styles */
+.json-editor-with-gutter {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-height: 100%;
+}
+.json-editor-gutter {
+  padding: 12px 6px 12px 0;
+  font-family: var(--font-mono);
+  font-size: var(--rpccall-json-font-size);
+  line-height: 1.6;
+  background: var(--surface-1);
+  border-right: 1px solid var(--line-soft);
+}
+.json-editor-gutter-line {
+  display: block;
+  height: 1.6em;
+  color: var(--text-muted);
+  opacity: 0.6;
+  text-align: right;
+  user-select: none;
+}
+.json-editor-gutter-line-error {
+  color: var(--state-error);
+  opacity: 1;
+  font-weight: 700;
+}
+.json-editor-code {
+  min-width: 0;
+  position: relative;
+}
 .json-editor {
   caret-color: var(--color-foreground);
+  min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 .json-editor-textarea {
   outline: none !important;

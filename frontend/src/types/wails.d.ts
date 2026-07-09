@@ -51,6 +51,15 @@ declare interface GrpcResponse {
   timing?: TimingDetail;
 }
 
+declare interface RequestValidationError {
+  path: string;
+  line: number;
+  column: number;
+  expected: string;
+  actual: string;
+  message: string;
+}
+
 declare interface BenchmarkVariable {
   name: string;
   type: 'sequence' | 'random_int' | 'random_string' | 'list';
@@ -340,6 +349,7 @@ interface Window {
         OpenProtoDirDialog: (projectId: string) => Promise<any[] | null>;
         ListServicesViaReflection: (address: string) => Promise<any[]>;
         GetMethodTemplate: (projectId: string, serviceName: string, methodName: string) => Promise<string>;
+        ValidateRequestBody: (req: GrpcRequest) => Promise<RequestValidationError[] | null>;
         InvokeUnary: (req: GrpcRequest) => Promise<GrpcResponse>;
         InvokeClientStream: (req: GrpcRequest) => Promise<GrpcResponse>;
         InvokeServerStream: (req: GrpcRequest) => Promise<void>;

@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 	"rpccall/internal/models"
 )
 
@@ -94,7 +93,8 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 		resp.RawTags = rawTags
 	}
 
-	msg := dynamic.NewMessage(msgDesc)
+	codec := newDynamicJSONCodec(collectProjectFiles(d.parser, projectID))
+	msg := codec.newMessage(msgDesc)
 	if err := msg.Unmarshal(rawBytes); err != nil {
 		resp.ErrorCode = "unmarshal_failed"
 		resp.Error = err.Error()
@@ -102,7 +102,7 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 		return resp
 	}
 
-	jsonBytes, err := marshalDynamicMessage(msg)
+	jsonBytes, err := codec.marshal(msg)
 	if err != nil {
 		resp.ErrorCode = "unmarshal_failed"
 		resp.Error = err.Error()
@@ -118,7 +118,7 @@ func (d *Decoder) DecodePayload(req models.DecodeRequest) *models.DecodeResponse
 		return resp
 	}
 
-	hits, warnings := d.applyNestedRules(projectID, doc, req.NestedRules, msgDesc)
+	hits, warnings := d.applyNestedRules(projectID, doc, req.NestedRules, msgDesc, codec)
 	resp.NestedHits = hits
 	resp.Warnings = append(resp.Warnings, warnings...)
 	fillMissingFieldsByDescriptor(doc, msgDesc)
@@ -239,7 +239,7 @@ func (d *Decoder) resolveMessageDescriptor(method *desc.MethodDescriptor, req mo
 	}
 }
 
-func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.NestedDecodeRule, rootDesc *desc.MessageDescriptor) (int, []string) {
+func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.NestedDecodeRule, rootDesc *desc.MessageDescriptor, codec dynamicJSONCodec) (int, []string) {
 	if len(rules) == 0 {
 		return 0, nil
 	}
@@ -256,7 +256,7 @@ func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.Nes
 			warnings = append(warnings, fmt.Sprintf("nested rule %s: message %s not found", path, msgType))
 			continue
 		}
-		changed, warn := decodeFieldPath(doc, path, rootDesc, md)
+		changed, warn := decodeFieldPath(doc, path, rootDesc, md, codec)
 		hits += changed
 		if warn != "" {
 			warnings = append(warnings, warn)
@@ -265,7 +265,7 @@ func (d *Decoder) applyNestedRules(projectID string, doc any, rules []models.Nes
 	return hits, warnings
 }
 
-func decodeFieldPath(root any, fieldPath string, rootDesc *desc.MessageDescriptor, decodeDesc *desc.MessageDescriptor) (int, string) {
+func decodeFieldPath(root any, fieldPath string, rootDesc *desc.MessageDescriptor, decodeDesc *desc.MessageDescriptor, codec dynamicJSONCodec) (int, string) {
 	rawParts := strings.Split(fieldPath, ".")
 	parts := make([]string, 0, len(rawParts))
 	for _, p := range rawParts {
@@ -292,11 +292,11 @@ func decodeFieldPath(root any, fieldPath string, rootDesc *desc.MessageDescripto
 	if len(parts) == 0 {
 		return 0, ""
 	}
-	changed, warn := decodeFieldPathInner(root, parts, decodeDesc, fieldPath)
+	changed, warn := decodeFieldPathInner(root, parts, decodeDesc, fieldPath, codec)
 	return changed, warn
 }
 
-func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, fieldPath string) (int, string) {
+func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, fieldPath string, codec dynamicJSONCodec) (int, string) {
 	if len(parts) == 0 {
 		return 0, ""
 	}
@@ -307,7 +307,7 @@ func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, 
 			return 0, fmt.Sprintf("nested rule %s: field not found", fieldPath)
 		}
 		if len(parts) == 1 {
-			changed, err := decodeNodeValue(next, md)
+			changed, err := decodeNodeValue(next, md, codec)
 			if err != nil {
 				return 0, fmt.Sprintf("nested rule %s: %v", fieldPath, err)
 			}
@@ -317,11 +317,11 @@ func decodeFieldPathInner(node any, parts []string, md *desc.MessageDescriptor, 
 			}
 			return 0, fmt.Sprintf("nested rule %s: field is not decodable string/list", fieldPath)
 		}
-		return decodeFieldPathInner(next, parts[1:], md, fieldPath)
+		return decodeFieldPathInner(next, parts[1:], md, fieldPath, codec)
 	case []any:
 		total := 0
 		for _, item := range cur {
-			c, _ := decodeFieldPathInner(item, parts, md, fieldPath)
+			c, _ := decodeFieldPathInner(item, parts, md, fieldPath, codec)
 			total += c
 		}
 		if total == 0 {
@@ -391,10 +391,10 @@ func toLowerCamelCase(s string) string {
 	return strings.Join(parts, "")
 }
 
-func decodeNodeValue(v any, md *desc.MessageDescriptor) (any, error) {
+func decodeNodeValue(v any, md *desc.MessageDescriptor, codec dynamicJSONCodec) (any, error) {
 	switch t := v.(type) {
 	case string:
-		return decodeNestedString(t, md)
+		return decodeNestedString(t, md, codec)
 	case []any:
 		var out []any
 		changed := false
@@ -404,7 +404,7 @@ func decodeNodeValue(v any, md *desc.MessageDescriptor) (any, error) {
 				out = append(out, item)
 				continue
 			}
-			decoded, err := decodeNestedString(s, md)
+			decoded, err := decodeNestedString(s, md, codec)
 			if err != nil {
 				out = append(out, item)
 				continue
@@ -421,7 +421,7 @@ func decodeNodeValue(v any, md *desc.MessageDescriptor) (any, error) {
 	}
 }
 
-func decodeNestedString(encoded string, md *desc.MessageDescriptor) (any, error) {
+func decodeNestedString(encoded string, md *desc.MessageDescriptor, codec dynamicJSONCodec) (any, error) {
 	raw, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		raw2, err2 := base64.RawStdEncoding.DecodeString(encoded)
@@ -430,11 +430,11 @@ func decodeNestedString(encoded string, md *desc.MessageDescriptor) (any, error)
 		}
 		raw = raw2
 	}
-	msg := dynamic.NewMessage(md)
+	msg := codec.newMessage(md)
 	if err := msg.Unmarshal(raw); err != nil {
 		return nil, err
 	}
-	jsonBytes, err := marshalDynamicMessage(msg)
+	jsonBytes, err := codec.marshal(msg)
 	if err != nil {
 		return nil, err
 	}
