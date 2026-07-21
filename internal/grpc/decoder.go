@@ -781,6 +781,14 @@ func decodeEscape(payload string) ([]byte, error) {
 			out = append(out, '\r')
 		case 't':
 			out = append(out, '\t')
+		case 'b':
+			out = append(out, '\b')
+		case 'f':
+			out = append(out, '\f')
+		case 'a':
+			out = append(out, '\a')
+		case 'v':
+			out = append(out, '\v')
 		case '\\':
 			out = append(out, '\\')
 		case '"':
