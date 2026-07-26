@@ -1,4 +1,4 @@
-import { X, Send, FileText, ListFilter, Globe2, FolderHeart, Clock, Gauge, Link2, Server, Lock, Sparkles, Terminal, GitCompareArrows, Palette, Binary } from "lucide-react";
+import { X, Send, FileText, ListFilter, Globe2, FolderHeart, Clock, Gauge, Link2, Server, Lock, Sparkles, Terminal, GitCompareArrows, Palette, Binary, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "@/components/ui/IconButton";
 
@@ -9,6 +9,7 @@ interface Props {
 const features = [
   { icon: Send, titleKey: "help.grpcCall", descKey: "help.grpcCallDesc", tipKey: "help.grpcCallTip", color: "text-blue-400" },
   { icon: FileText, titleKey: "help.protoImport", descKey: "help.protoImportDesc", tipKey: "help.protoImportTip", color: "text-green-400" },
+  { icon: Star, titleKey: "help.defaultAddress", descKey: "help.defaultAddressDesc", color: "text-amber-400" },
   { icon: ListFilter, titleKey: "help.metadata", descKey: "help.metadataDesc", color: "text-yellow-400" },
   { icon: Globe2, titleKey: "help.environment", descKey: "help.environmentDesc", color: "text-cyan-400" },
   { icon: FolderHeart, titleKey: "help.collections", descKey: "help.collectionsDesc", color: "text-pink-400" },

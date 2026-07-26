@@ -28,7 +28,10 @@
     "bidiStream": "BIDI STREAM",
     "placeholder": "localhost:50051",
     "clickToSave": ", click to save current address",
-    "timeout": "Request timeout (seconds)"
+    "timeout": "Request timeout (seconds)",
+    "defaultAddress": "Default Address",
+    "setDefaultAddress": "Set as default address",
+    "clearDefaultAddress": "Clear default address"
   },
   "panels": {
     "requestBody": "Request Body",
@@ -64,6 +67,8 @@
     "jsonFormat": "JSON format",
     "invalidJson": "Invalid JSON, expected {\"key\": \"value\"} format",
     "apply": "Apply",
+    "fieldsMode": "Fields",
+    "autoApplyHint": "Valid JSON is automatically applied to this request.",
     "addMetadata": "Add metadata"
   },
   "metadataProfile": {
@@ -88,6 +93,9 @@
     "disable": "Disable",
     "refresh": "Refresh",
     "refreshed": "Default metadata refreshed",
+    "edit": "Edit",
+    "saved": "Default metadata saved",
+    "metadataRequired": "Keep at least one metadata entry",
     "clear": "Clear",
     "confirmDelete": "Confirm Delete",
     "deleteTitle": "Delete default Metadata?",
@@ -387,8 +395,10 @@
     "protoImport": "Proto Import",
     "protoImportDesc": "Import .proto files, directories, or use Server Reflection to auto-discover services. The service tree appears in the sidebar after import.",
     "protoImportTip": "⌘+R to reload",
+    "defaultAddress": "Default Address",
+    "defaultAddressDesc": "Click the star in the saved-address dropdown to set an address as the default. Empty startup tabs and ordinary new tabs use it automatically and load its TLS settings. Without a default, new tabs keep inheriting the current address and TLS state.",
     "metadata": "Metadata",
-    "metadataDesc": "Add request headers in the Metadata tab. Supports key-value editing and JSON bulk import. From a JSON response, save fields as address default Metadata; later requests to the same address auto-attach them. Hover the status bar to view full key/value pairs, and Refresh replays the source RPC to update defaults. Manual keys still win conflicts.",
+    "metadataDesc": "Add request headers in the Metadata tab. Supports key-value editing and JSON bulk import; valid JSON is applied to the current request automatically. From a JSON response, save fields as address default Metadata; later requests to the same address auto-attach them. Hover the status bar to view full key/value pairs, then refresh, disable, edit the profile name/key/value, and save. Manual keys still win conflicts.",
     "environment": "Environments",
     "environmentDesc": "Switch environments from the title bar. Manage variables per environment. Use {{varName}} in request body and metadata — values are auto-replaced on send.",
     "collections": "Collections",

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { Edit2, Plus, RefreshCw, Save, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import { type MetadataEntry } from "@/store/app-store";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Input } from "@/components/ui/Input";
 
 interface Props {
   address: string;
@@ -15,6 +17,9 @@ export function MetadataProfileBar({ address }: Props) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [pendingDelete, setPendingDelete] = useState<MetadataProfile | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftMetadata, setDraftMetadata] = useState<MetadataEntry[]>([]);
 
   const load = useCallback(async () => {
     if (!address.trim()) {
@@ -70,6 +75,66 @@ export function MetadataProfileBar({ address }: Props) {
     setMessage("");
   };
 
+  const startEdit = (profile: MetadataProfile) => {
+    setEditingId(profile.id);
+    setDraftName(profile.name);
+    setDraftMetadata(profile.metadata.length > 0 ? profile.metadata.map((entry) => ({ ...entry, enabled: true })) : [{ key: "", value: "", enabled: true }]);
+    setMessage("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraftName("");
+    setDraftMetadata([]);
+    setMessage("");
+  };
+
+  const updateDraft = (index: number, updates: Partial<MetadataEntry>) => {
+    setDraftMetadata((items) => items.map((item, i) => (i === index ? { ...item, ...updates } : item)));
+  };
+
+  const addDraft = () => {
+    setDraftMetadata((items) => [...items, { key: "", value: "", enabled: true }]);
+  };
+
+  const removeDraft = (index: number) => {
+    setDraftMetadata((items) => items.filter((_, i) => i !== index));
+  };
+
+  const saveEdit = async (profile: MetadataProfile) => {
+    const name = draftName.trim();
+    if (!name) {
+      setMessage(t("metadataProfile.nameRequired"));
+      return;
+    }
+    const metadata = draftMetadata
+      .map((entry) => ({ key: entry.key.trim(), value: entry.value }))
+      .filter((entry) => entry.key);
+    if (metadata.length === 0) {
+      setMessage(t("metadataProfile.metadataRequired"));
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      await window.go.main.App.SaveMetadataProfile({
+        ...profile,
+        name,
+        metadata,
+      });
+      setEditingId(null);
+      setDraftName("");
+      setDraftMetadata([]);
+      await load();
+      setMessage(t("metadataProfile.saved"));
+      window.dispatchEvent(new CustomEvent("rpccall:metadata-profile-changed", { detail: { address } }));
+    } catch (e: unknown) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     try {
@@ -107,6 +172,9 @@ export function MetadataProfileBar({ address }: Props) {
         <IconButton onClick={() => refresh(activeProfile)} disabled={loading} size="sm" title={t("metadataProfile.refresh")}>
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
         </IconButton>
+        <IconButton onClick={() => startEdit(activeProfile)} size="sm" title={t("metadataProfile.edit")}>
+          <Edit2 size={12} />
+        </IconButton>
         <IconButton
           onClick={() => requestDelete(activeProfile)}
           size="sm"
@@ -129,13 +197,20 @@ export function MetadataProfileBar({ address }: Props) {
                 ) : (
                   <ShieldOff size={12} className="text-[var(--text-muted)]" />
                 )}
-                <span className="font-medium text-[var(--text-normal)]">{profile.name}</span>
+                {editingId === profile.id ? (
+                  <Input dense value={draftName} onChange={(e) => setDraftName(e.target.value)} className="max-w-32" />
+                ) : (
+                  <span className="font-medium text-[var(--text-normal)]">{profile.name}</span>
+                )}
                 <span className="ml-auto text-[10px] text-[var(--text-muted)]">{profile.metadata.length}</span>
                 <Button onClick={() => toggle(profile)} size="sm" variant="ghost" className="h-6">
                   {profile.enabled ? t("metadataProfile.disable") : t("metadataProfile.enable")}
                 </Button>
                 <IconButton onClick={() => refresh(profile)} disabled={loading} size="sm" title={t("metadataProfile.refresh")}>
                   <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
+                </IconButton>
+                <IconButton onClick={() => startEdit(profile)} size="sm" title={t("metadataProfile.edit")}>
+                  <Edit2 size={11} />
                 </IconButton>
                 <IconButton
                   onClick={() => requestDelete(profile)}
@@ -146,14 +221,41 @@ export function MetadataProfileBar({ address }: Props) {
                   <Trash2 size={11} />
                 </IconButton>
               </div>
-              <div className="flex flex-col gap-1 font-[var(--font-mono)]">
-                {profile.metadata.map((entry) => (
-                  <div key={entry.key} className="grid grid-cols-[minmax(80px,0.45fr)_1fr] gap-2 rounded bg-[var(--surface-0)] px-2 py-1">
-                    <span className="truncate text-[var(--state-info)]">{entry.key}</span>
-                    <span className="break-all text-[var(--text-normal)]">{entry.value}</span>
+              {editingId === profile.id ? (
+                <div className="flex flex-col gap-1">
+                  {draftMetadata.map((entry, index) => (
+                    <div key={index} className="grid grid-cols-[minmax(80px,0.45fr)_1fr_24px] gap-1">
+                      <Input dense value={entry.key} onChange={(e) => updateDraft(index, { key: e.target.value })} placeholder="key" />
+                      <Input dense value={entry.value} onChange={(e) => updateDraft(index, { value: e.target.value })} placeholder="value" />
+                      <IconButton size="sm" tone="danger" onClick={() => removeDraft(index)} title={t("common.delete")}>
+                        <Trash2 size={11} />
+                      </IconButton>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex justify-between gap-1">
+                    <Button onClick={addDraft} size="sm" variant="ghost" className="h-6">
+                      <Plus size={11} /> {t("common.add")}
+                    </Button>
+                    <div className="flex gap-1">
+                      <Button onClick={cancelEdit} size="sm" variant="ghost" className="h-6">
+                        <X size={11} /> {t("common.cancel")}
+                      </Button>
+                      <Button onClick={() => saveEdit(profile)} disabled={loading} size="sm" variant="primary" className="h-6">
+                        <Save size={11} /> {t("common.save")}
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1 font-[var(--font-mono)]">
+                  {profile.metadata.map((entry) => (
+                    <div key={entry.key} className="grid grid-cols-[minmax(80px,0.45fr)_1fr] gap-2 rounded bg-[var(--surface-0)] px-2 py-1">
+                      <span className="truncate text-[var(--state-info)]">{entry.key}</span>
+                      <span className="break-all text-[var(--text-normal)]">{entry.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

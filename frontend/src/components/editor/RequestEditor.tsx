@@ -49,15 +49,28 @@ function entriesToJson(entries: MetadataEntry[]): string {
 function MetadataTable({
   entries,
   onChange,
+  jsonError: externalJsonError,
+  onJsonErrorChange,
 }: {
   entries: MetadataEntry[];
   onChange: (entries: MetadataEntry[]) => void;
+  jsonError?: string | null;
+  onJsonErrorChange?: (error: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [jsonMode, setJsonMode] = useState(false);
-  const [jsonText, setJsonText] = useState("");
-  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [jsonMode, setJsonMode] = useState(true);
+  const [jsonText, setJsonText] = useState(() => entriesToJson(entries));
+  const [jsonError, setJsonError] = useState<string | null>(externalJsonError ?? null);
   const jsonTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setJsonError(externalJsonError ?? null);
+  }, [externalJsonError]);
+
+  const setMetadataJsonError = (error: string | null) => {
+    setJsonError(error);
+    onJsonErrorChange?.(error);
+  };
 
   const addEntry = () => {
     onChange([...entries, { key: "", value: "", enabled: true }]);
@@ -73,43 +86,49 @@ function MetadataTable({
 
   const switchToJson = () => {
     setJsonText(entriesToJson(entries));
-    setJsonError(null);
+    setMetadataJsonError(null);
     setJsonMode(true);
   };
 
-  const applyJson = () => {
+  const syncJsonText = (nextText: string): boolean => {
+    setJsonText(nextText);
     try {
-      JSON.parse(jsonText);
-      const parsed = parseJsonToEntries(jsonText);
+      JSON.parse(nextText);
+      const parsed = parseJsonToEntries(nextText);
       if (!parsed) {
-        setJsonError(t("metadata.invalidJson"));
-        return;
+        setMetadataJsonError(t("metadata.invalidJson"));
+        return false;
       }
       onChange(parsed);
-      setJsonError(null);
-      setJsonMode(false);
+      setMetadataJsonError(null);
+      return true;
     } catch (error) {
-      setJsonError(getJsonParseErrorMessage(error, t));
+      setMetadataJsonError(getJsonParseErrorMessage(error, t));
+      return false;
+    }
+  };
+
+  const applyJson = () => {
+    if (syncJsonText(jsonText)) {
+      setJsonMode(false);
     }
   };
 
   const handleJsonFormat = () => {
     try {
       const formatted = JSON.stringify(JSON.parse(jsonText), null, 2);
-      setJsonText(formatted);
-      setJsonError(null);
+      syncJsonText(formatted);
     } catch (error) {
-      setJsonError(getJsonParseErrorMessage(error, t));
+      setMetadataJsonError(getJsonParseErrorMessage(error, t));
     }
   };
 
   const handleJsonMinify = () => {
     try {
       const minified = JSON.stringify(JSON.parse(jsonText));
-      setJsonText(minified);
-      setJsonError(null);
+      syncJsonText(minified);
     } catch (error) {
-      setJsonError(getJsonParseErrorMessage(error, t));
+      setMetadataJsonError(getJsonParseErrorMessage(error, t));
     }
   };
 
@@ -137,7 +156,7 @@ function MetadataTable({
               onClick={() => setJsonMode(false)}
               className="text-[10px] px-2 py-0.5 rounded hover:bg-[var(--surface-1)] text-[var(--text-muted)]"
             >
-              {t("common.cancel")}
+              {t("metadata.fieldsMode")}
             </button>
             <button
               onClick={applyJson}
@@ -150,10 +169,13 @@ function MetadataTable({
         {jsonError && (
           <div className="px-2 pt-1 text-[10px] text-[var(--state-error)]">{jsonError}</div>
         )}
+        {!jsonError && (
+          <div className="px-2 pt-1 text-[10px] text-[var(--text-muted)]">{t("metadata.autoApplyHint")}</div>
+        )}
         <textarea
           ref={jsonTextareaRef}
           value={jsonText}
-          onChange={(e) => { setJsonText(e.target.value); setJsonError(null); }}
+          onChange={(e) => syncJsonText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Tab") {
               e.preventDefault();
@@ -163,8 +185,7 @@ function MetadataTable({
               const end = el.selectionEnd;
               const insert = "  ";
               const newText = jsonText.slice(0, start) + insert + jsonText.slice(end);
-              setJsonText(newText);
-              setJsonError(null);
+              syncJsonText(newText);
               requestAnimationFrame(() => {
                 el.focus();
                 const newPos = start + insert.length;
@@ -178,6 +199,8 @@ function MetadataTable({
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
+          data-form-type="other"
+          data-lpignore="true"
           autoFocus
         />
       </div>
@@ -387,11 +410,18 @@ export function RequestEditor() {
         message: err.path ? `${err.path}: ${err.message}` : err.message,
       })));
     };
+    const handleMetadataJsonError = (event: Event) => {
+      const custom = event as CustomEvent<{ tabId?: string; message?: string }>;
+      if (!custom.detail?.message || custom.detail.tabId !== activeTabId) return;
+      setActivePanel("metadata");
+    };
     window.addEventListener("rpccall:request-json-error", handleRequestJsonError as EventListener);
     window.addEventListener("rpccall:request-validation-error", handleRequestValidationError as EventListener);
+    window.addEventListener("rpccall:metadata-json-error", handleMetadataJsonError as EventListener);
     return () => {
       window.removeEventListener("rpccall:request-json-error", handleRequestJsonError as EventListener);
       window.removeEventListener("rpccall:request-validation-error", handleRequestValidationError as EventListener);
+      window.removeEventListener("rpccall:metadata-json-error", handleMetadataJsonError as EventListener);
     };
   }, [activeTabId]);
 
@@ -604,8 +634,11 @@ export function RequestEditor() {
           <>
             <MetadataProfileBar address={tab.address} />
             <MetadataTable
+              key={tab.id}
               entries={tab.metadata}
-              onChange={(metadata) => updateTab(tab.id, { metadata })}
+              jsonError={tab.metadataJsonError}
+              onChange={(metadata) => updateTab(tab.id, { metadata, metadataJsonError: null })}
+              onJsonErrorChange={(metadataJsonError) => updateTab(tab.id, { metadataJsonError })}
             />
           </>
         ) : activePanel === "chain" ? (

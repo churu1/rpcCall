@@ -364,6 +364,9 @@ interface Window {
         ListAddresses: () => Promise<{ id: number; name: string; address: string; createdAt: string }[] | null>;
         UpdateAddress: (id: number, name: string, address: string) => Promise<void>;
         DeleteAddress: (id: number) => Promise<void>;
+        GetDefaultAddress: () => Promise<string>;
+        SetDefaultAddress: (address: string) => Promise<void>;
+        ClearDefaultAddress: () => Promise<void>;
         GetAddressTLSSettings: (address: string) => Promise<AddressTLSSettings | null>;
         SaveAddressTLSSettings: (settings: AddressTLSSettings) => Promise<AddressTLSSettings | null>;
         ListProtoProjects: () => Promise<ProtoProject[] | null>;

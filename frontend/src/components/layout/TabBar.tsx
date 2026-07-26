@@ -14,7 +14,7 @@ interface ContextMenuState {
 
 export function TabBar() {
   const { t } = useTranslation();
-  const { tabs, activeTabId, setActiveTab, removeTab, addTab, reorderTabs } = useAppStore();
+  const { tabs, activeTabId, setActiveTab, addTab, reorderTabs } = useAppStore();
   const { requestClose, requestCloseByIds, dialog } = useTabClose();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -102,6 +102,14 @@ export function TabBar() {
     setContextMenu({ tabId, x: e.clientX, y: e.clientY });
   };
 
+  const handleMouseDown = (e: React.MouseEvent, tabId: string) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu(null);
+    requestClose(tabId);
+  };
+
   const closeTab = (id: string) => {
     setContextMenu(null);
     requestClose(id);
@@ -136,6 +144,7 @@ export function TabBar() {
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
             onContextMenu={(e) => handleContextMenu(e, tab.id, index)}
+            onMouseDown={(e) => handleMouseDown(e, tab.id)}
             className={cn(
               "flex items-center gap-1.5 px-3 h-9 border-r border-[var(--line-soft)] cursor-pointer text-xs shrink-0 max-w-[220px] group transition-all duration-150 relative",
               tab.id === activeTabId

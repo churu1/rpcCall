@@ -17,6 +17,7 @@ import (
 const (
 	maxRetainedHistoryEntries = 500
 	defaultHistoryListLimit   = 500
+	defaultAddressPrefKey     = "default_address"
 )
 
 type Store struct {
@@ -133,6 +134,17 @@ func createTables(db *sql.DB) error {
 			variables TEXT NOT NULL DEFAULT '{}',
 			is_active INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS app_preferences (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL,
+			updated_at TEXT NOT NULL
 		)
 	`)
 	if err != nil {
@@ -703,6 +715,65 @@ func (s *Store) UpdateAddress(id int64, name, address string) error {
 func (s *Store) DeleteAddress(id int64) error {
 	_, err := s.db.Exec("DELETE FROM saved_addresses WHERE id = ?", id)
 	return err
+}
+
+// --- App Preferences ---
+
+func (s *Store) GetPreference(key string) (string, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", fmt.Errorf("preference key cannot be empty")
+	}
+
+	var value string
+	err := s.db.QueryRow("SELECT value FROM app_preferences WHERE key = ?", key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+func (s *Store) SetPreference(key, value string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return fmt.Errorf("preference key cannot be empty")
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	_, err := s.db.Exec(`
+		INSERT INTO app_preferences (key, value, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+	`, key, value, now)
+	return err
+}
+
+func (s *Store) DeletePreference(key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return fmt.Errorf("preference key cannot be empty")
+	}
+	_, err := s.db.Exec("DELETE FROM app_preferences WHERE key = ?", key)
+	return err
+}
+
+func (s *Store) GetDefaultAddress() (string, error) {
+	return s.GetPreference(defaultAddressPrefKey)
+}
+
+func (s *Store) SetDefaultAddress(address string) error {
+	address = strings.Join(strings.Fields(address), "")
+	if address == "" {
+		return fmt.Errorf("address cannot be empty")
+	}
+	return s.SetPreference(defaultAddressPrefKey, address)
+}
+
+func (s *Store) ClearDefaultAddress() error {
+	return s.DeletePreference(defaultAddressPrefKey)
 }
 
 // --- Address TLS Settings ---

@@ -55,6 +55,7 @@ export interface Tab {
   requestBody: string;
   responseBody: string;
   metadata: MetadataEntry[];
+  metadataJsonError: string | null;
   responseMetadata: MetadataEntry[];
   responseTrailers: MetadataEntry[];
   isLoading: boolean;
@@ -75,6 +76,7 @@ export interface Tab {
 }
 
 const DIRTY_TRACKED_KEYS = ["address", "requestBody", "metadata", "useTls", "certPath", "keyPath", "caPath"] as const;
+const INITIAL_TAB_ADDRESS = "localhost:50051";
 
 function buildSavedSnapshot(tab: Tab): string {
   const snapshot = {
@@ -97,6 +99,7 @@ interface AppState {
   activeProjectId: string | null;
   tabs: Tab[];
   activeTabId: string | null;
+  defaultAddress: string;
   sidebarWidth: number;
 
   addProtoFile: (file: ProtoFile) => void;
@@ -118,6 +121,9 @@ interface AppState {
   markCollectionLoaded: (id: string, collectionRequestId: number) => void;
   markCollectionSaved: (id: string, collectionRequestId: number) => void;
   clearCollectionLink: (id: string) => void;
+  loadDefaultAddress: () => Promise<void>;
+  setDefaultAddress: (address: string) => Promise<void>;
+  clearDefaultAddress: () => Promise<void>;
 
   setSidebarWidth: (width: number) => void;
 }
@@ -131,11 +137,12 @@ function createTab(method?: ServiceMethod): Tab {
   return {
     id: `tab-${tabCounter}`,
     title: method?.serviceName && method?.methodName ? `${method.serviceName}/${method.methodName}` : "New Request",
-    address: "localhost:50051",
+    address: INITIAL_TAB_ADDRESS,
     method: method ?? null,
     requestBody: "{\n  \n}",
     responseBody: "",
     metadata: [],
+    metadataJsonError: null,
     responseMetadata: [],
     responseTrailers: [],
     isLoading: false,
@@ -151,6 +158,40 @@ function createTab(method?: ServiceMethod): Tab {
   };
 }
 
+function applyDefaultAddressToTab(tab: Tab, defaultAddress: string): string {
+  const normalized = defaultAddress.trim();
+  if (normalized) {
+    tab.address = normalized;
+  }
+  return normalized;
+}
+
+function shouldHydrateInitialTabAddress(tab: Tab): boolean {
+  return (
+    tab.address === INITIAL_TAB_ADDRESS &&
+    tab.method === null &&
+    !tab.collectionRequestId &&
+    tab.responseBody === "" &&
+    tab.statusCode === null
+  );
+}
+
+function loadDefaultAddressTls(tabId: string, address: string, get: () => AppState) {
+  void window.go.main.App.GetAddressTLSSettings(address).then((settings) => {
+    if (!settings) return;
+    const current = get().tabs.find((t) => t.id === tabId);
+    if (current?.address !== address) return;
+    get().updateTab(tabId, {
+      useTls: settings.useTls,
+      certPath: settings.certPath,
+      keyPath: settings.keyPath,
+      caPath: settings.caPath,
+    });
+  }).catch(() => {
+    // Keep the address even if TLS settings cannot be loaded.
+  });
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   protoFiles: [],
   protoProjects: [],
@@ -159,6 +200,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeProjectId: null,
   tabs: [createTab()],
   activeTabId: "tab-1",
+  defaultAddress: "",
   sidebarWidth: 280,
 
   addProtoFile: (file) => {
@@ -240,7 +282,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const active = state.tabs.find((t) => t.id === state.activeTabId);
     tab.projectId = active?.projectId ?? state.activeProjectId ?? null;
-    if (active) {
+    const defaultAddress = applyDefaultAddressToTab(tab, state.defaultAddress);
+    if (!defaultAddress && active) {
       tab.address = active.address;
       tab.useTls = active.useTls;
       tab.certPath = active.certPath;
@@ -251,14 +294,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,
     }));
+    if (defaultAddress) {
+      loadDefaultAddressTls(tab.id, defaultAddress, get);
+    }
     return tab.id;
   },
 
-  removeTab: (id) =>
+  removeTab: (id) => {
+    const fallbackTabs: Array<{ id: string; address: string }> = [];
     set((state) => {
       const newTabs = state.tabs.filter((t) => t.id !== id);
       if (newTabs.length === 0) {
         const tab = createTab();
+        const defaultAddress = applyDefaultAddressToTab(tab, state.defaultAddress);
+        if (defaultAddress) {
+          fallbackTabs.push({ id: tab.id, address: defaultAddress });
+        }
         return { tabs: [tab], activeTabId: tab.id };
       }
       const newActiveId =
@@ -266,7 +317,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? newTabs[Math.min(state.tabs.findIndex((t) => t.id === id), newTabs.length - 1)]?.id
           : state.activeTabId;
       return { tabs: newTabs, activeTabId: newActiveId };
-    }),
+    });
+    const fallbackTab = fallbackTabs[0];
+    if (fallbackTab) {
+      loadDefaultAddressTls(fallbackTab.id, fallbackTab.address, get);
+    }
+  },
 
   setActiveTab: (id) => set({ activeTabId: id }),
 
@@ -313,12 +369,50 @@ export const useAppStore = create<AppState>((set, get) => ({
       ),
     })),
 
-  removeTabsByIds: (ids) =>
+  loadDefaultAddress: async () => {
+    try {
+      const address = await window.go.main.App.GetDefaultAddress();
+      const defaultAddress = address ?? "";
+      const hydratedTabIds: string[] = [];
+      set((state) => ({
+        defaultAddress,
+        tabs: defaultAddress
+          ? state.tabs.map((tab) => {
+            if (!shouldHydrateInitialTabAddress(tab)) return tab;
+            hydratedTabIds.push(tab.id);
+            return { ...tab, address: defaultAddress };
+          })
+          : state.tabs,
+      }));
+      hydratedTabIds.forEach((tabId) => loadDefaultAddressTls(tabId, defaultAddress, get));
+    } catch {
+      set({ defaultAddress: "" });
+    }
+  },
+
+  setDefaultAddress: async (address) => {
+    const normalized = address.replace(/\s+/g, "");
+    if (!normalized) return;
+    await window.go.main.App.SetDefaultAddress(normalized);
+    set({ defaultAddress: normalized });
+  },
+
+  clearDefaultAddress: async () => {
+    await window.go.main.App.ClearDefaultAddress();
+    set({ defaultAddress: "" });
+  },
+
+  removeTabsByIds: (ids) => {
+    const fallbackTabs: Array<{ id: string; address: string }> = [];
     set((state) => {
       const idSet = new Set(ids);
       const newTabs = state.tabs.filter((t) => !idSet.has(t.id));
       if (newTabs.length === 0) {
         const tab = createTab();
+        const defaultAddress = applyDefaultAddressToTab(tab, state.defaultAddress);
+        if (defaultAddress) {
+          fallbackTabs.push({ id: tab.id, address: defaultAddress });
+        }
         return { tabs: [tab], activeTabId: tab.id };
       }
       let newActiveId = state.activeTabId;
@@ -334,7 +428,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         newActiveId = survivorId ?? newTabs[newTabs.length - 1].id;
       }
       return { tabs: newTabs, activeTabId: newActiveId };
-    }),
+    });
+    const fallbackTab = fallbackTabs[0];
+    if (fallbackTab) {
+      loadDefaultAddressTls(fallbackTab.id, fallbackTab.address, get);
+    }
+  },
 
   reorderTabs: (fromIndex, toIndex) =>
     set((state) => {

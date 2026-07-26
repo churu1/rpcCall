@@ -21,7 +21,7 @@ import { AISettingsPanel } from "@/components/ai/AISettingsPanel";
 import { HelpPanel } from "@/components/help/HelpPanel";
 
 export function AppLayout() {
-  const { sidebarWidth, setSidebarWidth } = useAppStore();
+  const { sidebarWidth, setSidebarWidth, loadDefaultAddress } = useAppStore();
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const { t, i18n } = useTranslation();
@@ -74,6 +74,10 @@ export function AppLayout() {
       document.removeEventListener("rpccall:ai-settings", onAISettings);
     };
   }, []);
+
+  useEffect(() => {
+    void loadDefaultAddress();
+  }, [loadDefaultAddress]);
 
   return (
     <div className="flex flex-col h-screen bg-[var(--surface-0)]">

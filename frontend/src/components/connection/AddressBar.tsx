@@ -4,7 +4,7 @@ import { useAppStore, type MethodType } from "@/store/app-store";
 import { useGrpc } from "@/hooks/useGrpc";
 import { useAddressTls } from "@/hooks/useAddressTls";
 import { cn } from "@/lib/utils";
-import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save, Shield, ShieldOff, FileKey, FolderOpen } from "lucide-react";
+import { Play, Loader2, Bookmark, ChevronDown, Trash2, Pencil, Check, X, Save, Shield, ShieldOff, FileKey, FolderOpen, Star } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Input } from "@/components/ui/Input";
@@ -32,7 +32,7 @@ const methodTypeI18nKeys: Record<MethodType, string> = {
 
 export function AddressBar() {
   const { t } = useTranslation();
-  const { activeTabId, tabs, updateTab } = useAppStore();
+  const { activeTabId, tabs, updateTab, defaultAddress, setDefaultAddress, clearDefaultAddress } = useAppStore();
   const { send } = useGrpc();
   const tab = tabs.find((tabItem) => tabItem.id === activeTabId);
 
@@ -139,11 +139,25 @@ export function AddressBar() {
     setShowDropdown(false);
   };
 
-  const handleDeleteAddress = async (e: React.MouseEvent, id: number) => {
+  const handleDeleteAddress = async (e: React.MouseEvent, addr: SavedAddress) => {
     e.stopPropagation();
     try {
-      await window.go.main.App.DeleteAddress(id);
+      if (addr.address === defaultAddress) {
+        await clearDefaultAddress();
+      }
+      await window.go.main.App.DeleteAddress(addr.id);
       await loadAddresses();
+    } catch { /* ignore */ }
+  };
+
+  const handleToggleDefaultAddress = async (e: React.MouseEvent, addr: SavedAddress) => {
+    e.stopPropagation();
+    try {
+      if (addr.address === defaultAddress) {
+        await clearDefaultAddress();
+      } else {
+        await setDefaultAddress(addr.address);
+      }
     } catch { /* ignore */ }
   };
 
@@ -268,71 +282,89 @@ export function AddressBar() {
                 {t("addressBar.noAddresses")}{t("addressBar.clickToSave")} <Bookmark size={12} className="inline" />
               </div>
             ) : (
-              addresses.map((addr) => (
-                <div
-                  key={addr.id}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface-1)] transition-colors group",
-                    addr.address === tab.address && "bg-[var(--surface-1)]/50"
-                  )}
-                  onClick={() => handleSelectAddress(addr)}
-                >
-                  {editingId === addr.id ? (
-                    <div className="flex-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Input
-                        autoFocus
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="flex-1 text-xs bg-[var(--surface-1)] px-2 py-0.5 rounded border border-[var(--line-strong)] text-[var(--text-normal)] focus:outline-none h-7"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") confirmEdit(e as any, addr);
-                          if (e.key === "Escape") cancelEdit(e as any);
-                        }}
-                      />
-                      <IconButton onClick={(e) => confirmEdit(e, addr)} size="sm" tone="primary" className="h-6 w-6 border-transparent bg-transparent"><Check size={12} /></IconButton>
-                      <IconButton onClick={cancelEdit} size="sm" tone="danger" className="h-6 w-6 border-transparent bg-transparent"><X size={12} /></IconButton>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 min-w-0">
-                        {addr.name && addr.name !== addr.address ? (
-                          <>
-                            <div className="text-xs font-medium text-[var(--text-normal)] truncate">
-                              {addr.name}
-                            </div>
-                            <div className="text-[10px] text-[var(--text-muted)] font-mono truncate">
+              addresses.map((addr) => {
+                const isDefault = addr.address === defaultAddress;
+
+                return (
+                  <div
+                    key={addr.id}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface-1)] transition-colors group",
+                      addr.address === tab.address && "bg-[var(--surface-1)]/50"
+                    )}
+                    onClick={() => handleSelectAddress(addr)}
+                  >
+                    {editingId === addr.id ? (
+                      <div className="flex-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          autoFocus
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="flex-1 text-xs bg-[var(--surface-1)] px-2 py-0.5 rounded border border-[var(--line-strong)] text-[var(--text-normal)] focus:outline-none h-7"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") confirmEdit(e as any, addr);
+                            if (e.key === "Escape") cancelEdit(e as any);
+                          }}
+                        />
+                        <IconButton onClick={(e) => confirmEdit(e, addr)} size="sm" tone="primary" className="h-6 w-6 border-transparent bg-transparent"><Check size={12} /></IconButton>
+                        <IconButton onClick={cancelEdit} size="sm" tone="danger" className="h-6 w-6 border-transparent bg-transparent"><X size={12} /></IconButton>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 min-w-0">
+                          {addr.name && addr.name !== addr.address ? (
+                            <>
+                              <div className="text-xs font-medium text-[var(--text-normal)] truncate">
+                                {addr.name}
+                              </div>
+                              <div className="text-[10px] text-[var(--text-muted)] font-mono truncate">
+                                {addr.address}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-xs font-mono text-[var(--text-normal)] truncate">
                               {addr.address}
                             </div>
-                          </>
-                        ) : (
-                          <div className="text-xs font-mono text-[var(--text-normal)] truncate">
-                            {addr.address}
-                          </div>
+                          )}
+                        </div>
+                        {isDefault && (
+                          <span className="text-[10px] text-[var(--state-info)] bg-[var(--state-info)]/10 rounded px-1.5 py-0.5 shrink-0">
+                            {t("addressBar.defaultAddress")}
+                          </span>
                         )}
-                      </div>
-                      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-                        <IconButton
-                          onClick={(e) => startEditing(e, addr)}
-                          size="sm"
-                          className="h-6 w-6 border-transparent bg-transparent"
-                          title={t("addressBar.rename")}
-                        >
-                          <Pencil size={12} />
-                        </IconButton>
-                        <IconButton
-                          onClick={(e) => handleDeleteAddress(e, addr.id)}
-                          size="sm"
-                          tone="danger"
-                          className="h-6 w-6 border-transparent bg-transparent"
-                          title={t("addressBar.delete")}
-                        >
-                          <Trash2 size={12} />
-                        </IconButton>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))
+                        <div className={cn("items-center gap-0.5 shrink-0", isDefault ? "flex" : "hidden group-hover:flex")}>
+                          <IconButton
+                            onClick={(e) => handleToggleDefaultAddress(e, addr)}
+                            size="sm"
+                            tone={isDefault ? "primary" : "neutral"}
+                            className="h-6 w-6 border-transparent bg-transparent"
+                            title={isDefault ? t("addressBar.clearDefaultAddress") : t("addressBar.setDefaultAddress")}
+                          >
+                            <Star size={12} fill={isDefault ? "currentColor" : "none"} />
+                          </IconButton>
+                          <IconButton
+                            onClick={(e) => startEditing(e, addr)}
+                            size="sm"
+                            className="h-6 w-6 border-transparent bg-transparent"
+                            title={t("addressBar.rename")}
+                          >
+                            <Pencil size={12} />
+                          </IconButton>
+                          <IconButton
+                            onClick={(e) => handleDeleteAddress(e, addr)}
+                            size="sm"
+                            tone="danger"
+                            className="h-6 w-6 border-transparent bg-transparent"
+                            title={t("addressBar.delete")}
+                          >
+                            <Trash2 size={12} />
+                          </IconButton>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         )}

@@ -475,6 +475,31 @@ func (a *App) DeleteAddress(id int64) error {
 	return a.history.DeleteAddress(id)
 }
 
+func (a *App) GetDefaultAddress() (string, error) {
+	if a.history == nil {
+		return "", nil
+	}
+	return a.history.GetDefaultAddress()
+}
+
+func (a *App) SetDefaultAddress(address string) error {
+	if a.history == nil {
+		return nil
+	}
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return fmt.Errorf("address cannot be empty")
+	}
+	return a.history.SetDefaultAddress(address)
+}
+
+func (a *App) ClearDefaultAddress() error {
+	if a.history == nil {
+		return nil
+	}
+	return a.history.ClearDefaultAddress()
+}
+
 func (a *App) GetAddressTLSSettings(address string) (*history.AddressTLSSettings, error) {
 	if a.history == nil {
 		return nil, nil

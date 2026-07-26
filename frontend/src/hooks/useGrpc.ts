@@ -20,6 +20,22 @@ export function useGrpc() {
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab || !tab.method || !tab.projectId) return;
 
+    if (tab.metadataJsonError) {
+      window.dispatchEvent(new CustomEvent("rpccall:metadata-json-error", {
+        detail: { tabId: tab.id, message: tab.metadataJsonError },
+      }));
+      updateTab(tab.id, {
+        isLoading: false,
+        responseBody: `Error: ${tab.metadataJsonError}`,
+        responseMetadata: [],
+        responseTrailers: [],
+        statusCode: "ERROR",
+        elapsedMs: null,
+        timing: null,
+      });
+      return;
+    }
+
     updateTab(tab.id, {
       isLoading: true,
       responseBody: "",
