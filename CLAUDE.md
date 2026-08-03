@@ -39,7 +39,7 @@ cd frontend && npm run build  # tsc && vite build
 - **`internal/grpc/caller.go`** — Dynamic gRPC invocation engine for all four call types. Uses `jhump/protoreflect` dynamic messages for JSON ↔ Protobuf conversion.
 - **`internal/grpc/proto_parser.go`** — Proto file parsing with multi-level import resolution (built-in descriptors → absolute path → standard paths → basename index → suffix matching). Supports project-based isolation.
 - **`internal/grpc/reflection.go`** — gRPC Reflection API client, caches ServiceDescriptors, filters internal services.
-- **`internal/grpc/decoder.go`** — Multi-encoding protobuf payload decoder (auto-detect, hex, base64, escape, raw). Supports nested message decoding with field path rules and batch operations.
+- **`internal/grpc/decoder.go`** — Multi-encoding protobuf payload decoder (auto-detect, hex, base64, escape, raw). Supports nested message decoding with field path rules, batch operations, and schema-less raw protobuf decoding for base64 bytes fields in JSON responses.
 - **`internal/grpc/benchmark.go`** — Load testing with count/duration/QPS modes, concurrency ramp-up, latency percentiles (P50/P90/P99).
 - **`internal/grpc/connection.go`** — TLS/mTLS connection configuration; `DefaultUseTLSForAddress()` enables TLS by default for port 443.
 - **`internal/grpc/mock_server.go`** — Mock gRPC server for testing.

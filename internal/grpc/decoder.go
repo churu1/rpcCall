@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jhump/protoreflect/desc"
 	"rpccall/internal/models"
@@ -443,6 +445,217 @@ func decodeNestedString(encoded string, md *desc.MessageDescriptor, codec dynami
 		return nil, err
 	}
 	return doc, nil
+}
+
+type rawProtoUint uint64
+
+func (v rawProtoUint) MarshalJSON() ([]byte, error) {
+	if uint64(v) <= 9007199254740991 {
+		return json.Marshal(uint64(v))
+	}
+	return json.Marshal(strconv.FormatUint(uint64(v), 10))
+}
+
+type rawProtoMessage struct {
+	fields []int32
+	values map[int32][]any
+}
+
+func (m *rawProtoMessage) add(field int32, value any) {
+	if m.values == nil {
+		m.values = make(map[int32][]any)
+	}
+	if _, ok := m.values[field]; !ok {
+		m.fields = append(m.fields, field)
+	}
+	m.values[field] = append(m.values[field], value)
+}
+
+func (m rawProtoMessage) MarshalJSON() ([]byte, error) {
+	var b strings.Builder
+	b.WriteByte('{')
+	first := true
+	for _, field := range m.fields {
+		values := m.values[field]
+		if len(values) == 0 {
+			continue
+		}
+		if !first {
+			b.WriteByte(',')
+		}
+		first = false
+		b.WriteString(strconv.Quote(strconv.Itoa(int(field))))
+		b.WriteByte(':')
+		var value any = values[0]
+		if len(values) > 1 {
+			value = values
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		b.Write(raw)
+	}
+	b.WriteByte('}')
+	return []byte(b.String()), nil
+}
+
+func parseRawProtobuf(b []byte) (rawProtoMessage, error) {
+	msg := rawProtoMessage{values: map[int32][]any{}}
+	i := 0
+	for i < len(b) {
+		field, wire, value, next, err := consumeRawProtobufField(b, i)
+		if err != nil {
+			return msg, err
+		}
+		if wire == 4 {
+			return msg, fmt.Errorf("unexpected end group for field %d", field)
+		}
+		msg.add(field, value)
+		i = next
+	}
+	return msg, nil
+}
+
+func consumeRawProtobufField(b []byte, i int) (int32, int32, any, int, error) {
+	tag, n, err := readProtoVarintAt(b, i)
+	if err != nil {
+		return 0, 0, nil, i, err
+	}
+	i += n
+	field := int32(tag >> 3)
+	wire := int32(tag & 0x7)
+	if field <= 0 {
+		return 0, 0, nil, i, fmt.Errorf("invalid field number 0 at offset %d", i-n)
+	}
+
+	switch wire {
+	case 0:
+		v, n2, err := readProtoVarintAt(b, i)
+		if err != nil {
+			return 0, 0, nil, i, err
+		}
+		return field, wire, rawProtoUint(v), i + n2, nil
+	case 1:
+		if i+8 > len(b) {
+			return 0, 0, nil, i, fmt.Errorf("truncated fixed64 at offset %d", i)
+		}
+		v := binary.LittleEndian.Uint64(b[i : i+8])
+		return field, wire, rawProtoUint(v), i + 8, nil
+	case 2:
+		l, n2, err := readProtoVarintAt(b, i)
+		if err != nil {
+			return 0, 0, nil, i, err
+		}
+		i += n2
+		if l > uint64(len(b)-i) {
+			return 0, 0, nil, i, fmt.Errorf("truncated bytes field at offset %d", i)
+		}
+		value := rawProtobufBytesValue(b[i : i+int(l)])
+		return field, wire, value, i + int(l), nil
+	case 3:
+		group := rawProtoMessage{values: map[int32][]any{}}
+		for i < len(b) {
+			groupField, groupWire, groupValue, next, err := consumeRawProtobufField(b, i)
+			if err != nil {
+				return 0, 0, nil, i, err
+			}
+			if groupWire == 4 {
+				if groupField != field {
+					return 0, 0, nil, i, fmt.Errorf("mismatched end group: expected %d got %d", field, groupField)
+				}
+				return field, wire, group, next, nil
+			}
+			group.add(groupField, groupValue)
+			i = next
+		}
+		return 0, 0, nil, i, fmt.Errorf("truncated group field %d", field)
+	case 4:
+		return field, wire, nil, i, nil
+	case 5:
+		if i+4 > len(b) {
+			return 0, 0, nil, i, fmt.Errorf("truncated fixed32 at offset %d", i)
+		}
+		v := binary.LittleEndian.Uint32(b[i : i+4])
+		return field, wire, rawProtoUint(v), i + 4, nil
+	default:
+		return 0, 0, nil, i, fmt.Errorf("unsupported wire type %d at offset %d", wire, i)
+	}
+}
+
+func rawProtobufBytesValue(b []byte) any {
+	if len(b) == 0 {
+		return ""
+	}
+	if msg, err := parseRawProtobuf(b); err == nil && len(msg.fields) > 0 {
+		return msg
+	}
+	if utf8.Valid(b) {
+		return string(b)
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+func base64ProtobufCandidate(value string) ([]byte, bool) {
+	if len(value) < 8 || len(value) > 1<<20 {
+		return nil, false
+	}
+	raw, err := decodeBase64(value)
+	if err != nil || len(raw) == 0 {
+		return nil, false
+	}
+	tag, n, err := readProtoVarintAt(raw, 0)
+	if err != nil || n <= 0 {
+		return nil, false
+	}
+	field := int32(tag >> 3)
+	wire := int32(tag & 0x7)
+	if field <= 0 || wire == 4 {
+		return nil, false
+	}
+	return raw, true
+}
+
+func DecodeJSONProtobufFields(jsonBody string) string {
+	var doc any
+	if err := json.Unmarshal([]byte(jsonBody), &doc); err != nil {
+		return "{}"
+	}
+	found := make(map[string]any)
+	collectJSONProtobufFields(doc, found, 200)
+	out, err := json.Marshal(found)
+	if err != nil {
+		return "{}"
+	}
+	return string(out)
+}
+
+func collectJSONProtobufFields(node any, out map[string]any, limit int) {
+	if len(out) >= limit {
+		return
+	}
+	switch value := node.(type) {
+	case string:
+		raw, ok := base64ProtobufCandidate(value)
+		if !ok {
+			return
+		}
+		msg, err := parseRawProtobuf(raw)
+		if err != nil || len(msg.fields) == 0 {
+			return
+		}
+		if _, exists := out[value]; !exists {
+			out[value] = msg
+		}
+	case []any:
+		for _, item := range value {
+			collectJSONProtobufFields(item, out, limit)
+		}
+	case map[string]any:
+		for _, item := range value {
+			collectJSONProtobufFields(item, out, limit)
+		}
+	}
 }
 
 func fillMissingFieldsByDescriptor(node any, md *desc.MessageDescriptor) {

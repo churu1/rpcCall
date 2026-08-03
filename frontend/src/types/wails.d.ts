@@ -430,6 +430,7 @@ interface Window {
         AIDiagnoseError: (serviceName: string, methodName: string, statusCode: string, errorMessage: string, trailers: { key: string; value: string }[]) => Promise<string>;
         DecodePayload: (req: DecodeRequest) => Promise<DecodeResponse>;
         DecodeBatch: (req: DecodeBatchRequest) => Promise<DecodeBatchResponse>;
+        DecodeJSONProtobufFields: (jsonBody: string) => Promise<string>;
         GetDecodeHistory: (limit: number) => Promise<DecodeHistoryEntry[] | null>;
         GetDecodeHistoryDetail: (id: number) => Promise<DecodeHistoryDetail | null>;
         DeleteDecodeHistory: (id: number) => Promise<void>;

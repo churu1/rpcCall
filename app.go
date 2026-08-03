@@ -1308,6 +1308,10 @@ func (a *App) DecodeBatch(req models.DecodeBatchRequest) (*models.DecodeBatchRes
 	return resp, nil
 }
 
+func (a *App) DecodeJSONProtobufFields(jsonBody string) string {
+	return grpclib.DecodeJSONProtobufFields(jsonBody)
+}
+
 func (a *App) GetDecodeHistory(limit int) ([]history.DecodeHistoryEntry, error) {
 	if a.history == nil {
 		return nil, nil

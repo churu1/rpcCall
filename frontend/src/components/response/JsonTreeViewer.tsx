@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface JsonTreeViewerProps {
   json: string;
@@ -124,6 +125,8 @@ function JsonNode({
   defaultExpanded,
   searchQuery,
   searchCtx,
+  decodedFields,
+  decodedLabel,
 }: {
   data: unknown;
   name?: string;
@@ -131,6 +134,8 @@ function JsonNode({
   defaultExpanded: boolean;
   searchQuery: string;
   searchCtx?: SearchRenderContext;
+  decodedFields: Record<string, unknown>;
+  decodedLabel: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -153,12 +158,29 @@ function JsonNode({
   }
 
   if (typeof data === "string") {
+    const decoded = decodedFields[data];
     return (
-      <div className="flex items-start gap-1 py-0.5" style={{ paddingLeft: depth * 16 }}>
-        {nameEl}
-        <span className="text-[var(--color-syntax-string)]">
-          "<HighlightSearchText text={data} ctx={searchCtx} />"
-        </span>
+      <div className="py-0.5" style={{ paddingLeft: depth * 16 }}>
+        <div className="flex items-start gap-1">
+          {nameEl}
+          <span className="text-[var(--color-syntax-string)]">
+            "<HighlightSearchText text={data} ctx={searchCtx} />"
+          </span>
+        </div>
+        {decoded !== undefined && (
+          <div className="pl-4">
+            <JsonNode
+              data={decoded}
+              name={decodedLabel}
+              depth={depth + 1}
+              defaultExpanded={true}
+              searchQuery={searchQuery}
+              searchCtx={searchCtx}
+              decodedFields={decodedFields}
+              decodedLabel={decodedLabel}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -206,6 +228,8 @@ function JsonNode({
                 defaultExpanded={depth + 1 < 2}
                 searchQuery={searchQuery}
                 searchCtx={searchCtx}
+                decodedFields={decodedFields}
+                decodedLabel={decodedLabel}
               />
             ))}
             <div style={{ paddingLeft: depth * 16 }} className="text-[var(--text-muted)]">]</div>
@@ -241,6 +265,8 @@ function JsonNode({
                 defaultExpanded={depth + 1 < 2}
                 searchQuery={searchQuery}
                 searchCtx={searchCtx}
+                decodedFields={decodedFields}
+                decodedLabel={decodedLabel}
               />
             ))}
             <div style={{ paddingLeft: depth * 16 }} className="text-[var(--text-muted)]">{"}"}</div>
@@ -259,7 +285,9 @@ function JsonNode({
 }
 
 export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 }: JsonTreeViewerProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [decodedFields, setDecodedFields] = useState<Record<string, unknown>>({});
   const parsed = useMemo(() => {
     try {
       return JSON.parse(json);
@@ -267,6 +295,28 @@ export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 
       return null;
     }
   }, [json]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDecodedFields({});
+    if (!json.trim()) return;
+    window.go.main.App.DecodeJSONProtobufFields(json)
+      .then((res) => {
+        if (cancelled || !res) return;
+        try {
+          setDecodedFields(JSON.parse(res) as Record<string, unknown>);
+        } catch {
+          // Keep the tree in its original form if decoding metadata is malformed.
+        }
+      })
+      .catch(() => {
+        // Keep the tree in its original form if the backend is unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [json]);
+
   const normalizedSearchQuery = searchQuery.trim();
   const searchCtx: SearchRenderContext | undefined = normalizedSearchQuery
     ? { query: normalizedSearchQuery, currentMatchIndex, nextIndex: 0 }
@@ -292,6 +342,8 @@ export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 
         defaultExpanded={true}
         searchQuery={normalizedSearchQuery}
         searchCtx={searchCtx}
+        decodedFields={decodedFields}
+        decodedLabel={t("decode.rawProtobuf")}
       />
     </div>
   );
