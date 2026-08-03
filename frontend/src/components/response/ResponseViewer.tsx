@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore, type MetadataEntry } from "@/store/app-store";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,10 @@ import { buildJsonTreeSearchText, JsonTreeViewer } from "./JsonTreeViewer";
 import { DecodeResultPanel } from "@/components/decode/DecodeResultPanel";
 import { MetadataProfileDialog } from "@/components/metadata/MetadataProfileDialog";
 import { parseJsonBody } from "@/lib/metadata-profile";
+import {
+  fetchDecodedProtobufFields,
+  renderDecodedProtobufJson,
+} from "@/lib/decode-protobuf-fields";
 import { PanelTabs } from "@/components/ui/PanelTabs";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -125,6 +129,7 @@ export function ResponseViewer() {
   const [searchCurrentIndex, setSearchCurrentIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
+  const [decodedProtobufFields, setDecodedProtobufFields] = useState<Record<string, unknown>>({});
 
   const [aiResult, setAiResult] = useState<string | null>(null);
   const [aiType, setAiType] = useState<"analyze" | "diagnose" | null>(null);
@@ -251,6 +256,28 @@ export function ResponseViewer() {
     }
   }, [activePanel, chainResults]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setDecodedProtobufFields({});
+    const body = tab?.responseBody;
+    if (!body) return;
+    fetchDecodedProtobufFields(body)
+      .then((fields) => {
+        if (!cancelled) setDecodedProtobufFields(fields);
+      })
+      .catch(() => {
+        // Keep the original response when decoding metadata is unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab?.responseBody]);
+
+  const rawDisplayBody = useMemo(
+    () => renderDecodedProtobufJson(tab?.responseBody || "", decodedProtobufFields),
+    [tab?.responseBody, decodedProtobufFields],
+  );
+
   if (!tab) return null;
 
   const responseTabs: { key: "body" | "headers" | "trailers" | "decode" | "chain"; label: string }[] = [
@@ -269,7 +296,7 @@ export function ResponseViewer() {
       : "text-[var(--state-error)]"
     : "";
   const canSaveDefaultMetadata = tab.statusCode === "OK" && !!tab.responseBody && !!parseJsonBody(tab.responseBody);
-  const responseSearchText = showSearch && viewMode === "tree" ? buildJsonTreeSearchText(tab.responseBody) : tab.responseBody;
+  const responseSearchText = showSearch && viewMode === "tree" ? buildJsonTreeSearchText(tab.responseBody) : rawDisplayBody;
 
   return (
     <div className="flex flex-col h-full bg-[var(--surface-1)]" ref={containerRef} tabIndex={-1}>
@@ -404,13 +431,14 @@ export function ResponseViewer() {
                 json={tab.responseBody}
                 searchQuery={showSearch ? searchQuery : ""}
                 currentMatchIndex={searchCurrentIndex}
+                decodedFields={decodedProtobufFields}
               />
             ) : (
               <pre ref={preRef} className="text-[var(--rpccall-json-font-size)] p-3 font-[var(--font-mono)] leading-relaxed whitespace-pre-wrap">
                 <code dangerouslySetInnerHTML={{
                   __html: showSearch && searchMatches.length > 0
-                    ? renderJsonHtmlWithSearch(tab.responseBody, searchMatches, searchCurrentIndex)
-                    : highlightJsonHtml(tab.responseBody)
+                    ? renderJsonHtmlWithSearch(rawDisplayBody, searchMatches, searchCurrentIndex)
+                    : highlightJsonHtml(rawDisplayBody)
                 }} />
               </pre>
             )

@@ -8,7 +8,7 @@ import (
 const sampleSpecData = "ChwIARIG6IGK5aSpGgcjRjRFN0ZGIgcjQzg4N0ZGGJGzt7gJOA9AD4oBAIoBAIoBAIoBAIoBAIoBANgBuBfgAQb6AQtub3JtYWxfcm9vbYICOW1lZGlhLzIwMjYvMDQvMjEvMjc3NDIzZDktNzFkYy00OTcxLWJjZGItMWExOGJlNmNiNjAxLnBuZw=="
 
 func TestDecodeJSONProtobufFields(t *testing.T) {
-	body := `{"elements":[{"specData":"` + sampleSpecData + `","plain":"hello"}]}`
+	body := `{"elements":[{"specData":"` + sampleSpecData + `","plain":"hello","short":"aGk="}]}`
 	out := DecodeJSONProtobufFields(body)
 
 	var decoded map[string]json.RawMessage
@@ -35,6 +35,9 @@ func TestDecodeJSONProtobufFields(t *testing.T) {
 	}
 	if _, ok := decoded["hello"]; ok {
 		t.Fatalf("plain text should not be treated as base64 protobuf")
+	}
+	if _, ok := decoded["aGk="]; ok {
+		t.Fatalf("short UTF-8 payload should not be treated as base64 protobuf")
 	}
 }
 

@@ -596,24 +596,22 @@ func rawProtobufBytesValue(b []byte) any {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-func base64ProtobufCandidate(value string) ([]byte, bool) {
+func base64ProtobufCandidate(value string) (rawProtoMessage, bool) {
 	if len(value) < 8 || len(value) > 1<<20 {
-		return nil, false
+		return rawProtoMessage{}, false
 	}
 	raw, err := decodeBase64(value)
 	if err != nil || len(raw) == 0 {
-		return nil, false
+		return rawProtoMessage{}, false
 	}
-	tag, n, err := readProtoVarintAt(raw, 0)
-	if err != nil || n <= 0 {
-		return nil, false
+	if utf8.Valid(raw) {
+		return rawProtoMessage{}, false
 	}
-	field := int32(tag >> 3)
-	wire := int32(tag & 0x7)
-	if field <= 0 || wire == 4 {
-		return nil, false
+	msg, err := parseRawProtobuf(raw)
+	if err != nil || len(msg.fields) < 2 {
+		return rawProtoMessage{}, false
 	}
-	return raw, true
+	return msg, true
 }
 
 func DecodeJSONProtobufFields(jsonBody string) string {
@@ -636,12 +634,8 @@ func collectJSONProtobufFields(node any, out map[string]any, limit int) {
 	}
 	switch value := node.(type) {
 	case string:
-		raw, ok := base64ProtobufCandidate(value)
+		msg, ok := base64ProtobufCandidate(value)
 		if !ok {
-			return
-		}
-		msg, err := parseRawProtobuf(raw)
-		if err != nil || len(msg.fields) == 0 {
 			return
 		}
 		if _, exists := out[value]; !exists {

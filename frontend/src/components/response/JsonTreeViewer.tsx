@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 interface JsonTreeViewerProps {
   json: string;
   searchQuery?: string;
   currentMatchIndex?: number;
+  decodedFields?: Record<string, unknown>;
 }
 
 interface SearchRenderContext {
@@ -126,7 +126,6 @@ function JsonNode({
   searchQuery,
   searchCtx,
   decodedFields,
-  decodedLabel,
 }: {
   data: unknown;
   name?: string;
@@ -135,7 +134,6 @@ function JsonNode({
   searchQuery: string;
   searchCtx?: SearchRenderContext;
   decodedFields: Record<string, unknown>;
-  decodedLabel: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -159,6 +157,19 @@ function JsonNode({
 
   if (typeof data === "string") {
     const decoded = decodedFields[data];
+    if (decoded !== undefined) {
+      return (
+        <JsonNode
+          data={decoded}
+          name={name}
+          depth={depth}
+          defaultExpanded={true}
+          searchQuery={searchQuery}
+          searchCtx={searchCtx}
+          decodedFields={{}}
+        />
+      );
+    }
     return (
       <div className="py-0.5" style={{ paddingLeft: depth * 16 }}>
         <div className="flex items-start gap-1">
@@ -167,20 +178,6 @@ function JsonNode({
             "<HighlightSearchText text={data} ctx={searchCtx} />"
           </span>
         </div>
-        {decoded !== undefined && (
-          <div className="pl-4">
-            <JsonNode
-              data={decoded}
-              name={decodedLabel}
-              depth={depth + 1}
-              defaultExpanded={true}
-              searchQuery={searchQuery}
-              searchCtx={searchCtx}
-              decodedFields={decodedFields}
-              decodedLabel={decodedLabel}
-            />
-          </div>
-        )}
       </div>
     );
   }
@@ -229,7 +226,6 @@ function JsonNode({
                 searchQuery={searchQuery}
                 searchCtx={searchCtx}
                 decodedFields={decodedFields}
-                decodedLabel={decodedLabel}
               />
             ))}
             <div style={{ paddingLeft: depth * 16 }} className="text-[var(--text-muted)]">]</div>
@@ -266,7 +262,6 @@ function JsonNode({
                 searchQuery={searchQuery}
                 searchCtx={searchCtx}
                 decodedFields={decodedFields}
-                decodedLabel={decodedLabel}
               />
             ))}
             <div style={{ paddingLeft: depth * 16 }} className="text-[var(--text-muted)]">{"}"}</div>
@@ -284,10 +279,15 @@ function JsonNode({
   );
 }
 
-export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 }: JsonTreeViewerProps) {
-  const { t } = useTranslation();
+export function JsonTreeViewer({
+  json,
+  searchQuery = "",
+  currentMatchIndex = -1,
+  decodedFields,
+}: JsonTreeViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [decodedFields, setDecodedFields] = useState<Record<string, unknown>>({});
+  const [localDecodedFields, setLocalDecodedFields] = useState<Record<string, unknown>>({});
+  const resolvedDecodedFields = decodedFields ?? localDecodedFields;
   const parsed = useMemo(() => {
     try {
       return JSON.parse(json);
@@ -297,14 +297,15 @@ export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 
   }, [json]);
 
   useEffect(() => {
+    if (decodedFields !== undefined) return;
     let cancelled = false;
-    setDecodedFields({});
+    setLocalDecodedFields({});
     if (!json.trim()) return;
     window.go.main.App.DecodeJSONProtobufFields(json)
       .then((res) => {
         if (cancelled || !res) return;
         try {
-          setDecodedFields(JSON.parse(res) as Record<string, unknown>);
+          setLocalDecodedFields(JSON.parse(res) as Record<string, unknown>);
         } catch {
           // Keep the tree in its original form if decoding metadata is malformed.
         }
@@ -315,7 +316,7 @@ export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 
     return () => {
       cancelled = true;
     };
-  }, [json]);
+  }, [json, decodedFields]);
 
   const normalizedSearchQuery = searchQuery.trim();
   const searchCtx: SearchRenderContext | undefined = normalizedSearchQuery
@@ -342,8 +343,7 @@ export function JsonTreeViewer({ json, searchQuery = "", currentMatchIndex = -1 
         defaultExpanded={true}
         searchQuery={normalizedSearchQuery}
         searchCtx={searchCtx}
-        decodedFields={decodedFields}
-        decodedLabel={t("decode.rawProtobuf")}
+        decodedFields={resolvedDecodedFields}
       />
     </div>
   );
