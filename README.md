@@ -185,6 +185,8 @@ wails dev
 
 自动安装前端依赖并启动 Vite，Go 与前端均热重载；也可在浏览器访问 `http://localhost:34115` 调试。
 
+> 注意：`wails dev` 退出时会删除它生成的开发二进制，因此退出后不要直接 `open build/bin/RpcCall.app`。需要打开生产构建时，先执行 `wails build`，或直接使用 `./scripts/open.sh`，脚本会在可执行文件缺失时自动先构建再打开。
+
 ### 生产构建
 
 ```bash
@@ -195,6 +197,8 @@ wails build      # 产物输出到 build/bin/RpcCall.app（macOS）
 
 ```bash
 open build/bin/RpcCall.app
+# 或使用自动补构建脚本：
+./scripts/open.sh
 ```
 
 ### macOS 下载安装（DMG）
@@ -252,6 +256,7 @@ go test ./internal/grpc -v
 
 | 日期 | 功能 |
 |------|------|
+| 2026-08-05 | 修复 `wails dev` 退出会删除 `build/bin/RpcCall.app` 可执行文件导致 `open` 报错的问题；新增 `scripts/open.sh`，可执行文件缺失时自动先构建再打开 |
 | 2026-08-03 | 响应原始/树形视图直接解码 base64 protobuf `bytes` 字段：无需嵌套 schema，也无需切换视图，即可把 `specData` 这类字段显示为原始字段编号结构 |
 | 2026-07-27 | 新增默认域名偏好：可在地址下拉框中设为默认，普通新标签页和启动初始页自动填充并加载对应 TLS 配置；Metadata 面板默认提供 JSON 批量编辑模式，合法 JSON 自动应用到请求，错误会保留并提示；自动附加的地址级 Metadata 支持编辑配置名和 key/value 后持久化保存 |
 | 2026-07-09 | 支持发送前 proto schema 请求校验，JSON 语法错误和字段类型错误会在请求体行号栏标记，并在响应区输出完整错误列表；支持 `google.protobuf.Any` 请求与响应解析，覆盖普通调用、流式调用、压测、Mock 与 Payload 解码；响应中的 `Any` 内部 JSON 会自动格式化展开，默认请求模板会尽量按字段名推断并展开 `Any` 类型，推断不到时生成 `@type` 占位 |

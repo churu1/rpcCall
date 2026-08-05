@@ -18,6 +18,12 @@ wails build
 # Open built app (macOS)
 open build/bin/RpcCall.app
 
+# Or use the helper that rebuilds first if the executable is missing
+./scripts/open.sh
+
+# Note: `wails dev` removes its dev binary on exit, so run `wails build`
+# or `scripts/open.sh` before opening the production bundle after dev mode.
+
 # Frontend only (from frontend/ directory)
 cd frontend && npm install
 cd frontend && npm run dev    # Vite dev server
