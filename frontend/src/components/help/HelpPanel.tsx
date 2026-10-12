@@ -7,6 +7,7 @@ interface Props {
 }
 
 const features = [
+  { icon: Palette, titleKey: "help.windowSize", descKey: "help.windowSizeDesc", color: "text-indigo-400" },
   { icon: Send, titleKey: "help.grpcCall", descKey: "help.grpcCallDesc", tipKey: "help.grpcCallTip", color: "text-blue-400" },
   { icon: FileText, titleKey: "help.protoImport", descKey: "help.protoImportDesc", tipKey: "help.protoImportTip", color: "text-green-400" },
   { icon: Star, titleKey: "help.defaultAddress", descKey: "help.defaultAddressDesc", color: "text-amber-400" },

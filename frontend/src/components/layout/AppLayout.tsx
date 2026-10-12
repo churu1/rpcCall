@@ -91,9 +91,14 @@ export function AppLayout() {
       <div
         className="h-8 bg-[var(--surface-1)] border-b border-[var(--line-soft)] flex items-center justify-center text-[11px] text-[var(--text-muted)] select-none relative"
         style={{ "--wails-draggable": "drag" } as React.CSSProperties}
+        onDoubleClick={(event) => {
+          if (event.button !== 0 || (event.target as HTMLElement).closest("[data-titlebar-controls]")) return;
+          window.runtime?.WindowToggleMaximise?.();
+        }}
       >
         {t("app.title")}
         <div
+          data-titlebar-controls
           className="absolute right-2 top-1 flex items-center gap-1"
           style={{ "--wails-draggable": "no-drag" } as React.CSSProperties}
         >

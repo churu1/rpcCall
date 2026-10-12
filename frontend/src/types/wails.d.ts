@@ -451,6 +451,7 @@ interface Window {
     };
   };
   runtime: {
+    WindowToggleMaximise: () => void;
     EventsOn: (event: string, callback: (...args: any[]) => void) => () => void;
     EventsOff: (event: string) => void;
   };
