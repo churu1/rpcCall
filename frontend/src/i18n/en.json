@@ -389,7 +389,7 @@
   },
   "help": {
     "windowSize": "Maximize and Restore",
-    "windowSizeDesc": "Double-click the empty title bar or app name to maximize the window; double-click again to restore its previous size. You can still drag the title bar. The environment selector and buttons on the right do not maximize the window. On macOS, this uses native window zoom without entering fullscreen or changing font size.",
+    "windowSizeDesc": "Double-click the empty title bar or app name to maximize the window; double-click again to restore its previous size. You can still drag the title bar. The environment selector and buttons on the right do not maximize the window. On macOS, native window zoom maximizes or restores instantly without a resize animation, fullscreen, or font size changes.",
     "title": "Feature Guide",
     "grpcCall": "gRPC Calls",
     "grpcCallDesc": "Supports Unary, Server Streaming, Client Streaming, and Bidi Streaming. Enter the server address, select a method from the sidebar, edit the request body, and click Send.",

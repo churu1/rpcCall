@@ -30,7 +30,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 15, G: 17, B: 23, A: 255},
+		BackgroundColour: &options.RGBA{R: 243, G: 246, B: 250, A: 255},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
@@ -43,7 +43,7 @@ func main() {
 				HideTitleBar:              false,
 				FullSizeContent:           true,
 			},
-			WebviewIsTransparent: true,
+			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 		},
 		Frameless: false,
